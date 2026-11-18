@@ -323,14 +323,14 @@ isOneToOne: false
                   ]
                 },"incidents": {
                   Row: {
-                    "acked_at": string | null,"acked_by": string | null,"alerted_at": string | null,"auto_resolved": boolean,"client_update_due_at": string | null,"client_update_not_needed": boolean,"client_update_note": string | null,"client_update_required": boolean,"client_updated_at": string | null,"client_updated_by": string | null,"created_at": string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level": number,"escalation_plan": Json | null,"id": string,"is_flapping": boolean,"is_manual": boolean,"l0_user_id": string | null,"manual_at": string | null,"monitor_id": string | null,"number": number,"recovered_at": string | null,"resolved_at": string | null,"resolved_by": string | null,"review_state": string | null,"root_cause": string | null,"root_cause_category": string | null,"root_cause_fix": string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state": Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at": string
+                    "acked_at": string | null,"acked_by": string | null,"acked_cause": Database["public"]['Enums']["incident_trigger"] | null,"alerted_at": string | null,"auto_resolved": boolean,"cause_trigger": Database["public"]['Enums']["incident_trigger"] | null,"client_update_due_at": string | null,"client_update_not_needed": boolean,"client_update_note": string | null,"client_update_required": boolean,"client_updated_at": string | null,"client_updated_by": string | null,"created_at": string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level": number,"escalation_plan": Json | null,"expiry_ack_at": string | null,"expiry_ack_by": string | null,"expiry_left": boolean,"id": string,"is_flapping": boolean,"is_manual": boolean,"l0_user_id": string | null,"manual_at": string | null,"monitor_id": string | null,"number": number,"recovered_at": string | null,"resolved_at": string | null,"resolved_by": string | null,"review_state": string | null,"root_cause": string | null,"root_cause_category": string | null,"root_cause_fix": string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state": Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "acked_at"?: string | null,"acked_by"?: string | null,"alerted_at"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_not_needed"?: boolean,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"l0_user_id"?: string | null,"manual_at"?: string | null,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state"?: Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
+                    "acked_at"?: string | null,"acked_by"?: string | null,"acked_cause"?: Database["public"]['Enums']["incident_trigger"] | null,"alerted_at"?: string | null,"auto_resolved"?: boolean,"cause_trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"client_update_due_at"?: string | null,"client_update_not_needed"?: boolean,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at": string,"episode_severity": Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"expiry_ack_at"?: string | null,"expiry_ack_by"?: string | null,"expiry_left"?: boolean,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"l0_user_id"?: string | null,"manual_at"?: string | null,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity": Database["public"]['Enums']["severity"],"site_id": string,"started_at": string,"state"?: Database["public"]['Enums']["incident_state"],"trigger": Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
                   }
                   Update: {
-                    "acked_at"?: string | null,"acked_by"?: string | null,"alerted_at"?: string | null,"auto_resolved"?: boolean,"client_update_due_at"?: string | null,"client_update_not_needed"?: boolean,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at"?: string,"episode_severity"?: Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"l0_user_id"?: string | null,"manual_at"?: string | null,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity"?: Database["public"]['Enums']["severity"],"site_id"?: string,"started_at"?: string,"state"?: Database["public"]['Enums']["incident_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
+                    "acked_at"?: string | null,"acked_by"?: string | null,"acked_cause"?: Database["public"]['Enums']["incident_trigger"] | null,"alerted_at"?: string | null,"auto_resolved"?: boolean,"cause_trigger"?: Database["public"]['Enums']["incident_trigger"] | null,"client_update_due_at"?: string | null,"client_update_not_needed"?: boolean,"client_update_note"?: string | null,"client_update_required"?: boolean,"client_updated_at"?: string | null,"client_updated_by"?: string | null,"created_at"?: string,"detected_at"?: string,"episode_severity"?: Database["public"]['Enums']["severity"],"escalation_level"?: number,"escalation_plan"?: Json | null,"expiry_ack_at"?: string | null,"expiry_ack_by"?: string | null,"expiry_left"?: boolean,"id"?: string,"is_flapping"?: boolean,"is_manual"?: boolean,"l0_user_id"?: string | null,"manual_at"?: string | null,"monitor_id"?: string | null,"number"?: never,"recovered_at"?: string | null,"resolved_at"?: string | null,"resolved_by"?: string | null,"review_state"?: string | null,"root_cause"?: string | null,"root_cause_category"?: string | null,"root_cause_fix"?: string | null,"severity"?: Database["public"]['Enums']["severity"],"site_id"?: string,"started_at"?: string,"state"?: Database["public"]['Enums']["incident_state"],"trigger"?: Database["public"]['Enums']["incident_trigger"],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -342,6 +342,12 @@ isOneToOne: false
     },{
       foreignKeyName: "incidents_client_updated_by_fkey"
       columns: ["client_updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "incidents_expiry_ack_by_fkey"
+      columns: ["expiry_ack_by"]
 isOneToOne: false
       referencedRelation: "profiles"
       referencedColumns: ["id"]
@@ -1117,6 +1123,9 @@ isOneToOne: false
 "engine_cancel_ladder":
 { Args: { "p_incident_id": string,"p_reason": string }; Returns: number
                            },
+"engine_cause_back_incident":
+{ Args: { "p_context": Json,"p_incident_id": string,"p_monitor_id": string,"p_monitors"?: Json,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: boolean
+                           },
 "engine_checks":
 { Args: { "p_after_checked_at"?: string,"p_after_id"?: string,"p_limit"?: number,"p_since": string }; Returns: {
               "akamai_ok": boolean | null,
@@ -1193,6 +1202,9 @@ isOneToOne: false
         isOneToOne: false
         isSetofReturn: true
       } },
+"engine_new_cause_incident":
+{ Args: { "p_context": Json,"p_hold_until"?: string,"p_incident_id": string,"p_monitor_id": string,"p_monitors"?: Json,"p_notify": boolean,"p_outside_hours"?: boolean,"p_round_at": string,"p_status"?: Database["public"]['Enums']["site_state"],"p_trigger": Database["public"]['Enums']["incident_trigger"] }; Returns: boolean
+                           },
 "engine_note_site":
 { Args: { "p_note"?: string,"p_round_at": string,"p_site_id": string }; Returns: undefined
                            },

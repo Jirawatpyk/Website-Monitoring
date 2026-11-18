@@ -1,5 +1,5 @@
 import { isHardFail } from './hard-fail';
-import type { IncidentState, ProbeLocation, Severity } from '@dxt/shared';
+import type { IncidentState, ProbeLocation, Severity, Trigger } from '@dxt/shared';
 import type { LocationResult } from './round';
 import type { CheckFacts } from './triggers';
 
@@ -42,6 +42,16 @@ export interface OpenIncident {
   detectedAt?: Date;
   /** Tagged flapping (D-004): RECOVERED becomes one summary after 15 min of continuous OK. */
   isFlapping?: boolean;
+  /**
+   * The cause of the drop in progress (`incidents.cause_trigger`, else `trigger`): an SSL / domain
+   * incident takes a new cause and goes back to it (D-067).
+   */
+  trigger?: Trigger;
+  /**
+   * D-067 item 4: the incident's cause came from an SSL / domain expiry (its newest `new_cause` since
+   * the last PROBLEM AGAIN left one) — only such an incident may go back to it.
+   */
+  leftExpiry?: boolean;
 }
 
 /** The site note while a blocked site can't be verified (D-019; trigger label, spec §11). */

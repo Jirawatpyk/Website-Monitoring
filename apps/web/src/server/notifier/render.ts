@@ -5,6 +5,8 @@ import {
   buildAcknowledgedEmail,
   buildAgainAlert,
   buildAgainEmail,
+  buildNewCauseAlert,
+  buildNewCauseEmail,
   buildAutoResolvedAlert,
   buildAutoResolvedEmail,
   buildFlapSummaryAlert,
@@ -35,6 +37,7 @@ import {
   type KeyPageFacts,
   type ProblemFacts,
   type VerifierDownReason,
+  expiryNow,
 } from '@dxt/notifier';
 import {
   clockMinutes,
@@ -44,9 +47,11 @@ import {
   ROOT_CAUSE_CATEGORIES,
   ROOT_CAUSE_LABELS,
   TIER_CONFIG,
+  TRIGGER_LABELS,
   type ProbeLocation,
   type RootCauseCategory,
   type Tier,
+  type Trigger,
 } from '@dxt/shared';
 import {
   contextOf,
@@ -213,6 +218,36 @@ function againAlert(n: Notification, i: IncidentFacts, now: Date = new Date(n.cr
   });
 }
 
+/** D-067: the expiry incident's new, more urgent cause — whoever acts now is mentioned (§19.3). */
+function newCauseAlert(n: Notification, i: IncidentFacts): ChatMessage {
+  const ctx = contextOf(n.context);
+  const acked = !!i.acked_at && !!i.acker;
+  return buildNewCauseAlert({
+    incidentId: i.id,
+    incidentNumber: i.number,
+    site: i.sites.name,
+    tier: i.sites.tier,
+    was: str(ctx.was, 'ssl') as IncidentFacts['trigger'],
+    trigger: (typeof ctx.trigger === 'string' ? ctx.trigger : i.trigger) as IncidentFacts['trigger'],
+    summary: str(ctx.summary, 'problem'),
+    cause: str(ctx.cause, 'Problem'),
+    mention: acked
+      ? { name: i.acker!.display_name, chatUserId: i.acker!.google_chat_user_id ?? null }
+      : (nightMention(ctx) ?? person(l0Of(i))),
+    ackedBy: acked ? i.acker!.display_name : null,
+    afterDown: ctx.afterDown === true,
+    at: new Date(n.created_at),
+  });
+}
+
+/** D-067 (Tao, 17 Nov): the person on call a Tier 1 new cause at night names, stored with the row. */
+function nightMention(ctx: Record<string, unknown>): ChatPerson | null {
+  const m = ctx.mention as { name?: unknown; chatUserId?: unknown } | undefined;
+  return m && typeof m.name === 'string'
+    ? { name: m.name, chatUserId: typeof m.chatUserId === 'string' ? m.chatUserId : null }
+    : null;
+}
+
 /** RESOLVED (D-033): who, when and the root cause, as `resolve_incident` stored them with the message. */
 function resolvedOf(n: Notification, i: IncidentFacts) {
   const ctx = contextOf(n.context);
@@ -273,13 +308,36 @@ function clientUpdateReaderOf(i: IncidentFacts, userId: string): { at: Date; noA
 /** The client the site belongs to; the site's name when it isn't loaded (an older facts query). */
 const clientOf = (i: IncidentFacts) => i.sites.client?.name ?? i.sites.name;
 
-/** The cause line stored when the incident opened (its `detected` event). */
-function causeOf(i: IncidentFacts): string | null {
-  const detected = i.incident_events?.find((e) => e.type === 'detected');
+/**
+ * The cause line stored when the incident opened (its `detected` event). An SSL / domain PROBLEM's
+ * days left are counted again for when the message goes (D-066 item 2).
+ */
+function causeOf(i: IncidentFacts, now: Date): string | null {
+  const events = i.incident_events ?? [];
+  // D-067: the cause the incident carries now — the newest of a new cause (or back to the expiry), a
+  // PROBLEM AGAIN and a raise to DOWN, each words its own drop (message-checker: never the opening SSL
+  // recounted after a renewal, never an old keyword after a DOWN). A DOWN AGAIN keeps the opening words.
+  const last = [...events]
+    .filter((e) => e.type === 'new_cause' || e.type === 'relapsed' || e.type === 'escalated_to_down')
+    .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''))
+    .at(-1);
+  const current =
+    last && !(last.type === 'relapsed' && contextOf(last.payload).severity === 'down') ? last : undefined;
+  const detected = current ?? events.find((e) => e.type === 'detected');
   const ctx = detected ? contextOf(detected.payload) : {};
   const manual = manualOf(ctx);
   if (manual) return manualCause(manual);
+  // Counted to the recovery once it recovered (a renewed certificate never reads "expired 12 days ago").
+  const asOf = i.recovered_at ? new Date(Math.min(now.getTime(), Date.parse(i.recovered_at))) : now;
+  const expiry = expiryNow(ctx.detail, asOf);
+  if (expiry) return expiry.cause;
   return typeof ctx.cause === 'string' ? ctx.cause : null;
+}
+
+/** The trigger a message was queued with (D-067: the incident's may have moved to a new cause since). */
+function triggerOf(ctx: Record<string, unknown>, i: IncidentFacts): IncidentFacts['trigger'] {
+  const t = ctx.trigger;
+  return typeof t === 'string' && t in TRIGGER_LABELS ? (t as IncidentFacts['trigger']) : i.trigger;
 }
 
 /** "3 of 3 locations": where the problem was seen, of the locations reporting when it opened. */
@@ -339,7 +397,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         incidentNumber: i.number,
         site: i.sites.name,
         tier: i.sites.tier,
-        trigger: i.trigger,
+        trigger: triggerOf(ctx, i),
         detectedAt: new Date(i.detected_at),
         now,
         cause: str(ctx.cause, 'Problem'),
@@ -452,7 +510,8 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
     }
     case 'down_again':
     case 'problem_again':
-      return againAlert(n, i, now);
+      // D-067: a new cause rides problem_again (its SQL lists), marked in the context.
+      return ctx.newCause === true ? newCauseAlert(n, i) : againAlert(n, i, now);
     case 'note':
       return buildNoteAlert({ site: i.sites.name, by: str(ctx.by, 'someone'), text: str(ctx.text, '') });
     case 'resolved':
@@ -483,7 +542,18 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   if (n.template === 'acknowledged' && contextOf(n.context).ackedById === n.user_id) return 'acked';
   // A step's own email (its people); the Chat fallback goes to the backup and Admins (D-016).
   if (n.template === 'step_fired') return contextOf(n.context).fallback === true ? 'fallback' : 'step';
+  // A Tier 1 new cause at night: the person on call it named (D-067).
+  const mention = contextOf(n.context).mention as { id?: unknown } | undefined;
+  if (n.user_id && n.template === 'problem_again' && mention?.id === n.user_id) return 'oncall';
   if (l0Of(i)?.id === n.user_id) return l0IsOnCall(i) ? 'oncall' : 'owner';
+  // …and their later emails (RECOVERED, RESOLVED): emailed about it, nothing asked of them — the owner
+  // adds the root cause (message-checker). The new cause's event says whom it told.
+  const told = (i.incident_events ?? []).some(
+    (e) =>
+      e.type === 'new_cause' &&
+      (contextOf(e.payload).mention as { id?: unknown } | undefined)?.id === n.user_id,
+  );
+  if (n.user_id && told) return 'emailed';
   // Someone the L0 pencil adds (S10): told at once by email too, then followed up like anyone emailed.
   if (n.user_id && l0PeopleOf(i).includes(n.user_id)) return L0_TEMPLATES.has(n.template) ? 'l0' : 'emailed';
   if (n.template === 'resolved') return 'emailed';
@@ -558,7 +628,7 @@ export function renderEmail(
     case 'problem':
       return buildProblemEmail({
         ...base,
-        trigger: i.trigger,
+        trigger: triggerOf(ctx, i),
         detectedAt: new Date(i.detected_at),
         cause: str(ctx.cause, 'Problem'),
         summary: str(ctx.summary, 'problem'),
@@ -578,7 +648,7 @@ export function renderEmail(
         // From the first failed check (D-002): 15 min on Tier 1; a Tier 2 night counts the wall clock.
         // By hand it can go before it fell due (D-055 item 3): how long it was down when it was sent.
         downMinutes: clockMinutes(new Date(i.started_at), byHandOf(ctx) ? new Date(n.created_at) : dueAt),
-        cause: causeOf(i),
+        cause: causeOf(i, sentAt),
         acked: i.acker && i.acked_at ? { by: i.acker.display_name, at: new Date(i.acked_at) } : null,
         noAm: ctx.noAm === true,
         draftUrl: `${incidentUrl(appUrl, i.id)}#client-update`,
@@ -615,7 +685,7 @@ export function renderEmail(
         owner: l0Of(i)?.display_name ?? null,
         asFyi,
         asked: namedIn(i, n.context).askedNames.join(' and ') || null,
-        cause: causeOf(i),
+        cause: causeOf(i, sentAt),
         toldAt: toldAtOf(i),
         fallback: ctx.fallback === true,
         clientUpdate: step.kind === 'fyi' ? clientUpdateFact(i) : null,
@@ -625,7 +695,7 @@ export function renderEmail(
       return buildAcknowledgedEmail({
         ...base,
         problem: problemOf(i),
-        cause: causeOf(i),
+        cause: causeOf(i, sentAt),
         ackedBy: str(ctx.ackedBy, 'someone'),
         ackedAt: new Date(str(ctx.ackedAt, n.created_at)),
         startedAt: new Date(i.started_at),
@@ -644,7 +714,7 @@ export function renderEmail(
           trigger: i.trigger,
           flaggedAt: new Date(i.detected_at),
           recoveredAt: drop.end,
-          cause: causeOf(i),
+          cause: causeOf(i, sentAt),
           keyPage: keyPageOf(openedWith(i).keyPage),
         });
       }
@@ -679,6 +749,19 @@ export function renderEmail(
     // The D-016 fallback when the Chat reply failed, or (D-047) the owner's first email: the reply's words.
     case 'down_again':
     case 'problem_again': {
+      // D-067: a new cause rides problem_again (its SQL lists) and has its own email — not an AGAIN.
+      if (ctx.newCause === true) {
+        return buildNewCauseEmail({
+          ...base,
+          now:
+            TRIGGER_LABELS[(typeof ctx.trigger === 'string' ? ctx.trigger : i.trigger) as Trigger] ??
+            'Problem',
+          was: TRIGGER_LABELS[str(ctx.was, 'ssl') as Trigger] ?? 'SSL expiring',
+          cause: str(ctx.cause, 'Problem'),
+          acknowledged,
+          afterDown: ctx.afterDown === true,
+        });
+      }
       const chat = againAlert(n, i);
       const card = chat.cardsV2[0]!.card;
       const body = card.sections[0]?.widgets[0];

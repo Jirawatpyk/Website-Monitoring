@@ -44,6 +44,34 @@ const now = new Date('2026-09-25T03:07:30Z');
 const view = (i: Partial<IncidentRow> = {}, events: EventRow[] = [detected], v = viewer(), at = now) =>
   buildIncidentView({ ...incident, ...i }, events, v, names, at);
 
+describe('header cause after a raise to DOWN (S13 /code-review)', () => {
+  const ssl: EventRow = {
+    type: 'detected',
+    at: '2026-09-25T02:00:00Z',
+    actor_id: null,
+    payload: {
+      cause: 'SSL certificate expires in 13 days (Thu 8 Oct)',
+      detail: { kind: 'ssl', expiresAt: '2026-10-08T13:00:00Z', daysLeft: 13 },
+    },
+  };
+  const raised = (payload: Record<string, unknown>): EventRow => ({
+    type: 'escalated_to_down',
+    at: '2026-09-25T02:48:41Z',
+    actor_id: null,
+    payload,
+  });
+
+  it('a raise by hand reads as a hand report, never the SSL it opened with', () => {
+    const v = view({ trigger: 'ssl' }, [ssl, raised({ manual: true, raised: true, note: '502 again' })]);
+    expect(v.cause).toBe('Manual (hand check)');
+  });
+
+  it('a raise by the probes reads its own cause', () => {
+    const v = view({ trigger: 'ssl' }, [ssl, raised({ cause: 'Timeout > 30 s (BKK, TYO)' })]);
+    expect(v.cause).toBe('Timeout > 30 s (BKK, TYO)');
+  });
+});
+
 describe('canAcknowledge (D-016)', () => {
   it.each([
     [viewer({ role: 'admin', id: 'u-tao' }), true],

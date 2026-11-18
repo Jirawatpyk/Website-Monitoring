@@ -144,6 +144,8 @@ export const ACTION_WORDS: Record<string, string> = {
   'incident.hand_down': 'Reported down by hand',
   'incident.recovered': 'Recovered',
   'incident.relapsed': 'Down again',
+  'incident.new_cause': 'New cause',
+  'incident.cause_back': 'Back to expiry',
   'incident.state': 'Changed state',
   'incident.note': 'Added note',
   'incident.root_cause': 'Wrote root cause',

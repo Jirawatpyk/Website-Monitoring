@@ -1,3 +1,4 @@
+import { expiryIssue, expiryUnknown, isExpiryTrigger, type ExpiryFact } from './expiry';
 import { failsHere, firstTimeoutRound, isHardFail, isTlsChainFail } from './hard-fail';
 import {
   CRAWLER_FRESH_MS,
@@ -110,6 +111,8 @@ export interface SiteMonitor {
   crawler?: readonly CrawlerFact[];
   /** The primary's page-change facts (S09d, D-046): its baseline and newest plain fetches. */
   pageChange?: PageChangeInput;
+  /** The primary's site's latest SSL / domain expiry read (S13, D-066); none = no data. */
+  expiry?: ExpiryFact;
 }
 
 export interface SiteSnapshot {
@@ -143,6 +146,11 @@ export interface SiteSnapshot {
   /** OK ↔ not-OK changes at incident steps in the last 30 min, and the last one's direction (D-024). */
   flips?: readonly Date[];
   flipOk?: boolean | null;
+  /**
+   * D-067 item 1: inside response hours (Mon–Fri 09:00–18:00 less holidays) — only then may an SSL /
+   * domain expiry raise a PROBLEM. Unset = inside. One already raised carries on (`expiryNow`).
+   */
+  expiryOpens?: boolean;
 }
 
 /** A monitor's verdict for the judged round, and its carry state for the next one. */
@@ -216,6 +224,30 @@ export type SiteDecision =
       trigger: Trigger;
       detail: ProblemDetail;
       /** When the problem started: its first check (slow: the first slow round). */
+      startedAt: Date;
+    } & Judged)
+  /**
+   * D-067: the incident open for an SSL / domain expiry now has a more urgent PROBLEM — its cause
+   * switches and the thread is told ("PROBLEM · … · new cause: …"); state and ladder carry on.
+   */
+  | ({
+      kind: 'new_cause';
+      /** The expiry it took over from (a DOWN incident's drop: what the site carried). */
+      was: 'ssl' | 'domain';
+      monitorId: string;
+      trigger: Trigger;
+      detail: ProblemDetail;
+      startedAt: Date;
+    } & Judged)
+  /**
+   * D-067 item 4: the new cause cleared and the certificate / domain is still under its line — the
+   * incident goes back to its expiry, silently.
+   */
+  | ({
+      kind: 'cause_back';
+      monitorId: string;
+      trigger: Trigger;
+      detail: ProblemDetail;
       startedAt: Date;
     } & Judged)
   /** DOWN confirmed on the primary's check and recheck (or in the browser): open an incident. */
@@ -437,10 +469,11 @@ function judgeSiteRound(
   });
   const primaryVerdict = verdicts.find((x) => x.m.isPrimary)?.v ?? { kind: 'insufficient' as const };
 
-  // ── PROBLEM: the primary's first, then the key pages in order ──
-  const problem = [...verdicts]
-    .sort((a, b) => Number(b.m.isPrimary) - Number(a.m.isPrimary))
-    .find((x) => x.v.kind === 'problem');
+  // ── PROBLEM: the primary's first, then the key pages in order; an SSL / domain expiry last of all
+  // (D-066: the least urgent — a key page failing outranks it) ──
+  const rank = (x: (typeof verdicts)[number]) =>
+    x.v.kind === 'problem' && isExpiryTrigger(x.v.trigger) ? 2 : x.m.isPrimary ? 0 : 1;
+  const problem = [...verdicts].sort((a, b) => rank(a) - rank(b)).find((x) => x.v.kind === 'problem');
   if (problem && problem.v.kind === 'problem') {
     // D-023: a DOWN drop is over once the home page answers again, whatever a key page says.
     // RECOVERED, and what still fails joins as PROBLEM AGAIN in the same round (spec §19.7).
@@ -475,12 +508,49 @@ function judgeSiteRound(
         detail: problem.v.detail,
         startedAt: problem.v.startedAt,
         detectedAt: roundAt,
-        flapping,
+        // D-067 item 1: an expiry joins after a clean recovery by rule, never because the site flapped
+        // (engine re-review: a DOWN, RECOVERED, then SSL would be its 3rd change in 30 min).
+        flapping: flapping && !isExpiryTrigger(problem.v.trigger),
         ...base,
         status: 'problem',
       };
     }
     const status = open && episode === 'down' ? ('down' as const) : ('problem' as const);
+    // D-067: an open expiry PROBLEM drop never swallows a more urgent cause.
+    // D-067 items 2, 4: on a PROBLEM drop the cause follows between an expiry and anything more
+    // urgent — announced one way, silent the other. A PROBLEM incident's cause is its trigger; a DOWN
+    // incident's PROBLEM drop (D-023, a PROBLEM AGAIN) keeps its trigger, so its cause is what the site
+    // carried last round (Tao, 17 Nov: a hijack after a DOWN never waits for a renewal either).
+    const onDrop = !!open && episode === 'problem' && RECOVERABLE.includes(open.state);
+    // The cause of the drop in progress (`OpenIncident.trigger`: incidents.cause_trigger, else trigger).
+    const was = open?.trigger ?? null;
+    // …or from one expiry to the other (Tao, 17 Nov: SSL renewed with the domain still under its line
+    // reads Domain expiring, never "SSL expired" counted from the old certificate).
+    const backToExpiry = open?.leftExpiry === true && !isExpiryTrigger(was);
+    const otherExpiry = isExpiryTrigger(was) && was !== problem.v.trigger;
+    if (onDrop && (backToExpiry || otherExpiry) && isExpiryTrigger(problem.v.trigger)) {
+      return {
+        kind: 'cause_back',
+        monitorId: problem.m.id,
+        trigger: problem.v.trigger,
+        detail: problem.v.detail,
+        startedAt: problem.v.startedAt,
+        ...base,
+        status,
+      };
+    }
+    if (onDrop && isExpiryTrigger(was) && !isExpiryTrigger(problem.v.trigger)) {
+      return {
+        kind: 'new_cause',
+        was,
+        monitorId: problem.m.id,
+        trigger: problem.v.trigger,
+        detail: problem.v.detail,
+        startedAt: problem.v.startedAt,
+        ...base,
+        status,
+      };
+    }
     if (open) return { kind: 'none', okRounds: 0, ...base, status };
     return {
       kind: 'problem',
@@ -858,6 +928,7 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
           kind: 'problem',
           trigger: issue.trigger,
           detail: issue.detail,
+          // A crawler, expiry or page-change fact starts at its fetch / read (clamped after the last round).
           startedAt: issue.at
             ? issue.trigger === 'content_change'
               ? pageStart(issue.at, s)
@@ -882,6 +953,23 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
     if (pageHolds(m, s)) return { verdict: { kind: 'insufficient' }, next };
     // D-050: the OK round between two timeouts isn't the end of an Intermittent PROBLEM.
     if (intermittentHolds(m, s, blips)) return { verdict: { kind: 'insufficient' }, next };
+    // D-066: the least urgent to fix, after every other trigger and their holds (D-067 item 4: a hold
+    // is no evidence the other cause cleared).
+    const expiry = expiryNow(m, s);
+    if (expiry) {
+      return {
+        verdict: {
+          kind: 'problem',
+          trigger: expiry.trigger,
+          detail: expiry.detail,
+          startedAt: crawlerStart(expiry.at, s),
+          reachable: passing,
+        },
+        next,
+      };
+    }
+    // D-066: an open SSL / domain PROBLEM whose read failed or went stale isn't over either.
+    if (expiryHolds(m, s)) return { verdict: { kind: 'insufficient' }, next };
     // Behind a WAF with some locations blocked: say who decided (D-027) — the home page only.
     const note =
       m.isPrimary && wafBlocked.length
@@ -944,6 +1032,21 @@ function judgeMonitor(s: SiteSnapshot, m: SiteMonitor, round: Round): Judgement 
         if (crawlerHolds(m, s, crawler.stale)) return { verdict: { kind: 'insufficient' }, next: reset };
         if (pageHolds(m, s)) return { verdict: { kind: 'insufficient' }, next: reset };
         if (intermittentHolds(m, s, blips)) return { verdict: { kind: 'insufficient' }, next: reset };
+        // D-066: the expiry read, as on a passing round (last, after the holds).
+        const expiry = expiryNow(m, s);
+        if (expiry) {
+          return {
+            verdict: {
+              kind: 'problem',
+              trigger: expiry.trigger,
+              detail: expiry.detail,
+              startedAt: crawlerStart(expiry.at, s),
+              reachable,
+            },
+            next: reset,
+          };
+        }
+        if (expiryHolds(m, s)) return { verdict: { kind: 'insufficient' }, next: reset };
         return { verdict: { kind: 'ok', reachable, note: BLOCKED_NOTE }, next: reset };
       }
       case 'failed':
@@ -1151,6 +1254,48 @@ function problemOf(
       : null) ??
     as('regional', regionalIssue(counted, failingSince, wafSite))
   );
+}
+
+/**
+ * The primary's expiry PROBLEM this round (D-066, D-067 items 1, 4).
+ * - With an incident still open (not recovered), only a plain PROBLEM incident that carries the expiry,
+ *   or took its cause from one, keeps it — any hour. Any other open incident recovers as if it weren't
+ *   there (a slow PROBLEM auto-resolves, a DOWN reads a clean RECOVERED); the expiry then joins as
+ *   PROBLEM AGAIN inside response hours.
+ * - Otherwise (nothing open, or recovered) it opens or relapses only inside response hours.
+ */
+function expiryNow(m: SiteMonitor, s: SiteSnapshot): ReturnType<typeof expiryIssue> {
+  if (!m.isPrimary) return null;
+  const issue = expiryIssue(m.expiry, s.now);
+  if (!issue) return null;
+  if (s.open && !RECOVERED_STATES.includes(s.open.state)) return keepsExpiry(m, s) ? issue : null;
+  return s.expiryOpens === false ? null : issue;
+}
+
+/**
+ * Whether the open, unrecovered incident is (or may go back to being) about the expiry — the one rule
+ * `expiryNow` and `expiryHolds` share: on its PROBLEM drop, the primary's last verdict was the expiry
+ * (a DOWN incident's PROBLEM AGAIN included — engine re-review: else it recovers and relapses every
+ * other round), or a PROBLEM incident whose cause is the expiry or came from it.
+ */
+function keepsExpiry(m: SiteMonitor, s: SiteSnapshot): boolean {
+  const o = s.open;
+  if (!o || RECOVERED_STATES.includes(o.state) || (o.episodeSeverity ?? o.severity) !== 'problem')
+    return false;
+  // The drop's cause is the expiry, or was taken from it (stored on the incident: a window hiding
+  // rounds can't lose it — engine re-review).
+  return isExpiryTrigger(o.trigger) || !!o.leftExpiry;
+}
+
+/**
+ * D-066 item 3: an open SSL / domain PROBLEM (the primary's last verdict, the incident not recovered)
+ * whose read failed, went stale or is missing is no evidence either way — it holds until a good read.
+ */
+function expiryHolds(m: SiteMonitor, s: SiteSnapshot): boolean {
+  // Keyed on the open PROBLEM drop (engine review M2), and only one about the expiry (the same rule as
+  // `expiryNow`): a keyword incident that never came from SSL recovers on a failed read as on a fresh one.
+  if (!m.isPrimary || !keepsExpiry(m, s)) return false;
+  return expiryUnknown(m.expiry, m.carry.status === 'problem' ? m.carry.trigger : null, s.now);
 }
 
 /** When a problem started: slow at its first slow round, regional at the location's first failure. */

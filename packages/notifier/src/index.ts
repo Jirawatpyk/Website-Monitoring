@@ -16,3 +16,4 @@ export * from './reports';
 export * from './weekly-email';
 export * from './series-alerts';
 export * from './account-alerts';
+export * from './new-cause-alerts';

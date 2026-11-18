@@ -1000,7 +1000,9 @@ export function timelineOf(
         return;
       }
       case 'alerted': {
-        const word = TEMPLATE_WORDS[str(e.payload.template) ?? ''] ?? 'Alert';
+        // D-067: a new cause rides problem_again but is neither an AGAIN nor part of a flapping cycle.
+        const newCause = e.payload.newCause === true;
+        const word = newCause ? 'New cause' : (TEMPLATE_WORDS[str(e.payload.template) ?? ''] ?? 'Alert');
         item(
           e,
           'alert',
@@ -1008,7 +1010,7 @@ export function timelineOf(
             ? `${word} emailed to ${nameOf(str(e.payload.user_id))}`
             : `${word} posted in Chat`,
           null,
-          CYCLE_TEMPLATES.has(str(e.payload.template) ?? '') ? 'between' : undefined,
+          !newCause && CYCLE_TEMPLATES.has(str(e.payload.template) ?? '') ? 'between' : undefined,
         );
         return;
       }
@@ -1119,6 +1121,35 @@ export function timelineOf(
           'Short PROBLEM, never acknowledged — no root cause needed',
         );
         return;
+      // D-067: the expiry incident took a more urgent PROBLEM as its cause.
+      case 'new_cause': {
+        const trig = str(e.payload.trigger);
+        const was = str(e.payload.was);
+        const label = (t: string | null) =>
+          t && t in TRIGGER_LABELS ? TRIGGER_LABELS[t as Trigger] : 'a problem';
+        // D-067 item 4: the new cause cleared, the expiry still under its line — back to it, silently.
+        if (e.payload.back === true) {
+          // From one expiry to the other (one renewed, or the other fell under its line — Tao, 17 Nov).
+          const fromExpiry = was === 'ssl' || was === 'domain';
+          item(
+            e,
+            'problem',
+            `${fromExpiry ? 'Now' : 'Back to'} ${label(trig)}`,
+            fromExpiry ? `was ${label(was)} · nobody was told` : `${label(was)} cleared · nobody was told`,
+          );
+          return;
+        }
+        item(
+          e,
+          'problem',
+          `New cause: ${label(trig)}`,
+          `${str(e.payload.cause) ?? label(trig)} · was ${label(was)}${
+            // D-067 item 2: an ack of the expiry doesn't cover the new cause (given back with the expiry).
+            e.payload.ackCleared === true ? ' · the acknowledgement of the expiry was set aside' : ''
+          }`,
+        );
+        return;
+      }
       case 'relapsed': {
         const down = e.payload.severity === 'down';
         // Down again by hand from the hand check (D-055 item 7).
@@ -1158,7 +1189,13 @@ export function timelineOf(
           e,
           down ? 'down' : 'problem',
           `${down ? 'Down' : 'Problem'} again${e.payload.flapping === true ? ' · flapping' : ''}`,
-          str(e.payload.summary) ?? str(e.payload.cause),
+          // D-067 item 6: an ack of the expiry doesn't silence the outage.
+          [
+            str(e.payload.summary) ?? str(e.payload.cause),
+            e.payload.ackCleared === true ? 'the acknowledgement of the expiry was cleared' : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || null,
           'relapse',
         );
         return;
@@ -1166,7 +1203,19 @@ export function timelineOf(
       case 'escalated_to_down':
         if (e.payload.manual === true)
           item(e, 'down', manualDownTitle(by, e.payload, true), MANUAL_DOWN_DETAIL);
-        else item(e, 'down', 'PROBLEM became DOWN', str(e.payload.cause));
+        else
+          item(
+            e,
+            'down',
+            'PROBLEM became DOWN',
+            // D-067 item 6: an ack of the expiry doesn't silence the outage.
+            [
+              str(e.payload.cause),
+              e.payload.ackCleared === true ? 'the acknowledgement of the expiry was cleared' : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || null,
+          );
         return;
       // §30.8: the first engine run after a stop, on an incident someone acted on by hand.
       case 'engine_back': {

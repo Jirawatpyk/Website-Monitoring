@@ -35,6 +35,8 @@ export interface ExpirySite {
   siteId: string;
   siteName: string;
   host: string;
+  /** An https home page: it has a certificate to read (an http:// one only has its domain). */
+  https: boolean;
   domain: string | null;
   row: {
     host: string;
@@ -62,11 +64,13 @@ export interface ExpiryDeps {
 }
 
 /**
- * Each live site's primary host, its stored row, and whether an expiry PROBLEM is open. Only an
- * https home page has a certificate to read: an http:// site serves none, whatever port 443 holds.
+ * Each live site's primary host, its stored row, and whether an expiry PROBLEM is open — the
+ * incident's trigger, or the primary's current verdict (an expiry drop that joined an incident opened
+ * by another trigger, engine review M3). Only an https home page has a certificate to read: an
+ * http:// site serves none, whatever port 443 holds, but its domain can still lapse.
  */
 export async function loadExpirySites(db: DbClient): Promise<ExpirySite[]> {
-  const [monitors, rows, open] = await Promise.all([
+  const [monitors, rows, open, verdicts, left] = await Promise.all([
     db
       .from('monitors')
       .select('url, site_id, sites!inner(name, is_active)')
@@ -79,12 +83,22 @@ export async function loadExpirySites(db: DbClient): Promise<ExpirySite[]> {
       .from('site_expiry')
       .select('site_id, host, domain, ssl_read_at, ssl_error, domain_read_at, domain_error'),
     db.from('incidents').select('site_id').is('resolved_at', null).in('trigger', ['ssl', 'domain']),
+    db.from('monitor_status').select('site_id').eq('status', 'problem').in('trigger', ['ssl', 'domain']),
+    // D-067: an incident whose drop is the expiry, or whose cause came from it (it may go back to it).
+    db
+      .from('incidents')
+      .select('site_id')
+      .is('resolved_at', null)
+      .or('cause_trigger.in.(ssl,domain),expiry_left.is.true'),
   ]);
   if (monitors.error) throw new Error(`monitors: ${monitors.error.message}`);
   if (rows.error) throw new Error(`site_expiry: ${rows.error.message}`);
   if (open.error) throw new Error(`incidents: ${open.error.message}`);
+  if (verdicts.error) throw new Error(`monitor_status: ${verdicts.error.message}`);
+  // A database without S13's incident columns yet (a deploy ahead of migrate-production): skip them.
+  if (left.error && left.error.code !== '42703') throw new Error(`incidents: ${left.error.message}`);
   const bySite = new Map(rows.data.map((r) => [r.site_id, r]));
-  const openSites = new Set(open.data.map((i) => i.site_id));
+  const openSites = new Set([...open.data, ...verdicts.data, ...(left.data ?? [])].map((i) => i.site_id));
   return monitors.data.flatMap((m) => {
     let url: URL;
     try {
@@ -92,13 +106,13 @@ export async function loadExpirySites(db: DbClient): Promise<ExpirySite[]> {
     } catch {
       return [];
     }
-    if (url.protocol !== 'https:') return [];
     const host = url.hostname;
     return [
       {
         siteId: m.site_id,
         siteName: m.sites.name,
         host,
+        https: url.protocol === 'https:',
         domain: registrableDomain(host),
         row: bySite.get(m.site_id) ?? null,
         openExpiry: openSites.has(m.site_id),
@@ -124,9 +138,12 @@ export function needsRead(s: ExpirySite, now: number): boolean {
   const r = s.row;
   if (!r || r.host !== s.host || s.openExpiry) return true;
   const old = (at: string | null) => !at || now - Date.parse(at) >= EXPIRY_REREAD_MS;
-  if (r.ssl_error || old(r.ssl_read_at)) return true;
+  if (s.https && (r.ssl_error || old(r.ssl_read_at))) return true;
   return domainReadable(s) && (r.domain_error !== null || old(r.domain_read_at));
 }
+
+/** An http:// home page: nothing to read on 443. */
+const NO_TLS = Symbol('no TLS');
 
 const reason = (err: unknown) => (err instanceof ExpiryReadError ? err.message : 'Read failed');
 
@@ -170,7 +187,7 @@ export async function runExpiry({
       return;
     }
     const [cert, dom] = await Promise.allSettled([
-      readCert(s.host),
+      s.https ? readCert(s.host) : Promise.reject(NO_TLS),
       s.domain ? domainOf(s.domain) : Promise.reject(new ExpiryReadError('No registrable domain')),
     ]);
     const at = new Date(clock()).toISOString();
@@ -185,6 +202,16 @@ export async function runExpiry({
         ssl_checked_at: at,
         ssl_error: null,
       } satisfies Partial<ExpiryRow>);
+    } else if (cert.reason === NO_TLS) {
+      // No certificate to read: the SSL half stays empty, and is never a failure.
+      Object.assign(row, {
+        ssl_expires_at: null,
+        ssl_valid_from: null,
+        ssl_issuer: null,
+        ssl_read_at: null,
+        ssl_checked_at: null,
+        ssl_error: null,
+      });
     } else {
       Object.assign(row, { ssl_checked_at: at, ssl_error: reason(cert.reason) });
       if (s.row && s.row.host !== s.host) {
@@ -211,7 +238,8 @@ export async function runExpiry({
         Object.assign(row, { domain_expires_at: null, domain_source: null, domain_read_at: null });
       }
     }
-    if (cert.status === 'rejected' || dom.status === 'rejected') failed.push(s.siteName);
+    if ((cert.status === 'rejected' && cert.reason !== NO_TLS) || dom.status === 'rejected')
+      failed.push(s.siteName);
     // One object per upsert: PostgREST updates only the keys present, so a failed half keeps its
     // last good dates. Never batch these into an array — its column set is the union of every row's
     // keys, and a row missing a date would write null over the stored one.

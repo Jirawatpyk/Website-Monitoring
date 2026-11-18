@@ -58,6 +58,7 @@ describe('needsRead (between full reads)', () => {
     siteId: 's',
     siteName: 'S',
     host: 'www.voca.co.th',
+    https: true,
     domain: 'voca.co.th',
     row: goodRow('s', 'www.voca.co.th'),
     openExpiry: false,
@@ -200,14 +201,53 @@ describe('runExpiry', () => {
     });
   });
 
-  it('an http:// home page has no certificate to read: left out', async () => {
-    const { db } = setup({ monitors: [monitor('plain', 'http://plain.example.test/')] });
+  it('an http:// home page has no certificate to read, but its domain is read (engine review L4)', async () => {
+    const { db, calls } = setup({ monitors: [monitor('plain', 'http://www.plain.co.th/')] });
     const readCert = vi.fn(async (_host: string) => cert);
     expect(await runExpiry({ db, all: true, readCert, readDomain: async () => domain })).toMatchObject({
-      sites: 0,
-      read: 0,
+      sites: 1,
+      read: 1,
+      sslRead: 0,
+      domainRead: 1,
     });
     expect(readCert).not.toHaveBeenCalled();
+    expect(calls.find((c) => c.op === 'upsert')!.values).toMatchObject({
+      ssl_error: null,
+      ssl_expires_at: null,
+      domain: 'plain.co.th',
+      domain_source: 'rdap',
+    });
+    // Between full reads its empty SSL half isn't a reason to read again.
+    const s = {
+      siteId: 'p',
+      siteName: 'P',
+      host: 'www.plain.co.th',
+      https: false,
+      domain: 'plain.co.th',
+      row: { ...goodRow('p', 'www.plain.co.th'), ssl_read_at: null },
+      openExpiry: false,
+    };
+    expect(needsRead(s, NOW)).toBe(false);
+  });
+
+  it('an expiry verdict on an incident another trigger opened is read hourly (engine review M3)', async () => {
+    const fake = fakeDb({
+      'monitors.select': { data: [monitor('voca', 'https://www.voca.co.th/')] },
+      'site_expiry.select': { data: [goodRow('voca', 'www.voca.co.th')] },
+      'monitor_status.select': { data: [{ site_id: 'voca' }] },
+      'site_expiry.upsert': { data: null },
+    });
+    const out = await runExpiry({
+      db: fake.db,
+      readCert: async () => cert,
+      readDomain: async () => domain,
+      clock: () => NOW,
+    });
+    expect(out).toMatchObject({ full: false, read: 1 });
+    expect(fake.calls.find((c) => c.table === 'monitor_status')?.filters).toEqual([
+      ['eq', 'status', 'problem'],
+      ['in', 'trigger', ['ssl', 'domain']],
+    ]);
   });
 
   it('no read starts after the budget; those sites wait for the next run', async () => {
@@ -266,8 +306,11 @@ describe('runExpiry', () => {
     error.mockRestore();
   });
 
-  it.each(['monitors', 'site_expiry', 'incidents'])('a failed %s read fails the run', async (table) => {
-    const fake = fakeDb({ [`${table}.select`]: { error: { message: 'down' } } });
-    await expect(runExpiry({ db: fake.db })).rejects.toThrow(`${table}: down`);
-  });
+  it.each(['monitors', 'site_expiry', 'incidents', 'monitor_status'])(
+    'a failed %s read fails the run',
+    async (table) => {
+      const fake = fakeDb({ [`${table}.select`]: { error: { message: 'down' } } });
+      await expect(runExpiry({ db: fake.db })).rejects.toThrow(`${table}: down`);
+    },
+  );
 });

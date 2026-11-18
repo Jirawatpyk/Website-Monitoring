@@ -1,10 +1,11 @@
 import 'server-only';
-import type { DbClient, Json } from '@dxt/db';
+import type { Database, DbClient, Json } from '@dxt/db';
 import {
   crawlerIssue,
   isRecording,
   ownDomains,
   pageChangeState,
+  type ExpiryFact,
   type PageChangeInput,
   type PageFact,
   latestPerView,
@@ -124,6 +125,10 @@ export interface EngineSummary extends CronJobResult {
   settled: number;
   /** New drops that joined a recovered incident (D-004): DOWN AGAIN / PROBLEM AGAIN queued. */
   relapses: number;
+  /** D-067: expiry incidents that took a more urgent PROBLEM as their cause (only counted when one did). */
+  newCauses?: number;
+  /** D-067 item 4: incidents whose new cause cleared and went back to their expiry (only when one did). */
+  causesBack?: number;
   /** Blocked rounds handed to the browser verifier this run (one per monitor). */
   verifying: number;
   /** Monitors the verifier couldn't decide this run: PROBLEM (unverified) (D-001). */
@@ -243,7 +248,7 @@ export async function runEngine(
   const siteIds = sites.map((s) => s.id);
   const windows = await loadWindows(db, siteIds, now);
   for (const s of sites) s.windows = windows.get(s.id);
-  const [checks, statuses, carries, incidents, verifier, crawler, pages] = await Promise.all([
+  const [checks, statuses, carries, incidents, verifier, crawler, pages, expiry] = await Promise.all([
     loadChecks(db, since),
     db
       .from('site_status')
@@ -251,16 +256,11 @@ export async function runEngine(
       .in('site_id', siteIds),
     // Server-side reads (S04b): no monitor ids in a GET query string (8 KB limit at 200 monitors).
     db.rpc('engine_monitor_status'),
-    db
-      .from('incidents')
-      .select(
-        'id, site_id, monitor_id, state, severity, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, is_manual, manual_at, root_cause_category, notifications(template)',
-      )
-      .in('site_id', siteIds)
-      .not('state', 'in', CLOSED_INCIDENT_STATES_IN),
+    loadOpenIncidents(db, siteIds),
     loadVerifierState(db, since, now),
     loadCrawler(db, now),
     loadPageChange(db, now),
+    loadExpiry(db),
   ]);
   /** D-046: page changes held back (alerts off, or recording), logged instead of acted on. */
   const pageHeld = new Set<string>();
@@ -502,6 +502,8 @@ export async function runEngine(
             startedAt: new Date(open.started_at),
             detectedAt: new Date(open.detected_at),
             isFlapping: open.is_flapping,
+            trigger: open.cause_trigger ?? open.trigger,
+            leftExpiry: open.expiry_left,
           } satisfies OpenIncident)
         : null,
       // OK ↔ not-OK changes at incident steps (D-024): the 3rd in 30 min tags flapping.
@@ -519,9 +521,12 @@ export async function runEngine(
         ...(verifier.jobs.get(m.id) ? { verifications: verifier.jobs.get(m.id)! } : {}),
         ...withCrawler(crawlerFor(site, m)),
         ...withPageChange(pageChangeFor(site, m)),
+        ...(m.isPrimary ? withExpiry(expiryFor(expiry.get(site.id), m.url)) : {}),
       })),
       verifierAvailable: verifier.available,
       behindWaf: site.behindWaf,
+      // D-067 item 1: an SSL / domain expiry raises a PROBLEM only inside response hours.
+      expiryOpens: isInsideHours(now, hours),
       faulty,
       slowLocations,
     };
@@ -560,6 +565,10 @@ export async function runEngine(
               monitorId: open.monitor_id,
               recoveredAt: open.recovered_at,
               isFlapping: open.is_flapping,
+              severity: open.severity,
+              episode_severity: open.episode_severity,
+              trigger: open.trigger,
+              cause_trigger: open.cause_trigger,
             }
           : null,
         now,
@@ -571,7 +580,7 @@ export async function runEngine(
           summary.notified += 1;
         },
       );
-      if (applied) summary[applied] += 1;
+      if (applied) summary[applied] = (summary[applied] ?? 0) + 1;
       if (applied && applied !== 'settled') summary.notified += 1;
       // The site note follows the latest judged round (OK + note, unverified, or none).
       const next = decision.note ?? null;
@@ -695,6 +704,55 @@ type CheckRow = Awaited<ReturnType<typeof loadChecks>>[number];
 
 const withCrawler = (crawler: readonly CrawlerFact[] | undefined) => (crawler?.length ? { crawler } : {});
 const withPageChange = (pageChange: PageChangeInput | undefined) => (pageChange ? { pageChange } : {});
+const withExpiry = (expiry: ExpiryFact | undefined) => (expiry ? { expiry } : {});
+
+interface ExpiryRow {
+  host: string;
+  fact: ExpiryFact;
+}
+
+/**
+ * S13 (D-066): each site's latest SSL / domain expiry read. A failed read (a deploy ahead of
+ * `migrate-production` answers PGRST205) never holds the run back: no row is no data — it holds an
+ * open expiry PROBLEM and opens none.
+ */
+async function loadExpiry(db: DbClient): Promise<Map<string, ExpiryRow>> {
+  const bySite = new Map<string, ExpiryRow>();
+  const { data, error } = await db
+    .from('site_expiry')
+    .select(
+      'site_id, host, ssl_expires_at, ssl_read_at, ssl_error, domain_expires_at, domain_read_at, domain_error',
+    );
+  if (error) {
+    console.error(JSON.stringify({ event: 'engine_site_expiry_failed', error: error.message }));
+    return bySite;
+  }
+  const date = (v: string | null) => (v ? new Date(v) : null);
+  for (const r of data ?? []) {
+    bySite.set(r.site_id, {
+      host: r.host,
+      fact: {
+        ssl: { expiresAt: date(r.ssl_expires_at), readAt: date(r.ssl_read_at), failed: r.ssl_error !== null },
+        domain: {
+          expiresAt: date(r.domain_expires_at),
+          readAt: date(r.domain_read_at),
+          failed: r.domain_error !== null,
+        },
+      },
+    });
+  }
+  return bySite;
+}
+
+/** The row's read, only while it was read from the primary's current host (db review S13). */
+function expiryFor(row: ExpiryRow | undefined, url: string): ExpiryFact | undefined {
+  if (!row) return undefined;
+  try {
+    return new URL(url).hostname === row.host ? row.fact : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Each live primary monitor's baseline and newest plain fetches (D-046, `engine_page_fingerprints`):
@@ -1066,6 +1124,11 @@ async function apply(
     /** The last recovery: "was back for 5 min (03:19–03:24)" on DOWN AGAIN. */
     recoveredAt: string | null;
     isFlapping: boolean;
+    /** For `windowHides` (D-067 item 3: an expiry-only incident hides like none). */
+    severity?: string;
+    episode_severity?: string | null;
+    trigger?: string | null;
+    cause_trigger?: string | null;
   } | null,
   now: Date,
   alertQueued: boolean,
@@ -1075,7 +1138,17 @@ async function apply(
   hours: ResponseHours,
   /** Counts the PROBLEM AGAIN a D-023 recovery queues in the same round. */
   relapsed: () => void = () => {},
-): Promise<'opened' | 'problems' | 'recovered' | 'settled' | 'escalated' | 'relapses' | null> {
+): Promise<
+  | 'opened'
+  | 'problems'
+  | 'recovered'
+  | 'settled'
+  | 'escalated'
+  | 'relapses'
+  | 'newCauses'
+  | 'causesBack'
+  | null
+> {
   const at = now.toISOString();
   const incidentId = open?.id ?? null;
   // Inside a maintenance window with nothing open (D-036): the round is recorded, nothing opens and
@@ -1098,7 +1171,9 @@ async function apply(
       d.kind === 'open' ||
       d.kind === 'problem' ||
       d.kind === 'relapse' ||
-      d.kind === 'escalate')
+      d.kind === 'escalate' ||
+      // D-067 item 3: a window hides an expiry incident's new cause; it's told on the first round after.
+      d.kind === 'new_cause')
   ) {
     const { error } = await db.rpc('engine_record_round', {
       p_site_id: site.id,
@@ -1161,6 +1236,8 @@ async function apply(
           summary: formatProblemSummary(d.detail, ctx),
           detail: d.detail as unknown as Json,
           monitorUrl: ctx.monitorUrl,
+          // The trigger it was queued with: a held email still says it after a new cause (D-067).
+          trigger: d.trigger,
           // "3 of 3 locations" on the card: the locations voting when it opened.
           reporting,
           // A key page's parts, for the replies that name it (auto-resolved RECOVERED, §19.6).
@@ -1195,6 +1272,79 @@ async function apply(
       });
       if (error) throw new Error(`engine_escalate_incident: ${error.message}`);
       return data ? 'escalated' : null;
+    }
+
+    case 'new_cause': {
+      if (!incidentId) return null;
+      // D-067 item 5: during a mute, a thread that already alerted isn't told yet — the round is recorded
+      // and the incident keeps its stored cause, so the first round after the mute takes the new cause,
+      // naming whoever acts then (message-checker: never last night's on-call at 09:30). With no alert
+      // out yet the cause switches silently, and the card after the mute is worded with it.
+      if (site.muted && alertQueued) {
+        await recordOnly(db, site.id, d.roundAt, at, judged);
+        return null;
+      }
+      // D-067: the expiry incident takes the more urgent PROBLEM as its cause and the thread is told.
+      const ctx = causeContext(site, d.monitorId);
+      const { data, error } = await db.rpc('engine_new_cause_incident', {
+        p_incident_id: incidentId,
+        p_monitor_id: d.monitorId,
+        p_trigger: d.trigger,
+        p_round_at: d.roundAt.toISOString(),
+        p_context: {
+          cause: formatProblemCause(d.detail, ctx),
+          summary: formatProblemSummary(d.detail, ctx),
+          detail: d.detail as unknown as Json,
+          monitorUrl: ctx.monitorUrl,
+          ...keyPageContext(d.detail, ctx),
+          startedAt: startOf(d.startedAt),
+        },
+        // D-067 item 5: during a mute the reply waits for its end (cancelled if the cause clears first);
+        // a first card the mute silenced goes after it, worded with the new cause (no reply then).
+        p_notify: alertQueued,
+        ...holdFor(site.tier, now, hours),
+        // Tier 1 at night: the person on call is L0 for the new cause (Tao, 17 Nov).
+        p_outside_hours: !isInsideHours(now, hours),
+        ...judged,
+      });
+      // A deploy ahead of migrate-production (PGRST202): no new cause yet, the round still recorded.
+      if (error?.code === 'PGRST202') {
+        console.error(JSON.stringify({ event: 'engine_new_cause_incident_missing', error: error.message }));
+        await recordOnly(db, site.id, d.roundAt, at, judged);
+        return null;
+      }
+      if (error) throw new Error(`engine_new_cause_incident: ${error.message}`);
+      if (!data) await recordOnly(db, site.id, d.roundAt, at, judged);
+      return data ? 'newCauses' : null;
+    }
+
+    case 'cause_back': {
+      if (!incidentId) return null;
+      // D-067 item 4: the new cause cleared, the expiry is still under its line — silently back to it.
+      const ctx = causeContext(site, d.monitorId);
+      const { data, error } = await db.rpc('engine_cause_back_incident', {
+        p_incident_id: incidentId,
+        p_monitor_id: d.monitorId,
+        p_trigger: d.trigger,
+        p_round_at: d.roundAt.toISOString(),
+        p_context: {
+          cause: formatProblemCause(d.detail, ctx),
+          summary: formatProblemSummary(d.detail, ctx),
+          detail: d.detail as unknown as Json,
+          monitorUrl: ctx.monitorUrl,
+          startedAt: startOf(d.startedAt),
+        },
+        ...judged,
+      });
+      // A deploy ahead of migrate-production (PGRST202): no new cause yet, the round still recorded.
+      if (error?.code === 'PGRST202') {
+        console.error(JSON.stringify({ event: 'engine_cause_back_incident_missing', error: error.message }));
+        await recordOnly(db, site.id, d.roundAt, at, judged);
+        return null;
+      }
+      if (error) throw new Error(`engine_cause_back_incident: ${error.message}`);
+      if (!data) await recordOnly(db, site.id, d.roundAt, at, judged);
+      return data ? 'causesBack' : null;
     }
 
     case 'relapse': {
@@ -1375,18 +1525,119 @@ async function lateAlerts(db: DbClient, now: Date, hours: ResponseHours): Promis
   let queued = 0;
   const failed: string[] = [];
   // One incident that can't post never holds back another site's first alert (engine review H1).
+  // D-067 (Tao, 17 Nov): an incident whose drop is an SSL / domain expiry gets its card after a mute
+  // only inside response hours, on every tier — skipped until then, so nothing is queued and its ladder
+  // clock (`alerted_at`) starts at the opening; anything more urgent (a new cause) goes at once.
+  const inside = isInsideHours(now, hours);
+  const expiryIds = inside
+    ? new Set<string>()
+    : await expiryIncidents(
+        db,
+        (data ?? []).filter((i) => i.severity === 'problem').map((i) => i.incident_id),
+      );
   for (const inc of data ?? []) {
+    if (expiryIds.has(inc.incident_id)) continue;
     const posted = await db.rpc('engine_post_late_alert', {
       p_incident_id: inc.incident_id,
       p_at: now.toISOString(),
       ...(inc.severity === 'problem' ? holdFor(inc.tier as Tier, now, hours) : {}),
-      p_outside_hours: !isInsideHours(now, hours),
+      p_outside_hours: !inside,
     });
     if (posted.error) failed.push(`${inc.incident_id}: ${posted.error.message}`);
     else if (posted.data) queued += 1;
   }
   if (failed.length) throw new Error(`engine_post_late_alert: ${failed.join('; ')} (${queued} posted)`);
   return queued;
+}
+
+const INCIDENT_COLUMNS =
+  'id, site_id, monitor_id, state, severity, trigger, episode_severity, started_at, detected_at, acked_at, recovered_at, escalation_level, is_flapping, is_manual, manual_at, root_cause_category, notifications(template)';
+
+/**
+ * The open incidents of these sites, with S13's `cause_trigger` / `expiry_left` (D-067). A deploy runs
+ * before `migrate-production`: while the columns aren't there (42703) it reads without them — no
+ * incident takes a new cause until the migration, and every site is still judged.
+ */
+async function loadOpenIncidents(
+  db: DbClient,
+  siteIds: string[],
+): Promise<{ data: OpenIncidentRow[] | null; error: { message: string; code?: string } | null }> {
+  const read = async (columns: string) => {
+    const r = await db
+      .from('incidents')
+      .select(columns)
+      .in('site_id', siteIds)
+      .not('state', 'in', CLOSED_INCIDENT_STATES_IN);
+    return { data: r.data as unknown as OpenIncidentRow[] | null, error: r.error };
+  };
+  const full = await read(`${INCIDENT_COLUMNS}, cause_trigger, expiry_left`);
+  if (full.error?.code !== '42703') return full;
+  console.error(JSON.stringify({ event: 'engine_incident_columns_lag', error: full.error.message }));
+  const lag = await read(INCIDENT_COLUMNS);
+  return { ...lag, data: lag.data?.map((i) => ({ ...i, cause_trigger: null, expiry_left: false })) ?? null };
+}
+
+type OpenIncidentRow = Pick<
+  Database['public']['Tables']['incidents']['Row'],
+  | 'id'
+  | 'site_id'
+  | 'monitor_id'
+  | 'state'
+  | 'severity'
+  | 'trigger'
+  | 'episode_severity'
+  | 'started_at'
+  | 'detected_at'
+  | 'acked_at'
+  | 'recovered_at'
+  | 'escalation_level'
+  | 'is_flapping'
+  | 'is_manual'
+  | 'manual_at'
+  | 'root_cause_category'
+  | 'cause_trigger'
+  | 'expiry_left'
+> & { notifications: { template: string }[] };
+
+/**
+ * A new cause / back to it the SQL guard refused (the incident moved on between the read and the write):
+ * the round is still recorded, or the next run's skew guard would skip the site for good (engine
+ * re-review M-a).
+ */
+async function recordOnly(
+  db: DbClient,
+  siteId: string,
+  roundAt: Date,
+  at: string,
+  judged: { p_monitors: Json; p_status?: SiteStatus },
+): Promise<void> {
+  const { error } = await db.rpc('engine_record_round', {
+    p_site_id: siteId,
+    p_round_at: roundAt.toISOString(),
+    p_evaluated_at: at,
+    p_ok_rounds: 0,
+    ...judged,
+  });
+  if (error) throw new Error(`engine_record_round: ${error.message}`);
+}
+
+/**
+ * Of these incidents (on a PROBLEM drop), those whose drop's cause is an SSL / domain expiry. A database
+ * without `cause_trigger` yet (a deploy ahead of migrate-production) reads `trigger`.
+ */
+async function expiryIncidents(db: DbClient, ids: string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const full = await db.from('incidents').select('id, trigger, cause_trigger').in('id', ids);
+  const rows =
+    full.error?.code === '42703'
+      ? ((await db.from('incidents').select('id, trigger').in('id', ids)).data ?? []).map((i) => ({
+          ...i,
+          cause_trigger: null,
+        }))
+      : full.data;
+  if (full.error && full.error.code !== '42703') throw new Error(`incidents: ${full.error.message}`);
+  const isExpiry = (t: string | null) => t === 'ssl' || t === 'domain';
+  return new Set((rows ?? []).filter((i) => isExpiry(i.cause_trigger ?? i.trigger)).map((i) => i.id));
 }
 
 /** A Tier 2–3 PROBLEM flagged outside response hours waits for the next opening (spec §7, §19.2). */

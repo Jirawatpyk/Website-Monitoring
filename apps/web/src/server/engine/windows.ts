@@ -21,12 +21,30 @@ export function inWindow(w: SiteWindows | undefined, at: Date): boolean {
 
 /**
  * Whether a window hides a site's new problems given its open incident: none, or one that recovered
- * (Monitoring / Needs root cause don't stop a window starting, D-036). One still failing is never
- * hidden (§14.5).
+ * (Monitoring / Needs root cause don't stop a window starting, D-036), or one open only for an SSL /
+ * domain expiry (D-067 item 3: a plain PROBLEM incident whose cause is ssl / domain — the same rule as
+ * `private.site_busy`). One still failing otherwise is never hidden (§14.5).
  */
-export function windowHides(open: { state: string } | null | undefined): boolean {
-  return !open || open.state === 'monitoring' || open.state === 'needs_root_cause';
+export function windowHides(
+  open:
+    | {
+        state: string;
+        severity?: string;
+        episode_severity?: string | null;
+        trigger?: string | null;
+        cause_trigger?: string | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!open || open.state === 'monitoring' || open.state === 'needs_root_cause') return true;
+  // On a PROBLEM drop whose cause is the expiry — a DOWN incident back up on SSL too (Tao, 17 Nov).
+  return (
+    (open.episode_severity ?? open.severity) === 'problem' && isExpiry(open.cause_trigger ?? open.trigger)
+  );
 }
+
+const isExpiry = (t: string | null | undefined) => t === 'ssl' || t === 'domain';
 
 /** When the latest window that ended at or before `at` ended: an incident it held back starts there. */
 export function endedBefore(w: SiteWindows | undefined, at: Date): Date | null {

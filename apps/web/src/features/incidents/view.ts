@@ -14,6 +14,7 @@ import {
   type Severity,
   type Trigger,
 } from '@dxt/shared';
+import { expiryNow } from '@dxt/notifier';
 import type { PersonWhoCanAct } from '@/components/states';
 import { mayAcknowledge } from './ack-rule';
 
@@ -106,6 +107,29 @@ const str = (v: unknown) => (typeof v === 'string' ? v : null);
 const num = (v: unknown) => (typeof v === 'number' ? v : null);
 
 /** Who may acknowledge this incident (D-016, `mayAcknowledge`). */
+/**
+ * D-067: the event the incident's cause comes from now — the newest `new_cause` (a new cause, or back
+ * to the expiry), and on a PROBLEM incident a PROBLEM AGAIN since it (message-checker H1).
+ */
+function latestNewCause(events: readonly EventRow[]): EventRow | undefined {
+  const sorted = [...events].sort((a, b) => a.at.localeCompare(b.at));
+  const last = sorted
+    .filter((e) => e.type === 'new_cause' || e.type === 'relapsed' || e.type === 'escalated_to_down')
+    .at(-1);
+  // A DOWN AGAIN keeps the opening words (as the notifier's causeOf).
+  return last && !(last.type === 'relapsed' && last.payload.severity === 'down') ? last : undefined;
+}
+
+/** A new cause's words; back to an expiry, its days counted again (D-066 item 6). */
+function newCauseLine(e: EventRow | undefined, asOf: Date): string | null {
+  if (!e) return null;
+  // A raise to DOWN by hand carries no probe cause: its own words, never the SSL it opened with
+  // (/code-review: the header fell through to the opening expiry).
+  if (e.type === 'escalated_to_down' && !str(e.payload.cause))
+    return e.payload.manual === true ? TRIGGER_LABELS.manual : TRIGGER_LABELS.hard_fail;
+  return expiryNow(e.payload.detail, asOf)?.cause ?? str(e.payload.cause);
+}
+
 export function canAcknowledge(viewer: Viewer, i: IncidentRow): boolean {
   return mayAcknowledge(viewer, {
     primaryOwnerId: i.sites.primary_owner_id,
@@ -248,7 +272,11 @@ export function buildIncidentView(
     cause:
       detected?.payload.manual === true
         ? `Opened by ${str(detected.payload.openedBy) ?? 'someone'} from a hand check${str(detected.payload.note) ? ` · “${str(detected.payload.note)}”` : ''}`
-        : (str(detected?.payload.cause) ?? TRIGGER_LABELS[i.trigger]),
+        : // D-067: after a new cause, its words; an expiry's days counted to the recovery.
+          (newCauseLine(latestNewCause(events), i.recovered_at ? new Date(i.recovered_at) : now) ??
+          expiryNow(detected?.payload.detail, i.recovered_at ? new Date(i.recovered_at) : now)?.cause ??
+          str(detected?.payload.cause) ??
+          TRIGGER_LABELS[i.trigger]),
     siteUrl: i.sites.monitors.find((m) => m.is_primary)?.url ?? null,
     ack,
   };

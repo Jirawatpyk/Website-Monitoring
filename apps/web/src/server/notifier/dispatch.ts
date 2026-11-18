@@ -291,7 +291,13 @@ async function dispatchChannel(
       const event = await db.from('incident_events').insert({
         incident_id: n.incident_id,
         type: 'alerted',
-        payload: { channel: n.channel, template: n.template, ...(n.user_id ? { user_id: n.user_id } : {}) },
+        payload: {
+          channel: n.channel,
+          template: n.template,
+          ...(n.user_id ? { user_id: n.user_id } : {}),
+          // D-067: a new cause rides problem_again; the page words it as its own message.
+          ...(contextOf(n.context).newCause === true ? { newCause: true } : {}),
+        },
       });
       if (event.error) throw new Error(`incident_events: ${event.error.message}`);
       continue;

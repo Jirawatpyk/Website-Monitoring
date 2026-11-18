@@ -72,6 +72,11 @@ export type ProblemDetail =
    * (D-049). `locations`: where the latest one timed out.
    */
   | { kind: 'intermittent'; blips: number; windowMin: number; locations: ProbeLocation[] }
+  /**
+   * S13 (D-066): the home page's certificate (`ssl`, under 14 days) or its domain (`domain`, under 30)
+   * expires soon. `daysLeft`: Bangkok calendar days on the round that raised it.
+   */
+  | { kind: 'ssl' | 'domain'; expiresAt: string; daysLeft: number }
   /** A blocked key page whose page then failed in the browser. */
   | { kind: 'browser'; detail: string | null }
   /**
