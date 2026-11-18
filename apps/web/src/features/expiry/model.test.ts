@@ -76,6 +76,7 @@ describe('expiryView — the §15.8 figures on Fri 25 Sep 2026 (Done-when 2)', (
   it('soonest expiry first, and Due soon / OK per row', () => {
     expect(v.rows.map((r) => r.siteId)).toEqual(['cando', 'wecare', 'ba-tw', 'dxt-ai']);
     expect(v.rows.map((r) => r.soon)).toEqual([true, true, false, false]);
+    expect(v.rows.map((r) => r.status)).toEqual(['soon', 'soon', 'ok', 'ok']);
   });
 
   it('KPIs count the same rows', () => {
@@ -121,6 +122,7 @@ describe('expiryView — alerts, failures and sites with no read', () => {
       error: 'No registry lookup for .app',
     });
     expect(v.meta).toMatch(/· 1 of 2 read$/);
+    expect(v.rows[0]!.status).toBe('failed');
   });
 
   it('a site with no row yet: dashes, listed last, "not checked yet"', () => {
@@ -130,6 +132,7 @@ describe('expiryView — alerts, failures and sites with no read', () => {
       domain: { date: null },
       soonest: null,
       soon: false,
+      status: 'unchecked',
     });
     expect(v.meta).toBe('Checked daily 06:00 · not checked yet · 0 of 2 read');
     expect(v.kpis[2]!.caption).toBe('Nothing due');

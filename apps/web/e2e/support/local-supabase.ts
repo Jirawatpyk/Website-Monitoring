@@ -161,6 +161,31 @@ export async function setBeat(name: string, at: Date): Promise<void> {
   });
 }
 
+/** The n-th live seeded site by name: specs running in both projects at once each take their own. */
+export async function nthLiveSiteId(n: number): Promise<string> {
+  const [site] = (await admin(
+    `/rest/v1/sites?select=id&is_active=eq.true&name=not.like.E2E*&order=name&offset=${n}&limit=1`,
+  )) as { id: string }[];
+  return site!.id;
+}
+
+/** Write a site's `site_expiry` row (S13): the Expiry page, the Sites column and Check now's 60 s guard read it. */
+export async function setSiteExpiry(siteId: string, row: Record<string, string | null>): Promise<void> {
+  await admin('/rest/v1/site_expiry?on_conflict=site_id', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ site_id: siteId, host: 'e2e.example.test', ...row }),
+  });
+}
+
+/** Remove a site's `site_expiry` row: the seed has none, so the page reads "not checked yet" again. */
+export async function clearSiteExpiry(siteId: string): Promise<void> {
+  await admin(`/rest/v1/site_expiry?site_id=eq.${siteId}`, {
+    method: 'DELETE',
+    headers: { Prefer: 'return=minimal' },
+  });
+}
+
 /** Remove a beat: a sweep that never ran is no fault (the seed state; a fresh stamp would age into one). */
 export async function clearBeat(name: string): Promise<void> {
   await admin(`/rest/v1/agent_heartbeats?name=eq.${encodeURIComponent(name)}`, {

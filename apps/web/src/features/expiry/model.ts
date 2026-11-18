@@ -43,6 +43,8 @@ export interface ExpiryRowView {
   certificate: string | null;
   domain: ExpiryHalf;
   soon: boolean;
+  /** Due soon, else a failed read, else no read yet, else OK: the Status column. */
+  status: 'soon' | 'failed' | 'unchecked' | 'ok';
   /** The sooner of the two, for the sort (null last). */
   soonest: number | null;
 }
@@ -86,13 +88,16 @@ export function expiryView(
     const ssl = half(r?.ssl_expires_at ?? null, c.ssl, r?.ssl_error ?? null);
     const domain = half(r?.domain_expires_at ?? null, c.domain, r?.domain_error ?? null);
     const days = [ssl.days, domain.days].filter((d): d is number => d !== null);
+    const soon =
+      ssl.tone === 'alert' || ssl.tone === 'soon' || domain.tone === 'alert' || domain.tone === 'soon';
     return {
       siteId: s.id,
       name: s.name,
       ssl,
       certificate: cert?.label ?? null,
       domain,
-      soon: ssl.tone === 'alert' || ssl.tone === 'soon' || domain.tone === 'alert' || domain.tone === 'soon',
+      soon,
+      status: soon ? 'soon' : ssl.error || domain.error ? 'failed' : days.length ? 'ok' : 'unchecked',
       soonest: days.length ? Math.min(...days) : null,
     };
   });

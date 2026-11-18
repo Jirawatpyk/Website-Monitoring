@@ -15,7 +15,15 @@ import {
   Tooltip,
   Tr,
 } from '@jirawatpyk/aura-react';
-import { IconCalendar, IconCircleCheck, IconClock, IconInfo, IconLock } from '@jirawatpyk/aura-react/icons';
+import {
+  IconCalendar,
+  IconCircleAlert,
+  IconCircleCheck,
+  IconClock,
+  IconInfo,
+  IconLock,
+  IconMinus,
+} from '@jirawatpyk/aura-react/icons';
 import type { DayTone, ExpiryData, ExpiryHalf, ExpiryRowView } from '../model';
 import { CheckNowButton } from './check-now';
 
@@ -50,6 +58,33 @@ function DaysCell({ half }: { half: ExpiryHalf }) {
   return <span className={`inline-block rounded-full px-2 leading-6 ${TONE[tone]}`}>{half.days}</span>;
 }
 
+/** Status never by colour alone: each badge has its icon and words (spec §11). */
+function StatusBadge({ status }: { status: ExpiryRowView['status'] }) {
+  if (status === 'soon')
+    return (
+      <Badge tone="warning" icon={<IconClock />}>
+        Due soon
+      </Badge>
+    );
+  if (status === 'failed')
+    return (
+      <Badge tone="neutral" icon={<IconCircleAlert />}>
+        Couldn&apos;t read
+      </Badge>
+    );
+  if (status === 'unchecked')
+    return (
+      <Badge tone="neutral" icon={<IconMinus />}>
+        Not checked yet
+      </Badge>
+    );
+  return (
+    <Badge tone="success" icon={<IconCircleCheck />}>
+      OK
+    </Badge>
+  );
+}
+
 function Row({ r }: { r: ExpiryRowView }) {
   return (
     <Tr>
@@ -74,15 +109,7 @@ function Row({ r }: { r: ExpiryRowView }) {
         <DaysCell half={r.domain} />
       </Td>
       <Td label="Status">
-        {r.soon ? (
-          <Badge tone="warning" icon={<IconClock />}>
-            Due soon
-          </Badge>
-        ) : (
-          <Badge tone="success" icon={<IconCircleCheck />}>
-            OK
-          </Badge>
-        )}
+        <StatusBadge status={r.status} />
       </Td>
     </Tr>
   );
