@@ -19,6 +19,7 @@ test.describe('SSL & domains (local Supabase)', () => {
   test.describe.configure({ mode: 'serial' });
 
   let siteId = '';
+  // eslint-disable-next-line no-empty-pattern -- Playwright reads the fixtures from a destructured first argument
   test.beforeAll(async ({}, info) => {
     // each project its own site, so one project's cleanup never removes the other's row
     siteId = await nthLiveSiteId(info.project.name === 'mobile' ? 1 : 0);

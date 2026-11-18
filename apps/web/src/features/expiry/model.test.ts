@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expiryView, type ExpiryRecord } from './model';
+import { expiryView, readWords, type ExpiryRecord } from './model';
 
 // Board Expiry / spec §15.8 sample (test data only): today is Fri 25 Sep 2026 (Bangkok).
 const NOW = new Date('2026-09-25T03:00:00Z');
@@ -87,7 +87,7 @@ describe('expiryView — the §15.8 figures on Fri 25 Sep 2026 (Done-when 2)', (
         label: 'Due within 60 days',
         value: '2',
         unit: 'items',
-        caption: 'Cando Asia 41 d · WeCare Studio 50 d',
+        caption: 'Cando Asia domain 41 d · WeCare Studio domain 50 d',
       },
     ]);
   });
@@ -164,5 +164,19 @@ describe('expiryView — alerts, failures and sites with no read', () => {
     });
     expect(v.meta).toBe('Checked daily 06:00 · not checked yet · 0 of 2 read');
     expect(v.kpis[2]!.caption).toBe('Nothing due');
+  });
+});
+
+describe('readWords — a failed read in words (spec §13)', () => {
+  it.each([
+    ['RDAP 503', 'Registry unavailable'],
+    ['WHOIS unreachable', 'Registry unavailable'],
+    ['RDAP 429', 'Registry refused the lookup'],
+    ['ECONNRESET', "Couldn't connect"],
+    ['Read failed', "Couldn't connect"],
+    ['Timeout', 'Timeout'],
+    ['No registry lookup for .app', 'No registry lookup for .app'],
+  ])('%s → %s', (raw, words) => {
+    expect(readWords(raw)).toBe(words);
   });
 });

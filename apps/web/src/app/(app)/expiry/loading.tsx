@@ -9,12 +9,8 @@ export default function Loading() {
         <PageHeaderSkeleton actions={1} phoneBar="title" />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3" aria-hidden>
           <CardSkeleton lines={2} />
-          <div className="max-md:hidden">
-            <CardSkeleton lines={2} />
-          </div>
-          <div className="max-md:hidden">
-            <CardSkeleton lines={2} />
-          </div>
+          <CardSkeleton lines={2} />
+          <CardSkeleton lines={2} />
         </div>
         <CardSkeleton lines={2} />
         <CardSkeleton lines={10} />

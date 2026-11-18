@@ -66,6 +66,17 @@ export interface ExpiryData {
   domains: number;
 }
 
+/**
+ * A read failure in words (spec §13): the reader's own messages are already words; a socket code
+ * (ECONNRESET) or an RDAP status (RDAP 503) is not.
+ */
+export function readWords(error: string): string {
+  if (/^RDAP 5\d\d$|^WHOIS unreachable$/.test(error)) return 'Registry unavailable';
+  if (/^RDAP \d{3}$/.test(error)) return 'Registry refused the lookup';
+  if (/^E[A-Z_]+/.test(error) || /^Read failed$/.test(error)) return "Couldn't connect";
+  return error;
+}
+
 function half(at: string | null, count: ExpiryCount | null, error: string | null): ExpiryHalf {
   if (!at || !count) return { date: null, days: null, tone: 'none', error };
   // A failed read's last date is shown greyed and never counted: it can't open a PROBLEM (D-066 item 3).
@@ -111,12 +122,12 @@ export function expiryView(
 
   const ssl14 = rows.filter((r) => r.ssl.tone === 'alert').length;
   const dom30 = rows.filter((r) => r.domain.tone === 'alert').length;
-  const due: { name: string; days: number }[] = [];
+  const due: { name: string; kind: 'SSL' | 'domain'; days: number }[] = [];
   for (const r of rows) {
     if (r.ssl.days !== null && (r.ssl.tone === 'alert' || r.ssl.tone === 'soon'))
-      due.push({ name: r.name, days: r.ssl.days });
+      due.push({ name: r.name, kind: 'SSL', days: r.ssl.days });
     if (r.domain.days !== null && (r.domain.tone === 'alert' || r.domain.tone === 'soon'))
-      due.push({ name: r.name, days: r.domain.days });
+      due.push({ name: r.name, kind: 'domain', days: r.domain.days });
   }
   due.sort((a, b) => a.days - b.days);
   const kpis: ExpiryKpi[] = [
@@ -126,7 +137,7 @@ export function expiryView(
       label: 'Due within 60 days',
       value: String(due.length),
       unit: due.length === 1 ? 'item' : 'items',
-      caption: due.length ? due.map((d) => `${d.name} ${d.days} d`).join(' · ') : 'Nothing due',
+      caption: due.length ? due.map((d) => `${d.name} ${d.kind} ${d.days} d`).join(' · ') : 'Nothing due',
     },
   ];
 
