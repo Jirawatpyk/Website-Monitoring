@@ -29,8 +29,15 @@ async function must<T>(
   return data;
 }
 
-// Inside response hours: a Tuesday 10:00 Bangkok, minute-aligned (Tier 1: a round a minute).
-const BASE = Date.parse('2026-11-10T03:00:00Z');
+// Inside response hours: the coming Wednesday 10:00 Bangkok (03:00 UTC), minute-aligned (Tier 1: a round
+// a minute). Never a fixed date: a fresh stack has check_results partitions from this month on only.
+const BASE = (() => {
+  const d = new Date();
+  d.setUTCHours(3, 0, 0, 0);
+  do d.setUTCDate(d.getUTCDate() + 1);
+  while (d.getUTCDay() !== 3);
+  return d.getTime();
+})();
 const roundAt = (k: number) => new Date(BASE + k * 60_000);
 const nowFor = (k: number) => new Date(BASE + k * 60_000 + 50_000);
 

@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(64);
+select plan(67);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -403,6 +403,39 @@ select ok(
      from public.audit_log where entity_id = '00000000-0000-0000-0000-0000000000e5' and action = 'incident.relapsed'
        and before ? 'expiry_ack_cleared'),
   'each audit row records the ack it cleared'
+);
+
+-- Tao, 17 Nov: an SSL incident acknowledged ("waiting for the renewal") takes a defacement: the ack is
+-- cleared and the PROBLEM ladder starts again from the new cause.
+insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000a8', '00000000-0000-0000-0000-0000000000c1', 'Acked SSL', 1,
+   (select id from ids where name = 'arm'), true);
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000d8', '00000000-0000-0000-0000-0000000000a8', 'http', true, 'https://h.pgtap.test');
+insert into public.incidents (id, site_id, monitor_id, trigger, severity, episode_severity, state, started_at, detected_at,
+                              acked_at, acked_by, escalation_level, escalation_plan)
+  values ('00000000-0000-0000-0000-0000000000e8', '00000000-0000-0000-0000-0000000000a8',
+          '00000000-0000-0000-0000-0000000000d8', 'ssl', 'problem', 'problem', 'acknowledged',
+          now() - interval '4 days', now() - interval '4 days', now() - interval '4 days',
+          (select id from ids where name = 'arm'), 1, public.escalation_plan_for(1::smallint, 'problem'));
+insert into public.notifications (incident_id, channel, template, thread_key, context, status, sent_at, created_at)
+  values ('00000000-0000-0000-0000-0000000000e8', 'google_chat', 'acknowledged', '00000000-0000-0000-0000-0000000000e8',
+          '{}', 'sent', now() - interval '4 days', now() - interval '4 days');
+set local role service_role;
+select ok(
+  public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e8', null, 'keyword', now(), '{"summary": "y"}', true),
+  'the acknowledged SSL incident takes the keyword'
+);
+reset role;
+select ok(
+  (select state = 'unacked' and acked_at is null and escalation_level = 0 and alerted_at = now()
+     from public.incidents where id = '00000000-0000-0000-0000-0000000000e8'),
+  'the ack of the SSL is cleared and the ladder starts again from the new cause'
+);
+select ok(
+  (select dedupe_key like '%:expiry-ack:%' from public.notifications
+     where incident_id = '00000000-0000-0000-0000-0000000000e8' and template = 'acknowledged'),
+  'its old ACKNOWLEDGED stays the record, under its own key (the next ack posts)'
 );
 
 -- Engine review: an incident acknowledged before the migration (no acked_cause) keeps its ack on a DOWN.

@@ -76,6 +76,9 @@ declare
   v_state public.incident_state;
   v_severity public.severity;
   v_column public.incident_trigger;
+  v_expiry_ack boolean;
+  v_acked_at timestamptz;
+  v_acked_by uuid;
   v_oncall uuid;
   v_recent_chat boolean;
   v_recent_mail boolean;
@@ -85,8 +88,9 @@ declare
 begin
   -- An incident on a PROBLEM drop whose cause is an expiry (a DOWN incident back up on SSL too, Tao
   -- 17 Nov), and only for a cause that isn't one.
-  select i.site_id, coalesce(i.cause_trigger, i.trigger), i.state, i.severity, i.trigger
-    into v_site_id, v_was, v_state, v_severity, v_column
+  select i.site_id, coalesce(i.cause_trigger, i.trigger), i.state, i.severity, i.trigger,
+         coalesce(i.acked_at is not null and i.acked_cause in ('ssl', 'domain'), false), i.acked_at, i.acked_by
+    into v_site_id, v_was, v_state, v_severity, v_column, v_expiry_ack, v_acked_at, v_acked_by
   from public.incidents i
   where i.id = p_incident_id
     and p_trigger not in ('ssl', 'domain')
@@ -103,8 +107,28 @@ begin
     set trigger = case when v_severity = 'problem' then p_trigger else i.trigger end,
         expiry_left = true,
         cause_trigger = p_trigger,
-        monitor_id = case when v_severity = 'problem' then coalesce(p_monitor_id, i.monitor_id) else i.monitor_id end
+        monitor_id = case when v_severity = 'problem' then coalesce(p_monitor_id, i.monitor_id) else i.monitor_id end,
+        -- Tao, 17 Nov: an ack given for the expiry doesn't cover the new cause — it is cleared and the
+        -- ladder starts again from the new cause (alerted_at: no level counted from the old clock).
+        acked_at = case when v_expiry_ack then null else i.acked_at end,
+        acked_by = case when v_expiry_ack then null else i.acked_by end,
+        state = case when v_expiry_ack then 'unacked'::public.incident_state else i.state end,
+        escalation_level = case when v_expiry_ack then 0 else i.escalation_level end,
+        alerted_at = case when v_expiry_ack then p_round_at else i.alerted_at end
     where i.id = p_incident_id;
+
+  if v_expiry_ack then
+    v_state := 'unacked';
+    -- Its ACKNOWLEDGED still held or retrying never posts after the reply; a sent one stays the record.
+    update public.notifications
+      set status = 'cancelled', error = 'Superseded: new cause', next_retry_at = null
+      where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued'
+        and attempts = (select count(*) from public.notification_attempts a where a.notification_id = public.notifications.id);
+    update public.notifications
+      set dedupe_key = coalesce(dedupe_key, '') || ':expiry-ack:' || to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+      where incident_id = p_incident_id and template = 'acknowledged' and status <> 'cancelled'
+        and coalesce(dedupe_key, '') not like '%:expiry-ack:%';
+  end if;
 
   -- Tao, 17 Nov: a Tier 1 new cause at night that nobody acknowledged is told to whoever is on call now.
   -- Only this reply and its email name them: the incident's L0 (the owner's emails, RECOVERED) is kept.
@@ -116,6 +140,7 @@ begin
   insert into public.incident_events (incident_id, type, payload, at)
   values (p_incident_id, 'new_cause',
           coalesce(p_context, '{}') || jsonb_build_object('trigger', p_trigger, 'was', v_was)
+            || case when v_expiry_ack then jsonb_build_object('ackCleared', true) else '{}'::jsonb end
             -- Who it told at night (their later emails say why they get them).
             || case when exists (select 1 from public.profiles p where p.id = v_oncall and p.is_active)
                     then jsonb_build_object('mention', jsonb_build_object('id', v_oncall)) else '{}'::jsonb end,
@@ -124,7 +149,10 @@ begin
   insert into public.audit_log (action, entity, entity_id, before, after)
   values ('incident.new_cause', 'incident', p_incident_id,
           -- The column as it was and is (a DOWN incident keeps hard_fail / manual), and the cause.
-          jsonb_build_object('trigger', v_column, 'cause', v_was, 'state', v_state),
+          jsonb_build_object('trigger', v_column, 'cause', v_was,
+                             'state', case when v_expiry_ack then 'acknowledged' else v_state::text end)
+            || case when v_expiry_ack then jsonb_build_object('expiry_ack_cleared', true,
+                 'acked_at', v_acked_at, 'acked_by', v_acked_by) else '{}'::jsonb end,
           jsonb_build_object('trigger', case when v_severity = 'problem' then p_trigger else v_column end,
                              'cause', p_trigger, 'state', v_state));
 
