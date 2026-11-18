@@ -45,8 +45,9 @@ export function CheckNowButton({ onChecking }: { onChecking: (startedAt: string 
       {busy ? 'Checking…' : 'Check now'}
     </Button>
   );
+  // One child of the header's actions, so the button keeps the whole row below md and the error sits under it.
   return (
-    <>
+    <div className="flex w-full flex-col items-stretch gap-1 md:w-auto md:items-end">
       {error ? (
         <Tooltip content={error} side="bottom">
           {button}
@@ -57,6 +58,6 @@ export function CheckNowButton({ onChecking }: { onChecking: (startedAt: string 
       <span role="status" className={error ? 'text-sm text-alert-warning-fg' : 'sr-only'}>
         {error ?? ''}
       </span>
-    </>
+    </div>
   );
 }

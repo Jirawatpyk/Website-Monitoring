@@ -249,6 +249,16 @@ describe('weekly email (WeeklyEmail board, §36)', () => {
     expect(weeklyEmail(busy()).html).toMatch(/>DxT <span/);
   });
 
+  it('COMING UP carries the expiry lines after the on-call week, in HTML and plain text (S13)', () => {
+    const f = busy({ expiring: [{ site: 'WeCare Studio', halves: [{ kind: 'domain', days: 47 }] }] });
+    const m = weeklyEmailModel(f);
+    expect(m.coming.at(-1)).toBe('WeCare Studio domain in 47 days');
+    expect(m.coming.indexOf('WeCare Studio domain in 47 days')).toBeGreaterThan(0);
+    const mail = weeklyEmail(f);
+    expect(mail.html).toContain('WeCare Studio domain in 47 days');
+    expect(mail.text).toContain('WeCare Studio domain in 47 days');
+  });
+
   it('escapes what people typed', () => {
     const evil = weeklyEmail(busy({ planned: [{ ...busy().planned[0]!, reason: '<img src=x> & "y"' }] }));
     expect(evil.html).toContain('&lt;img src=x&gt; &amp; &quot;y&quot;');

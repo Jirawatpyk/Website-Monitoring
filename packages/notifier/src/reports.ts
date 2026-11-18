@@ -174,16 +174,16 @@ export interface ReportExpiry {
   halves: readonly { kind: 'ssl' | 'domain'; days: number }[];
 }
 
-const inDays = (d: number, first: boolean) =>
-  d < 0
-    ? 'expired'
-    : d === 0
-      ? 'expires today'
-      : `in ${d} ${first ? (d === 1 ? 'day' : 'days') : ''}`.trimEnd();
+/** "in 38 days"; the unit is left off only after a half that already said "in N days" ("· SSL in 52"). */
+const inDays = (d: number, unit: boolean) =>
+  d < 0 ? 'expired' : d === 0 ? 'expires today' : `in ${d}${unit ? (d === 1 ? ' day' : ' days') : ''}`;
 
 /** "Cando Asia domain in 38 days · SSL in 52" (WeeklySummary COMING UP; who renews is left out, D-066 item 5). */
 export function expiryLine(e: ReportExpiry): string {
-  const words = e.halves.map((h, i) => `${h.kind === 'ssl' ? 'SSL' : 'domain'} ${inDays(h.days, i === 0)}`);
+  const words = e.halves.map((h, i) => {
+    const before = e.halves[i - 1];
+    return `${h.kind === 'ssl' ? 'SSL' : 'domain'} ${inDays(h.days, !before || before.days <= 0)}`;
+  });
   return `${plainName(e.site)} ${words.join(' · ')}`;
 }
 

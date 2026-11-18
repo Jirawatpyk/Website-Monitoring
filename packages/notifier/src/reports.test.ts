@@ -695,9 +695,16 @@ describe('expiryLine — COMING UP (S13)', () => {
         { kind: 'domain', days: 0 },
         { kind: 'ssl', days: 9 },
       ],
-      'Cando Asia domain expires today · SSL in 9',
+      'Cando Asia domain expires today · SSL in 9 days',
     ],
     [[{ kind: 'domain', days: -2 }], 'Cando Asia domain expired'],
+    [
+      [
+        { kind: 'ssl', days: -1 },
+        { kind: 'domain', days: 20 },
+      ],
+      'Cando Asia SSL expired · domain in 20 days',
+    ],
   ] as const)('%j', (halves, text) => {
     expect(expiryLine({ site: 'Cando Asia', halves })).toBe(text);
   });

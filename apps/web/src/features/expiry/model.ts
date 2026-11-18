@@ -68,7 +68,9 @@ export interface ExpiryData {
 
 function half(at: string | null, count: ExpiryCount | null, error: string | null): ExpiryHalf {
   if (!at || !count) return { date: null, days: null, tone: 'none', error };
-  return { date: formatDay(new Date(at), { year: true }), days: count.days, tone: count.tone, error };
+  // A failed read's last date is shown greyed and never counted: it can't open a PROBLEM (D-066 item 3).
+  const tone = error ? 'none' : count.tone;
+  return { date: formatDay(new Date(at), { year: true }), days: count.days, tone, error };
 }
 
 /**
@@ -135,7 +137,13 @@ export function expiryView(
     .filter((v): v is string => !!v)
     .sort()
     .at(-1);
-  const halves = sites.length * 2;
+  // A site served without TLS has no certificate to read (checked, no date, no error): one half only.
+  const byId = new Map(mine.map((r) => [r.site_id, r]));
+  const noTls = sites.filter((s) => {
+    const r = byId.get(s.id);
+    return !!r && !r.ssl_checked_at && !r.ssl_error && !!r.domain_checked_at;
+  }).length;
+  const halves = sites.length * 2 - noTls;
   const read = mine.reduce(
     (n, r) => n + (r.ssl_read_at && !r.ssl_error ? 1 : 0) + (r.domain_read_at && !r.domain_error ? 1 : 0),
     0,
@@ -147,7 +155,7 @@ export function expiryView(
     rows,
     kpis,
     meta: `Checked daily 06:00${last} · ${read} of ${halves} read`,
-    certificates: sites.length,
+    certificates: sites.length - noTls,
     domains: sites.length,
   };
 }

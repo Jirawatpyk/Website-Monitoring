@@ -25,6 +25,7 @@ import {
   IconMinus,
 } from '@jirawatpyk/aura-react/icons';
 import type { DayTone, ExpiryData, ExpiryHalf, ExpiryRowView } from '../model';
+import { TOUCH_HIT } from '@/components/site-cells';
 import { CheckNowButton } from './check-now';
 
 const KPI_ICONS = [<IconLock key="l" />, <IconCalendar key="c" />, <IconClock key="k" />];
@@ -41,7 +42,7 @@ function DateCell({ half }: { half: ExpiryHalf }) {
   if (half.error) {
     return (
       <Tooltip content={half.error} side="bottom">
-        <button type="button" className="flex flex-col items-start text-left">
+        <button type="button" className={`flex flex-col items-start text-left ${TOUCH_HIT}`}>
           <span className="text-alert-warning-fg">Couldn&apos;t read</span>
           {half.date && <span className="text-xs text-fg-tertiary">{`last ${half.date}`}</span>}
         </button>
@@ -53,9 +54,8 @@ function DateCell({ half }: { half: ExpiryHalf }) {
 
 function DaysCell({ half }: { half: ExpiryHalf }) {
   if (half.days === null) return <span className="text-fg-secondary">—</span>;
-  // a failed read's old count is greyed, never red: the PROBLEM waits for a good read (D-066 item 3)
-  const tone = half.error ? 'none' : half.tone;
-  return <span className={`inline-block rounded-full px-2 leading-6 ${TONE[tone]}`}>{half.days}</span>;
+  // a failed read's old count comes greyed from the model (tone none), never red (D-066 item 3)
+  return <span className={`inline-block rounded-full px-2 leading-6 ${TONE[half.tone]}`}>{half.days}</span>;
 }
 
 /** Status never by colour alone: each badge has its icon and words (spec §11). */
@@ -198,7 +198,7 @@ export function ExpiryView({ data, canCheck }: { data: ExpiryData; canCheck: boo
                 {shown.length === 0 ? (
                   <Tr>
                     <Td colSpan={7} className="text-fg-secondary">
-                      Nothing due within 60 days.
+                      {data.rows.length === 0 ? 'No sites are monitored yet.' : 'Nothing due within 60 days.'}
                     </Td>
                   </Tr>
                 ) : (

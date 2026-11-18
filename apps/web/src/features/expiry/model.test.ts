@@ -125,6 +125,34 @@ describe('expiryView — alerts, failures and sites with no read', () => {
     expect(v.rows[0]!.status).toBe('failed');
   });
 
+  it('a failed read 10 days out is greyed and never counted: it cannot open a PROBLEM (D-066 item 3)', () => {
+    const v = expiryView(
+      [rec('cando', '2026-10-05', 90, '2027-04-24', { ssl_error: 'TLS handshake timed out' })],
+      [{ id: 'cando', name: 'Cando Asia' }],
+      NOW,
+    );
+    expect(v.rows[0]!.ssl).toMatchObject({ days: 10, tone: 'none', date: '5 Oct 2026' });
+    expect(v.rows[0]!.status).toBe('failed');
+    expect(v.kpis.map((k) => k.value)).toEqual(['0', '0', '0']);
+  });
+
+  it('a site without TLS has one half to read', () => {
+    const v = expiryView(
+      [
+        rec('plain', null, 0, '2027-04-24', { ssl_checked_at: null }),
+        rec('cando', '2026-11-19', 90, '2026-11-05'),
+      ],
+      [
+        { id: 'plain', name: 'Plain' },
+        { id: 'cando', name: 'Cando Asia' },
+      ],
+      NOW,
+    );
+    expect(v.meta).toMatch(/· 3 of 3 read$/);
+    expect(v.certificates).toBe(1);
+    expect(v.rows.find((r) => r.siteId === 'plain')!.status).toBe('ok');
+  });
+
   it('a site with no row yet: dashes, listed last, "not checked yet"', () => {
     const v = expiryView([], [{ id: 'new', name: 'New site' }], NOW);
     expect(v.rows[0]).toMatchObject({
