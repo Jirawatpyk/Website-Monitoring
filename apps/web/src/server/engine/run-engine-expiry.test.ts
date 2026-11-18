@@ -171,7 +171,6 @@ describe('runEngine — SSL / domain expiry (D-066)', () => {
       p_trigger: 'keyword',
       p_notify: true,
       p_context: { cause: 'Found “Index of /” on / (SIN, TYO)' },
-      p_was: 'ssl',
       // 17:01 Bangkok on a Tuesday: inside hours, L0 stays (at night the SQL names the person on call).
       p_outside_hours: false,
     });

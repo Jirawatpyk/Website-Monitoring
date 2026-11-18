@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { IncidentFacts, Notification } from './facts';
-import { renderChat, renderEmail } from './render';
+import { emailReason, renderChat, renderEmail } from './render';
 
 // D-067: INC-0136 DxT AI (Tier 3) was open for SSL expiring; a forbidden word took over as its cause.
 const incident: IncidentFacts = {
@@ -153,6 +153,21 @@ describe('render — a new cause (D-067)', () => {
       thread,
     )!;
     expect(email.text).not.toContain('couldn’t be delivered');
+    // Their RECOVERED email later says why too (the new cause's event names them).
+    const told: IncidentFacts = {
+      ...incident,
+      incident_events: [
+        ...incident.incident_events!,
+        {
+          type: 'new_cause',
+          at: '2026-09-24T03:00:00Z',
+          payload: { trigger: 'keyword', mention: { id: 'u-oncall' } },
+        },
+      ],
+    };
+    expect(
+      emailReason(row({ channel: 'email', user_id: 'u-oncall', template: 'recovered', context: {} }), told),
+    ).toBe('oncall');
   });
 
   it('a DOWN incident back up on SSL: the body says so, not “open for SSL expiring”', () => {

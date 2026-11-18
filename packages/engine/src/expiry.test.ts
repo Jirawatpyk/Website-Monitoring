@@ -350,7 +350,7 @@ describe('decideSite — a new cause on an open expiry incident (D-067)', () => 
       ...open,
       severity: 'down',
       episodeSeverity: 'problem',
-      trigger: 'hard_fail',
+      trigger: 'ssl', // the drop's cause (cause_trigger)
     };
     expect(
       decideSite(
@@ -367,7 +367,7 @@ describe('decideSite — a new cause on an open expiry incident (D-067)', () => 
               expiry: fact('2026-10-06', null),
             }),
           ],
-          { open: { ...d023, leftExpiry: true } },
+          { open: { ...d023, trigger: 'keyword', leftExpiry: true } },
         ),
       ),
     ).toMatchObject({ kind: 'cause_back', trigger: 'ssl' });
@@ -378,7 +378,7 @@ describe('decideSite — a new cause on an open expiry incident (D-067)', () => 
       ...open,
       severity: 'down',
       episodeSeverity: 'problem',
-      trigger: 'hard_fail',
+      trigger: 'key_page',
     };
     const key = monitor(
       LOCATIONS.map((l, i) => ({ ...check(l, 'pass', 1 + i), statusCode: 404 })),
@@ -524,7 +524,7 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
       ...open,
       severity: 'down',
       episodeSeverity: 'problem',
-      trigger: 'hard_fail',
+      trigger: 'ssl', // the drop's cause (cause_trigger)
     };
     for (const over of [{}, night]) {
       expect(

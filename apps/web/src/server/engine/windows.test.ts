@@ -16,21 +16,13 @@ describe('engine windows (S09, D-036)', () => {
     expect(windowHides({ ...open, trigger: 'ssl' })).toBe(true);
     expect(windowHides({ ...open, trigger: 'domain', episode_severity: null })).toBe(true);
     expect(windowHides({ ...open, trigger: 'keyword' })).toBe(false);
-    // A DOWN incident back up: hidden only while the expiry is its only failing verdict (Tao, 17 Nov).
+    // A DOWN incident back up on SSL: hidden like a PROBLEM one, by the drop's cause (Tao, 17 Nov).
     const down = { ...open, severity: 'down', trigger: 'hard_fail' };
     expect(windowHides(down)).toBe(false);
-    expect(
-      windowHides(down, [
-        { status: 'problem', trigger: 'ssl' },
-        { status: 'ok', trigger: null },
-      ]),
-    ).toBe(true);
-    expect(
-      windowHides(down, [
-        { status: 'problem', trigger: 'ssl' },
-        { status: 'problem', trigger: 'key_page' },
-      ]),
-    ).toBe(false);
+    expect(windowHides({ ...down, cause_trigger: 'ssl' })).toBe(true);
+    expect(windowHides({ ...down, cause_trigger: 'key_page' })).toBe(false);
+    // A DOWN drop is never hidden.
+    expect(windowHides({ ...down, episode_severity: 'down', cause_trigger: 'ssl' })).toBe(false);
   });
 
   it('reads only windows whose start engine_log_windows checked (a failed log hides nothing)', async () => {

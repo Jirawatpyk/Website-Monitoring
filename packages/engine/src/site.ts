@@ -520,11 +520,8 @@ function judgeSiteRound(
     // incident's PROBLEM drop (D-023, a PROBLEM AGAIN) keeps its trigger, so its cause is what the site
     // carried last round (Tao, 17 Nov: a hijack after a DOWN never waits for a renewal either).
     const onDrop = !!open && episode === 'problem' && RECOVERABLE.includes(open.state);
-    const was = !open
-      ? null
-      : open.severity === 'problem'
-        ? (open.trigger ?? null)
-        : carriedCause(s.monitors);
+    // The cause of the drop in progress (`OpenIncident.trigger`: incidents.cause_trigger, else trigger).
+    const was = open?.trigger ?? null;
     if (onDrop && open.leftExpiry && !isExpiryTrigger(was) && isExpiryTrigger(problem.v.trigger)) {
       return {
         kind: 'cause_back',
@@ -1279,21 +1276,9 @@ function keepsExpiry(m: SiteMonitor, s: SiteSnapshot): boolean {
   const o = s.open;
   if (!o || RECOVERED_STATES.includes(o.state) || (o.episodeSeverity ?? o.severity) !== 'problem')
     return false;
-  // The expiry was the drop's only cause last round (engine re-review: a key page carried beside it
-  // means the incident is about the key page, which recovers when it clears).
-  if (isExpiryTrigger(carriedCause(s.monitors))) return true;
-  return (o.severity === 'problem' && isExpiryTrigger(o.trigger)) || !!o.leftExpiry;
-}
-
-/**
- * The site's cause last round from the monitors' carries, ranked as this round's PROBLEM is (the
- * primary, then key pages, an expiry last): an expiry only when nothing else was failing.
- */
-function carriedCause(monitors: readonly SiteMonitor[]): Trigger | null {
-  const failing = monitors.filter((m) => m.carry.status === 'problem' || m.carry.status === 'down');
-  const rank = (m: SiteMonitor) => (isExpiryTrigger(m.carry.trigger) ? 2 : m.isPrimary ? 0 : 1);
-  const first = [...failing].sort((a, b) => rank(a) - rank(b))[0];
-  return first ? (first.carry.trigger ?? null) : null;
+  // The drop's cause is the expiry, or was taken from it (stored on the incident: a window hiding
+  // rounds can't lose it — engine re-review).
+  return isExpiryTrigger(o.trigger) || !!o.leftExpiry;
 }
 
 /**

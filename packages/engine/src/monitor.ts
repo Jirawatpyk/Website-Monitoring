@@ -42,7 +42,10 @@ export interface OpenIncident {
   detectedAt?: Date;
   /** Tagged flapping (D-004): RECOVERED becomes one summary after 15 min of continuous OK. */
   isFlapping?: boolean;
-  /** Its current trigger (`incidents.trigger`): an SSL / domain incident takes a new cause (D-067). */
+  /**
+   * The cause of the drop in progress (`incidents.cause_trigger`, else `trigger`): an SSL / domain
+   * incident takes a new cause and goes back to it (D-067).
+   */
   trigger?: Trigger;
   /**
    * D-067 item 4: the incident's cause came from an SSL / domain expiry (its newest `new_cause` since

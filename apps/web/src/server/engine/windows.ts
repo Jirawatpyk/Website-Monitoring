@@ -27,17 +27,21 @@ export function inWindow(w: SiteWindows | undefined, at: Date): boolean {
  */
 export function windowHides(
   open:
-    | { state: string; severity?: string; episode_severity?: string | null; trigger?: string | null }
+    | {
+        state: string;
+        severity?: string;
+        episode_severity?: string | null;
+        trigger?: string | null;
+        cause_trigger?: string | null;
+      }
     | null
     | undefined,
-  carries: readonly { status: string; trigger: string | null }[] = [],
 ): boolean {
   if (!open || open.state === 'monitoring' || open.state === 'needs_root_cause') return true;
-  if ((open.episode_severity ?? open.severity) !== 'problem') return false;
-  if (open.severity === 'problem') return isExpiry(open.trigger);
-  // A DOWN incident back up whose only failing verdict is the expiry (Tao, 17 Nov).
-  const failing = carries.filter((c) => c.status !== 'ok');
-  return failing.length > 0 && failing.every((c) => c.status === 'problem' && isExpiry(c.trigger));
+  // On a PROBLEM drop whose cause is the expiry — a DOWN incident back up on SSL too (Tao, 17 Nov).
+  return (
+    (open.episode_severity ?? open.severity) === 'problem' && isExpiry(open.cause_trigger ?? open.trigger)
+  );
 }
 
 const isExpiry = (t: string | null | undefined) => t === 'ssl' || t === 'domain';

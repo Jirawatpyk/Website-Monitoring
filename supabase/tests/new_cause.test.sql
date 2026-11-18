@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(36);
+select plan(39);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -70,7 +70,7 @@ select ok(
   'once the cause is no longer an expiry, nothing more switches'
 );
 reset role;
-update public.incidents set trigger = 'ssl' where id = '00000000-0000-0000-0000-0000000000e1';
+update public.incidents set trigger = 'ssl', cause_trigger = null where id = '00000000-0000-0000-0000-0000000000e1';
 set local role service_role;
 select ok(
   not public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e1', null, 'domain', now(), '{}', true),
@@ -145,7 +145,7 @@ select ok(
 );
 
 -- Engine re-review: a key page flipping is told once per 30 min.
-update public.incidents set trigger = 'ssl' where id = '00000000-0000-0000-0000-0000000000e1';
+update public.incidents set trigger = 'ssl', cause_trigger = null where id = '00000000-0000-0000-0000-0000000000e1';
 insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key)
   values ('00000000-0000-0000-0000-0000000000e1', 'google_chat', 'problem_again',
           '00000000-0000-0000-0000-0000000000e1', '{"newCause": true, "trigger": "key_page"}', 'new_cause:earlier');
@@ -162,7 +162,7 @@ select is(
      and status <> 'cancelled'),
   1, 'no second reply within 30 min'
 );
-update public.incidents set trigger = 'ssl' where id = '00000000-0000-0000-0000-0000000000e1';
+update public.incidents set trigger = 'ssl', cause_trigger = null where id = '00000000-0000-0000-0000-0000000000e1';
 
 -- Engine re-review M2: a PROBLEM AGAIN on a DOWN incident keeps its trigger.
 insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
@@ -184,21 +184,33 @@ select is((select trigger::text from public.incidents where id = '00000000-0000-
   'the DOWN incident keeps its trigger (a hand-opened DOWN stays manual)');
 
 -- Tao, 17 Nov: a DOWN incident whose PROBLEM drop is SSL takes a new cause too, its trigger kept.
+select is((select cause_trigger::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e2'),
+  'key_page', 'the PROBLEM AGAIN stored its drop''s cause');
 set local role service_role;
 select ok(
-  public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e2', null, 'keyword', now(), '{}', false,
-    p_was => 'ssl'),
-  'a DOWN incident back up on SSL takes the keyword as its new cause'
-);
-select ok(
   not public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e2', null, 'keyword', now(), '{}', false),
-  'without the expiry its drop carried, it doesn''t'
+  'a key-page drop takes no new cause'
+);
+reset role;
+-- Its drop is SSL instead (a PROBLEM AGAIN into the expiry).
+update public.incidents set cause_trigger = 'ssl' where id = '00000000-0000-0000-0000-0000000000e2';
+set local role service_role;
+select ok(
+  public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e2', null, 'keyword', now(), '{}', false),
+  'a DOWN incident back up on SSL takes the keyword as its new cause'
 );
 reset role;
 select ok(
-  (select trigger = 'manual' and expiry_left from public.incidents where id = '00000000-0000-0000-0000-0000000000e2'),
-  'its trigger stays manual, and it may go back to SSL'
+  (select trigger = 'manual' and cause_trigger = 'keyword' and expiry_left from public.incidents
+     where id = '00000000-0000-0000-0000-0000000000e2'),
+  'its trigger stays manual, the drop''s cause is the keyword, and it may go back to SSL'
 );
+select is(private.site_busy('00000000-0000-0000-0000-0000000000a2'), 'INC-' || lpad(
+  (select number::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e2'), 4, '0'),
+  'its keyword blocks a window');
+update public.incidents set cause_trigger = 'ssl' where id = '00000000-0000-0000-0000-0000000000e2';
+select is(private.site_busy('00000000-0000-0000-0000-0000000000a2'), null,
+  'back on SSL alone it doesn''t (Tao, 17 Nov)');
 set local role service_role;
 select ok(
   not public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e1', null, 'domain', now(), '{}'),
@@ -208,13 +220,13 @@ reset role;
 
 -- D-067 item 3: an incident open only for an expiry doesn't stop a window or a mute.
 select is(private.site_busy('00000000-0000-0000-0000-0000000000a1'), null, 'an SSL incident leaves the site free');
-update public.incidents set trigger = 'keyword' where id = '00000000-0000-0000-0000-0000000000e1';
+update public.incidents set trigger = 'keyword', cause_trigger = null where id = '00000000-0000-0000-0000-0000000000e1';
 select is(private.site_busy('00000000-0000-0000-0000-0000000000a1'), 'INC-' || lpad(
   (select number::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e1'), 4, '0'),
   'a keyword incident still blocks it');
 
 -- D-067 item 2: a D-023 drop of a DOWN takes no new cause.
-update public.incidents set trigger = 'ssl', severity = 'down', episode_severity = 'problem'
+update public.incidents set trigger = 'ssl', cause_trigger = 'key_page', severity = 'down', episode_severity = 'problem'
   where id = '00000000-0000-0000-0000-0000000000e1';
 set local role service_role;
 select ok(
