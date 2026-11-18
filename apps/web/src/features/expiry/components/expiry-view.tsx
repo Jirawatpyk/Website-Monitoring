@@ -236,7 +236,7 @@ function HowItAlerts({ hours }: { hours: string }) {
  * `/expiry` — SSL & domains (boards Expiry, Expiry820, MExpiry; spec §14.12, §15.8, §39; S13, D-066).
  * Below xl the table is cards (D-066 item 9: the board's fixed columns don't fit 1024–1279 either).
  */
-export function ExpiryView({ data, canCheck }: { data: ExpiryData & { hours?: string }; canCheck: boolean }) {
+export function ExpiryView({ data, canCheck }: { data: ExpiryData & { hours: string }; canCheck: boolean }) {
   const total = data.rows.length;
   const all = `All ${total}`;
   const SOON = 'Within 60 days';
@@ -298,7 +298,7 @@ export function ExpiryView({ data, canCheck }: { data: ExpiryData & { hours?: st
         ))}
       </div>
 
-      <HowItAlerts hours={data.hours ?? 'Mon–Fri 09:00–18:00'} />
+      <HowItAlerts hours={data.hours} />
 
       <section className="flex flex-col gap-3" aria-labelledby="expiry-all">
         <div className="flex flex-wrap items-center justify-between gap-4">

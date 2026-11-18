@@ -1,4 +1,4 @@
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@jirawatpyk/aura-react';
 import { IconInfo, IconRotateCcw } from '@jirawatpyk/aura-react/icons';
@@ -17,6 +17,8 @@ export function CheckNowButton({ onChecking }: { onChecking: (startedAt: string 
   const [result, setResult] = useState<Result | null>(null);
   const [refreshing, startTransition] = useTransition();
   const busy = fetching || refreshing;
+  // a second click in the same tick sees the old `busy`; the ref closes that gap
+  const inFlight = useRef(false);
 
   // the meta line's "Checking…" ends with the refresh, not with the fetch
   useEffect(() => {
@@ -24,7 +26,8 @@ export function CheckNowButton({ onChecking }: { onChecking: (startedAt: string 
   }, [busy, onChecking]);
 
   async function check() {
-    if (busy) return;
+    if (busy || inFlight.current) return;
+    inFlight.current = true;
     const now = new Date();
     setFetching(true);
     setResult(null);
@@ -51,6 +54,7 @@ export function CheckNowButton({ onChecking }: { onChecking: (startedAt: string 
     } catch {
       next = { ok: false, error: "The check didn't reach the server — try again" };
     }
+    inFlight.current = false;
     setResult(next);
     setFetching(false);
     startTransition(() => router.refresh());
