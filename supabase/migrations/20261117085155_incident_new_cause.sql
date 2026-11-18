@@ -1,3 +1,5 @@
+set local lock_timeout = '5s';
+
 -- S13 (D-067): an incident open for an SSL / domain expiry takes a more urgent PROBLEM as its new
 -- cause. A site has one open incident (incidents_one_open_per_site), and an expiry PROBLEM can stay
 -- open for weeks while the certificate waits for its renewal; without this a defacement keyword, a
@@ -21,6 +23,30 @@ alter table public.incidents add column expiry_left boolean not null default fal
 -- `coalesce(cause_trigger, trigger)`; `trigger` stays what the pages and reports show (a DOWN incident
 -- keeps hard_fail / manual). One stored fact, so a window hiding rounds can't lose it (engine re-review).
 alter table public.incidents add column cause_trigger public.incident_trigger;
+
+-- What the ack was given for: the drop's cause when someone acknowledged (Tao, 17 Nov: an ack of an SSL
+-- / domain expiry never silences a real outage, while an ack of the outage itself still holds — engine
+-- re-review). Kept by a trigger, so every writer of acked_at (ack, Undo, a DOWN clearing it) agrees.
+alter table public.incidents add column acked_cause public.incident_trigger;
+
+create function private.incident_acked_cause()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.acked_at is null then
+    new.acked_cause := null;
+  elsif tg_op = 'INSERT' or old.acked_at is distinct from new.acked_at then
+    new.acked_cause := coalesce(new.cause_trigger, new.trigger);
+  end if;
+  return new;
+end;
+$$;
+
+create trigger incidents_acked_cause
+  before insert or update of acked_at on public.incidents
+  for each row execute function private.incident_acked_cause();
 
 create function public.engine_new_cause_incident(
   p_incident_id uuid,
@@ -274,8 +300,11 @@ declare
   v_before public.severity;
   v_to public.incident_state;
   v_after public.severity;
+  v_expiry_ack boolean;
 begin
-  select site_id, state, severity into v_site_id, v_from, v_before
+  select site_id, state, severity,
+         p_severity = 'down' and acked_at is not null and acked_cause in ('ssl', 'domain')
+    into v_site_id, v_from, v_before, v_expiry_ack
   from public.incidents
   where id = p_incident_id
     -- A DOWN never relapses a PROBLEM incident: that is engine_escalate_incident (D-021), which
@@ -303,7 +332,10 @@ begin
         cause_trigger = p_trigger,
         recovered_at = null,
         is_flapping = is_flapping or coalesce(p_flapping, false),
-        state = case when acked_at is not null then 'acknowledged'::public.incident_state
+        -- Tao, 17 Nov: an ack of the expiry never silences a real outage (DOWN AGAIN as D-021).
+        acked_at = case when v_expiry_ack then null else acked_at end,
+        acked_by = case when v_expiry_ack then null else acked_by end,
+        state = case when acked_at is not null and not v_expiry_ack then 'acknowledged'::public.incident_state
                      -- Escalated only when a step of this severity really paged someone (D-034).
                      when exists (select 1 from public.incident_events e
                                   where e.incident_id = p_incident_id and e.type = 'step_fired'
@@ -314,11 +346,24 @@ begin
     where id = p_incident_id
     returning state, severity into v_to, v_after;
 
+  -- The cleared ack's ACKNOWLEDGED: one still held is cancelled (it would post after the DOWN — message-
+  -- checker); one sent stays as the record under its own key, so the next ack posts a fresh one (one live
+  -- message per incident / channel / template / person / key). Undo reads only the current ack's rows.
+  if v_expiry_ack then
+    update public.notifications
+      set status = 'cancelled', error = 'Superseded: went down', next_retry_at = null
+      where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued' and attempts = 0;
+    update public.notifications
+      set dedupe_key = coalesce(dedupe_key, '') || ':expiry-ack:' || to_char(p_detected_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+      where incident_id = p_incident_id and template = 'acknowledged' and status <> 'cancelled';
+  end if;
+
   insert into public.incident_events (incident_id, type, payload, at)
   values (p_incident_id, 'relapsed',
           coalesce(p_context, '{}') || jsonb_build_object(
             'severity', p_severity, 'trigger', p_trigger, 'startedAt', p_started_at,
-            'flapping', coalesce(p_flapping, false)),
+            'flapping', coalesce(p_flapping, false))
+            || case when v_expiry_ack then jsonb_build_object('ackCleared', true) else '{}'::jsonb end,
           p_detected_at);
 
   insert into public.audit_log (action, entity, entity_id, before, after)
@@ -471,8 +516,7 @@ begin
   -- real outage — the DOWN restarts the ladder as if nobody had acknowledged.
   -- An ack given while the incident was about the expiry: its cause is one, or was taken from one (an
   -- ack of the SSL, then a keyword new cause, then the DOWN — advisor).
-  select site_id, state,
-         acked_at is not null and (coalesce(cause_trigger, trigger) in ('ssl', 'domain') or expiry_left)
+  select site_id, state, acked_at is not null and acked_cause in ('ssl', 'domain')
     into v_site_id, v_from, v_expiry_ack
   from public.incidents
   where id = p_incident_id and severity = 'problem' and state not in ('resolved', 'in_review', 'closed')
@@ -508,20 +552,28 @@ begin
     where i.id = p_incident_id and s.id = i.site_id
     returning i.state into v_to;
 
-  -- The cleared ack's ACKNOWLEDGED rows stay as the record, under their own key, so the next ack posts a
-  -- fresh one (one live message per incident / channel / template / person / key).
+  -- The cleared ack's ACKNOWLEDGED: one still held is cancelled (it would post after the DOWN — message-
+  -- checker); one sent stays as the record under its own key, so the next ack posts a fresh one (one live
+  -- message per incident / channel / template / person / key). Undo reads only the current ack's rows.
   if v_expiry_ack then
+    update public.notifications
+      set status = 'cancelled', error = 'Superseded: went down', next_retry_at = null
+      where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued' and attempts = 0;
     update public.notifications
       set dedupe_key = coalesce(dedupe_key, '') || ':expiry-ack:' || to_char(p_detected_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
       where incident_id = p_incident_id and template = 'acknowledged' and status <> 'cancelled';
   end if;
 
   insert into public.incident_events (incident_id, type, payload, at)
-  values (p_incident_id, 'escalated_to_down', p_context, p_detected_at);
+  values (p_incident_id, 'escalated_to_down',
+          case when v_expiry_ack then p_context || jsonb_build_object('ackCleared', true) else p_context end,
+          p_detected_at);
 
   insert into public.audit_log (action, entity, entity_id, before, after)
   values ('incident.severity', 'incident', p_incident_id,
-          jsonb_build_object('severity', 'problem', 'state', v_from, 'expiry_ack_cleared', v_expiry_ack),
+          jsonb_build_object('severity', 'problem', 'state', v_from, 'expiry_ack_cleared', v_expiry_ack)
+            || case when v_expiry_ack then (select jsonb_build_object('acked_at', acked_at, 'acked_by', acked_by)
+                                            from public.incidents where id = p_incident_id) else '{}'::jsonb end,
           jsonb_build_object('severity', 'down', 'state', v_to,
                              'l0_user_id', (select l0_user_id from public.incidents where id = p_incident_id)));
 
@@ -557,5 +609,207 @@ begin
 
   perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
   return true;
+end;
+$$;
+
+-- S13 (message-checker): Undo reads only the current ack's rows — an expiry ack a DOWN cleared (its
+-- ACKNOWLEDGED sent days ago) never closes the window of the next ack, and what that old ack set aside
+-- isn't put back. As in 20261016081115 otherwise.
+create or replace function public.undo_ack(p_incident_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_inc public.incidents%rowtype;
+  v_from public.incident_state;
+begin
+  select * into v_inc from public.incidents where id = p_incident_id for update;
+  if not found then
+    raise exception 'incident not found' using errcode = 'P0002';
+  end if;
+  if v_inc.acked_by is null then
+    raise exception 'Nothing to undo' using errcode = '55000';
+  end if;
+  if v_inc.acked_by is distinct from auth.uid() then
+    raise exception 'Only the person who acknowledged can undo it' using errcode = '42501';
+  end if;
+  -- Their own ack, but the incident moved on (recovered) or the window passed: too late.
+  if v_inc.state <> 'acknowledged' or now() >= v_inc.acked_at + interval '10 seconds' then
+    raise exception 'The undo window has closed' using errcode = '55000';
+  end if;
+
+  perform 1 from public.notifications
+    where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued'
+      and created_at >= v_inc.acked_at
+    for update;
+  if exists (
+    select 1 from public.notifications
+    where incident_id = p_incident_id and template = 'acknowledged'
+      and created_at >= v_inc.acked_at
+      and (status = 'sent' or (status = 'queued' and attempts > 0))
+  ) then
+    raise exception 'The undo window has closed' using errcode = '55000';
+  end if;
+
+  select (payload->>'from')::public.incident_state into v_from
+  from public.incident_events
+  where incident_id = p_incident_id and type = 'acknowledged'
+  order by at desc
+  limit 1;
+
+  update public.notifications
+    set status = 'cancelled', next_retry_at = null
+    where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued'
+      and created_at >= v_inc.acked_at;
+
+  -- D-047: the alert email the ack released waits out the rest of its grace again.
+  update public.notifications
+    set hold_until = created_at + interval '5 minutes'
+    where incident_id = p_incident_id and channel = 'email' and template in ('down', 'problem', 'down_again', 'problem_again')
+      and status = 'queued' and attempts = 0
+      and hold_until = v_inc.acked_at + interval '10 seconds'
+      and created_at + interval '5 minutes' > now();
+
+  -- As if the ack never happened: an alert it set aside is due again.
+  update public.notifications
+    set status = 'queued', error = null, next_retry_at = null
+    where incident_id = p_incident_id and status = 'cancelled'
+      and error = 'Superseded: acknowledged first' and updated_at >= v_inc.acked_at;
+
+  update public.incidents
+    set state = coalesce(v_from, 'unacked'), acked_at = null, acked_by = null
+    where id = p_incident_id;
+
+  insert into public.incident_events (incident_id, type, actor_id, payload)
+  values (p_incident_id, 'ack_undone', auth.uid(),
+          jsonb_build_object('state', coalesce(v_from, 'unacked')));
+
+  insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
+  values (auth.uid(), 'incident.ack_undone', 'incident', p_incident_id,
+          jsonb_build_object('state', 'acknowledged', 'acked_at', v_inc.acked_at),
+          jsonb_build_object('state', coalesce(v_from, 'unacked')));
+end;
+$$;
+
+-- D-067 item 3 (db review): the window's start has its own copy of the busy check (an invoker function
+-- can't call private.site_busy); it gets the same exception, or a window allowed on a site open for an
+-- expiry would be marked "didn't start". As in 20261011174143 otherwise.
+create or replace function public.engine_log_windows(p_now timestamptz)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  w public.maintenance_windows%rowtype;
+  v_busy text;
+  m public.maintenance_windows%rowtype;
+begin
+  -- Nobody approved it before its start: it never starts, and stops holding its time (D-036, §23.10).
+  for w in
+    update public.maintenance_windows mw
+      set cancelled_at = mw.starts_at, outcome = 'not_approved', end_logged = true,
+          log = mw.log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'not_approved'))
+    where mw.approved_at is null and mw.cancelled_at is null and mw.outcome is null and mw.starts_at <= p_now
+      and (mw.undo_until is null or mw.undo_until <= p_now)
+    returning mw.*
+  loop
+    insert into public.audit_log (action, entity, entity_id, before, after)
+    values ('maintenance.start', 'maintenance_window', w.id, jsonb_build_object('state', 'waiting'),
+            jsonb_build_object('state', 'not_approved', 'site_id', w.site_id));
+    perform public.engine_queue_window_messages(w.id, 'not_approved', null, null, 'not_approved');
+  end loop;
+
+  -- A window's start: it doesn't start on a site that is DOWN or has an incident that hasn't recovered
+  -- (§23.10); otherwise it starts, and a running mute on the site ends (alerts are off anyway).
+  for w in
+    select * from public.maintenance_windows mw
+    where mw.kind = 'maintenance' and not mw.start_logged and mw.cancelled_at is null and mw.outcome is null
+      and mw.approved_at is not null and mw.starts_at <= p_now
+      and (mw.undo_until is null or mw.undo_until <= p_now)
+    for update skip locked
+  loop
+    select coalesce(
+      (select 'INC-' || lpad(i.number::text, 4, '0') from public.incidents i
+        where i.site_id = w.site_id and i.state in ('unacked', 'escalated', 'acknowledged')
+          and not (coalesce(i.episode_severity, i.severity) = 'problem'
+                   and coalesce(i.cause_trigger, i.trigger) in ('ssl', 'domain'))
+        limit 1),
+      (select 'down' from public.site_status st where st.site_id = w.site_id and st.status = 'down'))
+    into v_busy;
+    if v_busy is not null then
+      update public.maintenance_windows
+        set cancelled_at = w.starts_at, outcome = 'didnt_start', outcome_detail = v_busy,
+            start_logged = true, end_logged = true,
+            log = log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'didnt_start', 'incident', v_busy))
+        where id = w.id;
+      insert into public.audit_log (action, entity, entity_id, before, after)
+      values ('maintenance.start', 'maintenance_window', w.id, jsonb_build_object('state', 'scheduled'),
+              jsonb_build_object('state', 'didnt_start', 'site_id', w.site_id, 'incident', v_busy));
+      perform public.engine_queue_window_messages(w.id, 'didnt_start', null, null, 'didnt_start',
+        jsonb_build_object('incident', v_busy));
+      continue;
+    end if;
+    update public.maintenance_windows
+      set start_logged = true,
+          log = log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'started'))
+      where id = w.id;
+    insert into public.audit_log (action, entity, entity_id, before, after)
+    values ('maintenance.start', 'maintenance_window', w.id, jsonb_build_object('state', 'scheduled'),
+            jsonb_build_object('state', 'active', 'site_id', w.site_id, 'ends_at', w.ends_at));
+    perform public.engine_queue_window_messages(w.id, 'started', null, null, 'started');
+    for m in
+      select * from public.maintenance_windows mm
+      where mm.site_id = w.site_id and mm.kind = 'mute' and mm.cancelled_at is null and mm.ended_at is null
+        and mm.starts_at <= p_now and mm.ends_at > p_now
+    loop
+      update public.maintenance_windows
+        set ended_at = p_now, end_reason = 'Maintenance started', end_logged = true,
+            log = log || jsonb_build_array(jsonb_build_object('at', p_now, 'action', 'ended_by_maintenance'))
+        where id = m.id;
+      insert into public.audit_log (action, entity, entity_id, before, after)
+      values ('site.mute_end', 'site', m.site_id, jsonb_build_object('muted_until', m.ends_at),
+              jsonb_build_object('ended_at', p_now, 'reason', 'Maintenance started', 'window_id', m.id));
+    end loop;
+  end loop;
+
+  -- Windows and mutes that ran their course: logged once (System).
+  for w in
+    update public.maintenance_windows mw
+      set end_logged = true,
+          log = mw.log || jsonb_build_array(jsonb_build_object('at', mw.ends_at, 'action', 'ended'))
+    where not mw.end_logged and mw.start_logged and mw.cancelled_at is null and mw.ended_at is null
+      and mw.outcome is null and mw.ends_at <= p_now
+      and (mw.undo_until is null or mw.undo_until <= p_now)
+    returning mw.*
+  loop
+    insert into public.audit_log (action, entity, entity_id, before, after)
+    values (case w.kind when 'mute' then 'site.mute_end' else 'maintenance.end' end,
+            case w.kind when 'mute' then 'site' else 'maintenance_window' end,
+            case w.kind when 'mute' then w.site_id else w.id end,
+            jsonb_build_object('state', 'active'),
+            jsonb_build_object('state', 'ended', 'ended_at', w.ends_at, 'window_id', w.id));
+    perform public.engine_queue_window_messages(w.id,
+      case w.kind when 'mute' then 'mute_ended' else 'ended' end, null, null, 'ended');
+  end loop;
+
+  -- A mute that ran out, or that maintenance ended, leaves the site row; one with no window behind it
+  -- (never written by the RPCs) is logged as it goes.
+  perform set_config('dxt.window_write', 'on', true);
+  with cleared as (
+    update public.sites s set muted_until = null, mute_reason = null, muted_at = null
+    where s.muted_until is not null
+      and (s.muted_until <= p_now
+           or not exists (select 1 from public.maintenance_windows mm
+                          where mm.site_id = s.id and mm.kind = 'mute' and mm.cancelled_at is null
+                            and mm.ended_at is null and mm.starts_at <= p_now and mm.ends_at > p_now))
+    returning s.id
+  )
+  insert into public.audit_log (action, entity, entity_id, after)
+  select 'site.mute_end', 'site', c.id, jsonb_build_object('reason', 'No mute window behind it')
+  from cleared c
+  where not exists (select 1 from public.maintenance_windows mm where mm.site_id = c.id and mm.kind = 'mute'
+                    and coalesce(mm.ended_at, mm.ends_at) between p_now - interval '2 minutes' and p_now + interval '1 minute');
 end;
 $$;

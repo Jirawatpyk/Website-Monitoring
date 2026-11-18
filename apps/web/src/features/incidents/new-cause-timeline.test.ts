@@ -51,7 +51,7 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
     );
     expect(t.map((x) => [x.title, x.detail])).toContainEqual([
       'Now Domain expiring',
-      'SSL expiring renewed · nobody was told',
+      'was SSL expiring · nobody was told',
     ]);
   });
 

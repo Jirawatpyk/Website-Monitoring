@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(49);
+select plan(57);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -302,9 +302,9 @@ insert into public.incidents (id, site_id, monitor_id, trigger, severity, episod
           now() - interval '9 days', now() - interval '9 days', now() - interval '9 days',
           (select id from ids where name = 'arm'), public.escalation_plan_for(1::smallint, 'problem'));
 -- The ack's ACKNOWLEDGED reply went 9 days ago.
-insert into public.notifications (incident_id, channel, template, thread_key, context, status, sent_at)
+insert into public.notifications (incident_id, channel, template, thread_key, context, status, sent_at, created_at)
   values ('00000000-0000-0000-0000-0000000000e4', 'google_chat', 'acknowledged', '00000000-0000-0000-0000-0000000000e4',
-          '{}', 'sent', now() - interval '9 days');
+          '{}', 'sent', now() - interval '9 days', now() - interval '9 days');
 set local role service_role;
 select ok(
   public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e4', null, 'domain', now(), '{}'),
@@ -341,11 +341,74 @@ select is(
      and channel = 'google_chat' and template = 'acknowledged' and status = 'queued'),
   1, 'a fresh ACKNOWLEDGED is queued'
 );
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select lives_ok(
+  $$select public.undo_ack('00000000-0000-0000-0000-0000000000e4')$$,
+  'and can undo it: the cleared ack''s old reply doesn''t close the window (message-checker)'
+);
+reset role;
+
+-- Engine re-review: the ack is judged by what it was given for. An ack of the outage holds.
+insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000a5', '00000000-0000-0000-0000-0000000000c1', 'Acked down', 1,
+   (select id from ids where name = 'arm'), true);
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000d5', '00000000-0000-0000-0000-0000000000a5', 'http', true, 'https://e.pgtap.test');
+insert into public.incidents (id, site_id, monitor_id, trigger, severity, episode_severity, state, started_at, detected_at,
+                              acked_at, acked_by, escalation_plan)
+  values ('00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000a5',
+          '00000000-0000-0000-0000-0000000000d5', 'hard_fail', 'down', 'down', 'acknowledged',
+          now() - interval '1 hour', now() - interval '1 hour', now() - interval '55 minutes',
+          (select id from ids where name = 'arm'), public.escalation_plan_for(1::smallint, 'down'));
+select is((select acked_cause::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e5'),
+  'hard_fail', 'the ack remembers it was given for the DOWN');
+-- Back up with SSL due (a PROBLEM AGAIN into the expiry), then DOWN AGAIN.
+update public.incidents set episode_severity = 'problem', cause_trigger = 'ssl'
+  where id = '00000000-0000-0000-0000-0000000000e5';
+set local role service_role;
+select ok(
+  public.engine_relapse_incident('00000000-0000-0000-0000-0000000000e5', 'down', 'hard_fail', now(), now(), now(), '{}', false, false),
+  'DOWN AGAIN'
+);
+reset role;
+select ok(
+  (select state = 'acknowledged' and acked_at is not null from public.incidents where id = '00000000-0000-0000-0000-0000000000e5'),
+  'the ack of the outage holds (D-004)'
+);
+
+-- An ack of the keyword the SSL incident took as its new cause holds through a DOWN too (D-021).
+update public.incidents set acked_at = now(), acked_by = (select id from ids where name = 'nok'), state = 'acknowledged'
+  where id = '00000000-0000-0000-0000-0000000000e3';
+set local role service_role;
+select ok(public.engine_escalate_incident('00000000-0000-0000-0000-0000000000e3', now(), now(), '{}', false),
+  'the defaced site goes DOWN');
+reset role;
+select ok(
+  (select state = 'acknowledged' and acked_cause = 'keyword' from public.incidents where id = '00000000-0000-0000-0000-0000000000e3'),
+  'the keyword''s ack holds'
+);
+
+-- D-067 item 3 (db review): a window on a site open only for an expiry starts.
+insert into public.maintenance_windows (site_id, kind, starts_at, ends_at, reason, approved_at)
+  values ('00000000-0000-0000-0000-0000000000a2', 'maintenance', now() - interval '1 minute', now() + interval '1 hour',
+          'Deploy', now() - interval '1 day');
+update public.incidents set cause_trigger = 'ssl' where id = '00000000-0000-0000-0000-0000000000e2';
+set local role service_role;
+select public.engine_log_windows(now());
+reset role;
+select is(
+  (select outcome from public.maintenance_windows where site_id = '00000000-0000-0000-0000-0000000000a2'),
+  null, 'it starts (not "didn''t start")'
+);
 
 select tests.authenticate_as((select id from ids where name = 'arm'));
 select throws_ok(
   $$select public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000e1', null, 'keyword', now(), '{}', true)$$,
   '42501', null, 'a signed-in session can''t call it'
+);
+select throws_ok(
+  $$select public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e1', null, 'ssl', now(), '{}')$$,
+  '42501', null, 'nor the way back (security review)'
 );
 
 select * from finish();

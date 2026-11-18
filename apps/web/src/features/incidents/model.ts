@@ -1129,13 +1129,13 @@ export function timelineOf(
           t && t in TRIGGER_LABELS ? TRIGGER_LABELS[t as Trigger] : 'a problem';
         // D-067 item 4: the new cause cleared, the expiry still under its line — back to it, silently.
         if (e.payload.back === true) {
-          // From one expiry to the other: the certificate renewed, the domain still due (Tao, 17 Nov).
+          // From one expiry to the other (one renewed, or the other fell under its line — Tao, 17 Nov).
           const fromExpiry = was === 'ssl' || was === 'domain';
           item(
             e,
             'problem',
             `${fromExpiry ? 'Now' : 'Back to'} ${label(trig)}`,
-            `${label(was)} ${fromExpiry ? 'renewed' : 'cleared'} · nobody was told`,
+            fromExpiry ? `was ${label(was)} · nobody was told` : `${label(was)} cleared · nobody was told`,
           );
           return;
         }

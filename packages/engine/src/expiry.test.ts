@@ -346,6 +346,17 @@ describe('decideSite — a new cause on an open expiry incident (D-067)', () => 
     ).toMatchObject({ kind: 'cause_back', trigger: 'domain', detail: { kind: 'domain', daysLeft: 20 } });
   });
 
+  it('…and the other way: a domain incident whose certificate fell under 14 days reads SSL expiring', () => {
+    const domainOpen: OpenIncident = { ...sslOpen, trigger: 'domain' };
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: heldDomain, expiry: fact('2026-10-06', '2026-10-13') })], {
+          open: domainOpen,
+        }),
+      ),
+    ).toMatchObject({ kind: 'cause_back', trigger: 'ssl' });
+  });
+
   it('a DOWN still escalates (D-021), never a new cause', () => {
     expect(
       decideSite(
