@@ -835,6 +835,26 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"site_expiry": {
+                  Row: {
+                    "created_at": string,"domain": string | null,"domain_checked_at": string | null,"domain_error": string | null,"domain_expires_at": string | null,"domain_read_at": string | null,"domain_source": string | null,"host": string,"id": string,"site_id": string,"ssl_checked_at": string | null,"ssl_error": string | null,"ssl_expires_at": string | null,"ssl_issuer": string | null,"ssl_read_at": string | null,"ssl_valid_from": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"domain"?: string | null,"domain_checked_at"?: string | null,"domain_error"?: string | null,"domain_expires_at"?: string | null,"domain_read_at"?: string | null,"domain_source"?: string | null,"host": string,"id"?: string,"site_id": string,"ssl_checked_at"?: string | null,"ssl_error"?: string | null,"ssl_expires_at"?: string | null,"ssl_issuer"?: string | null,"ssl_read_at"?: string | null,"ssl_valid_from"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"domain"?: string | null,"domain_checked_at"?: string | null,"domain_error"?: string | null,"domain_expires_at"?: string | null,"domain_read_at"?: string | null,"domain_source"?: string | null,"host"?: string,"id"?: string,"site_id"?: string,"ssl_checked_at"?: string | null,"ssl_error"?: string | null,"ssl_expires_at"?: string | null,"ssl_issuer"?: string | null,"ssl_read_at"?: string | null,"ssl_valid_from"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "site_expiry_site_id_fkey"
+      columns: ["site_id"]
+isOneToOne: true
+      referencedRelation: "sites"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"site_status": {
                   Row: {
                     "created_at": string,"flip_ok": boolean | null,"flips": (string)[],"last_evaluated_at": string | null,"last_round_at": string | null,"note": string | null,"ok_rounds": number,"since": string,"site_id": string,"status": Database["public"]['Enums']["site_state"],"updated_at": string

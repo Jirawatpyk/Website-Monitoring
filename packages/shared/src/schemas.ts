@@ -129,3 +129,14 @@ export const verdictSchema = z.object({
   screenshot: z.boolean().default(false),
 });
 export type Verdict = z.input<typeof verdictSchema>;
+
+/**
+ * The part of an RDAP domain answer (RFC 9083) the expiry check reads (S13): its events, of which
+ * `expiration` is the registration's end. Everything else in the answer is ignored.
+ */
+export const rdapDomainSchema = z.object({
+  events: z
+    // No count cap: the reader already caps the answer at 64 KB.
+    .array(z.object({ eventAction: z.string().max(64), eventDate: z.string().max(64) }))
+    .default([]),
+});

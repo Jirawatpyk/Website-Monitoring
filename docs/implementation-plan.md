@@ -34,7 +34,7 @@
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Done |
 | S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | Done |
 | S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Done |
-| S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Todo |
+| S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | In progress |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Done |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Done |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Done |
@@ -668,13 +668,25 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S13 · SSL & domain expiry
 
 - **Scope:** FR-11. Daily SSL certificate and domain (RDAP / WHOIS) checks; PROBLEM at SSL < 14 days / domain < 30 days (internal only, §12); routing per the SSL row; Expiry page. Test target gains an expiring-cert mode (or a fixture host).
-- **Boards:** Expiry · **Test plan:** T01 cert path
+- **Settled (D-066, 17 Nov 2026):**
+  - **Alert:** a normal PROBLEM with the PROBLEM routing.
+  - **Days left:** Bangkok calendar days.
+  - **No data:** a failed or 36 h old read holds and never opens.
+  - **Reading:** hourly from sin1, every site at 06:00 Bangkok.
+  - **Board:** the Certificate column comes from the certificate; "Renewed by" and the reminder are left out.
+  - **Phone:** waits for an MExpiry board.
+  - **Proof:** Done-when 1 is proved with fixture `site_expiry` rows on staging plus the reader and engine tests.
+- **Boards:** Expiry · **Tables:** site_expiry · **Test plan:** T01 cert path
+- **PRs:**
+  1. Schema and collector: `site_expiry`, `@dxt/probe` `expiry.ts`, `/api/cron/expiry`.
+  2. Engine and messages.
+  3. Page, the Sites list column, the weekly lines and nav.
 - **Depends on:** S04
 - **Done when:**
   1. An expiring-cert target opens PROBLEM "SSL expiring"; a domain 20 days from expiry opens PROBLEM "Domain expiring".
   2. Days-left on the page match a fixed "today" (spec §15.8 figures in a test).
   3. spec-checker passes Expiry; nav "SSL & domains" live.
-- **Review:** engine-reviewer, spec-checker.
+- **Review:** engine-reviewer, spec-checker, db-reviewer and security-reviewer (`site_expiry`, the reader), message-checker (the cause and the weekly lines).
 
 ### S14 · Digest, weekly summary & recurring maintenance
 
@@ -969,7 +981,7 @@ ChatAlert starts in S02a and EmailAlert in S02b; both gain rows in every slice t
 | maintenance_windows | S09 |
 | oncall_shifts | S10 |
 
-Tables the plan adds beyond PRD §11: organisation settings and company holidays (S08), API keys and webhooks (S24), `private.allowed_email_domains` (done, migration 0002), `private.allowed_emails` (S01, D-007), `account_events` (S16, D-062 item 13).
+Tables the plan adds beyond PRD §11: organisation settings and company holidays (S08), API keys and webhooks (S24), `private.allowed_email_domains` (done, migration 0002), `private.allowed_emails` (S01, D-007), `account_events` (S16, D-062 item 13), `site_expiry` (S13, D-066).
 
 ### Go-live test plan (PRD §12)
 

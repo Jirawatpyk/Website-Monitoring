@@ -3,6 +3,7 @@
   "directWrites": {
     "server/check-results.ts#check_results": "Probe results (service role): monitoring data, not config or incident state.",
     "server/crawler/run-crawler.ts#crawler_checks": "Crawler fetches (service role): monitoring data.",
+    "server/expiry/run-expiry.ts#site_expiry": "Certificate and domain expiry reads (service role): monitoring data.",
     "server/engine/run-engine.ts#verification_jobs": "Queues and settles browser-verify jobs (service role); verdicts are judged by audited engine steps.",
     "server/verifier/housekeeping.ts#verification_jobs": "Removes verify-job rows older than 30 days (retention).",
     "server/heartbeats.ts#agent_heartbeats": "Heartbeats of the crons (service role).",
@@ -233,6 +234,9 @@
     },
     "app/api/cron/notifier/route.ts#GET": {
       "exempt": "Delivers messages that audited actions and engine steps queued."
+    },
+    "app/api/cron/expiry/route.ts#GET": {
+      "exempt": "Reads each site's certificate and domain expiry into site_expiry (monitoring data); any incident follows through the audited engine steps."
     },
     "app/api/cron/reports/route.ts#GET": {
       "exempt": "Queues and sends the daily digest and the weekly summary; changes no state."

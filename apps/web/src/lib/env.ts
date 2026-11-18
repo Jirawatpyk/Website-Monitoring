@@ -28,6 +28,8 @@ const serverEnvSchema = z.object({
   HEALTHCHECKS_PING_URL_PROBE_TYO: z.url().optional(),
   HEALTHCHECKS_PING_URL_NOTIFIER: z.url().optional(),
   HEALTHCHECKS_PING_URL_CRAWLER: z.url().optional(),
+  /** S13 (D-066): the hourly expiry read; optional (the Healthchecks plan holds 20 checks). */
+  HEALTHCHECKS_PING_URL_EXPIRY: z.url().optional(),
   /** S14 (D-056): pinged once the 09:00 digest is posted; a missing ping by 09:05 alerts Tao. */
   HEALTHCHECKS_PING_URL_REPORTS: z.url().optional(),
   /**
