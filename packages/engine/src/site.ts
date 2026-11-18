@@ -524,7 +524,11 @@ function judgeSiteRound(
     const onDrop = !!open && episode === 'problem' && RECOVERABLE.includes(open.state);
     // The cause of the drop in progress (`OpenIncident.trigger`: incidents.cause_trigger, else trigger).
     const was = open?.trigger ?? null;
-    if (onDrop && open.leftExpiry && !isExpiryTrigger(was) && isExpiryTrigger(problem.v.trigger)) {
+    // …or from one expiry to the other (Tao, 17 Nov: SSL renewed with the domain still under its line
+    // reads Domain expiring, never "SSL expired" counted from the old certificate).
+    const backToExpiry = open?.leftExpiry === true && !isExpiryTrigger(was);
+    const otherExpiry = isExpiryTrigger(was) && was !== problem.v.trigger;
+    if (onDrop && (backToExpiry || otherExpiry) && isExpiryTrigger(problem.v.trigger)) {
       return {
         kind: 'cause_back',
         monitorId: problem.m.id,

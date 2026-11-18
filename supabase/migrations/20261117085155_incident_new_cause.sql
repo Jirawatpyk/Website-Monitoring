@@ -194,12 +194,14 @@ begin
     into v_site_id, v_was, v_state
   from public.incidents
   where id = p_incident_id
-    and coalesce(cause_trigger, trigger) not in ('ssl', 'domain')
     and p_trigger in ('ssl', 'domain')
     and coalesce(episode_severity, severity) = 'problem'
     and state in ('unacked', 'escalated', 'acknowledged')
-    -- Its cause was taken from an expiry (engine re-review H3: one that never had one recovers instead).
-    and expiry_left
+    and (
+      -- Its cause was taken from an expiry (engine re-review H3: one that never had one recovers instead)…
+      (coalesce(cause_trigger, trigger) not in ('ssl', 'domain') and expiry_left)
+      -- …or it moves from one expiry to the other (Tao, 17 Nov: SSL renewed, the domain still due).
+      or (coalesce(cause_trigger, trigger) in ('ssl', 'domain') and coalesce(cause_trigger, trigger) <> p_trigger))
   for update;
 
   if v_site_id is null then
@@ -438,4 +440,111 @@ as $$
                  and coalesce(i.cause_trigger, i.trigger) in ('ssl', 'domain'))
       limit 1),
     (select 'down' from public.site_status st where st.site_id = p_site_id and st.status = 'down'));
+$$;
+
+-- Tao, 17 Nov (engine re-review M3): a DOWN on an incident acknowledged for an SSL / domain expiry starts
+-- the DOWN ladder from L0 again (Unacked; the person on call at night), never only an FYI. As in
+-- 20261029144512 otherwise.
+create or replace function public.engine_escalate_incident(
+  p_incident_id uuid,
+  p_detected_at timestamptz,
+  p_round_at timestamptz,
+  p_context jsonb,
+  p_notify boolean,
+  p_monitors jsonb default null,
+  p_status public.site_state default null,
+  p_flapping boolean default false,
+  p_outside_hours boolean default false
+)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_site_id uuid;
+  v_from public.incident_state;
+  v_to public.incident_state;
+  v_verify_job uuid := nullif(p_context ->> 'verifyJobId', '')::uuid;
+  v_expiry_ack boolean;
+begin
+  -- Tao, 17 Nov: an ack of an SSL / domain expiry ("waiting for the client to renew") never silences a
+  -- real outage — the DOWN restarts the ladder as if nobody had acknowledged.
+  select site_id, state, acked_at is not null and coalesce(cause_trigger, trigger) in ('ssl', 'domain')
+    into v_site_id, v_from, v_expiry_ack
+  from public.incidents
+  where id = p_incident_id and severity = 'problem' and state not in ('resolved', 'in_review', 'closed')
+  for update;
+
+  if v_site_id is null then
+    return false;
+  end if;
+
+  update public.incidents i
+    set severity = 'down',
+        episode_severity = 'down',
+        detected_at = p_detected_at,
+        is_flapping = is_flapping or coalesce(p_flapping, false),
+        recovered_at = case when state in ('monitoring', 'needs_root_cause') then null else recovered_at end,
+        escalation_plan = public.escalation_plan_for(s.tier, 'down'),
+        escalation_level = case when acked_at is not null and not v_expiry_ack then escalation_level else 0 end,
+        -- The ladder clock restarts unless acknowledged: so does who L0 pages (S10).
+        l0_user_id = case when acked_at is not null and not v_expiry_ack then l0_user_id
+                          when s.tier = 1 and p_outside_hours then public.oncall_person_at(p_detected_at) end,
+        acked_at = case when v_expiry_ack then null else acked_at end,
+        acked_by = case when v_expiry_ack then null else acked_by end,
+        -- A DOWN drop: its own cause, nothing to go back to.
+        cause_trigger = 'hard_fail',
+        expiry_left = false,
+        state = case
+          when acked_at is not null and not v_expiry_ack then
+            case when state in ('monitoring', 'needs_root_cause') then 'acknowledged'::public.incident_state
+                 else state end
+          else 'unacked'::public.incident_state
+        end
+    from public.sites s
+    where i.id = p_incident_id and s.id = i.site_id
+    returning i.state into v_to;
+
+  insert into public.incident_events (incident_id, type, payload, at)
+  values (p_incident_id, 'escalated_to_down', p_context, p_detected_at);
+
+  insert into public.audit_log (action, entity, entity_id, before, after)
+  values ('incident.severity', 'incident', p_incident_id,
+          jsonb_build_object('severity', 'problem', 'state', v_from, 'expiry_ack_cleared', v_expiry_ack),
+          jsonb_build_object('severity', 'down', 'state', v_to,
+                             'l0_user_id', (select l0_user_id from public.incidents where id = p_incident_id)));
+
+  update public.site_status
+    set status = 'down', ok_rounds = 0, last_evaluated_at = p_detected_at, last_round_at = p_round_at
+    where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
+
+  perform public.engine_record_flip(v_site_id, p_round_at, false);
+  perform public.engine_cancel_flap_summary(p_incident_id);
+  perform public.engine_cancel_held_problem(p_incident_id, 'Superseded: went down');
+  -- The PROBLEM ladder ends here: its step or reminder still waiting never goes before the DOWN card.
+  perform public.engine_cancel_ladder(p_incident_id, 'Superseded: went down');
+
+  -- The browser's screenshot joins the timeline as evidence.
+  if v_verify_job is not null then
+    update public.verification_jobs set incident_id = p_incident_id where id = v_verify_job;
+    insert into public.incident_events (incident_id, type, payload, at)
+    select p_incident_id, 'evidence',
+           jsonb_build_object('screenshotPath', j.screenshot_path, 'result', j.result, 'jobId', j.id),
+           coalesce(j.completed_at, p_detected_at)
+    from public.verification_jobs j
+    where j.id = v_verify_job and j.screenshot_path is not null;
+  end if;
+
+  if p_notify then
+    insert into public.notifications (incident_id, channel, template, thread_key, context)
+    values (p_incident_id, 'google_chat', 'down', p_incident_id::text, p_context)
+    on conflict do nothing;
+
+    perform public.engine_queue_l0_emails(p_incident_id, 'down', p_context,
+                                           now() + interval '5 minutes', null, false); -- D-047
+  end if;
+
+  perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
+  return true;
+end;
 $$;

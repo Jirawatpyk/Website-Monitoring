@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(43);
+select plan(47);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -213,8 +213,8 @@ select is(private.site_busy('00000000-0000-0000-0000-0000000000a2'), null,
   'back on SSL alone it doesn''t (Tao, 17 Nov)');
 set local role service_role;
 select ok(
-  not public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e1', null, 'domain', now(), '{}'),
-  'an expiry incident has nothing to go back to'
+  not public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e1', null, 'ssl', now(), '{}'),
+  'an SSL incident has nothing to go back to on SSL'
 );
 reset role;
 
@@ -287,6 +287,40 @@ select ok(
   and (select payload -> 'mention' ->> 'id' = (select id::text from ids where name = 'nok') from public.incident_events
          where incident_id = '00000000-0000-0000-0000-0000000000e3' and type = 'new_cause'),
   'L0 is kept; the event records whom it told'
+);
+
+-- Tao, 17 Nov: SSL renewed with the domain still due → Domain expiring, silently.
+insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000c1', 'Renewed', 1,
+   (select id from ids where name = 'arm'), true);
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000d4', '00000000-0000-0000-0000-0000000000a4', 'http', true, 'https://d.pgtap.test');
+insert into public.incidents (id, site_id, monitor_id, trigger, severity, episode_severity, state, started_at, detected_at,
+                              acked_at, acked_by, escalation_plan)
+  values ('00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000a4',
+          '00000000-0000-0000-0000-0000000000d4', 'ssl', 'problem', 'problem', 'acknowledged',
+          now() - interval '9 days', now() - interval '9 days', now() - interval '9 days',
+          (select id from ids where name = 'arm'), public.escalation_plan_for(1::smallint, 'problem'));
+set local role service_role;
+select ok(
+  public.engine_cause_back_incident('00000000-0000-0000-0000-0000000000e4', null, 'domain', now(), '{}'),
+  'SSL → Domain expiring'
+);
+reset role;
+select is((select coalesce(cause_trigger, trigger)::text from public.incidents where id = '00000000-0000-0000-0000-0000000000e4'),
+  'domain', 'it reads Domain expiring');
+
+-- Tao, 17 Nov: acknowledged for the expiry, then a real DOWN: the DOWN ladder starts from L0 again.
+set local role service_role;
+select ok(
+  public.engine_escalate_incident('00000000-0000-0000-0000-0000000000e4', now(), now(), '{}', false),
+  'the site goes DOWN'
+);
+reset role;
+select ok(
+  (select state = 'unacked' and acked_at is null and acked_by is null and escalation_level = 0
+     from public.incidents where id = '00000000-0000-0000-0000-0000000000e4'),
+  'the expiry''s ack doesn''t silence the outage: Unacked, the ladder from L0'
 );
 
 select tests.authenticate_as((select id from ids where name = 'arm'));

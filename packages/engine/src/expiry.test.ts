@@ -324,7 +324,6 @@ describe('decideSite — a new cause on an open expiry incident (D-067)', () => 
 
   it.each<[string, OpenIncident, StoredCheck[], ExpiryFact]>([
     ['the expiry itself again', sslOpen, clean, fact('2026-10-06', null)],
-    ['SSL → domain is no new cause', sslOpen, clean, fact('2026-12-22', '2026-10-13')],
     [
       'an incident open for another trigger',
       { ...sslOpen, trigger: 'slow' },
@@ -335,6 +334,16 @@ describe('decideSite — a new cause on an open expiry incident (D-067)', () => 
     expect(decideSite(site([monitor(checks, { carry: heldSsl, expiry })], { open: o }))).toMatchObject({
       kind: 'none',
     });
+  });
+
+  it('SSL renewed with the domain 20 days out → Domain expiring, silently (Tao, 17 Nov)', () => {
+    expect(
+      decideSite(
+        site([monitor(clean, { carry: heldSsl, expiry: fact('2026-12-22', '2026-10-13') })], {
+          open: sslOpen,
+        }),
+      ),
+    ).toMatchObject({ kind: 'cause_back', trigger: 'domain', detail: { kind: 'domain', daysLeft: 20 } });
   });
 
   it('a DOWN still escalates (D-021), never a new cause', () => {
