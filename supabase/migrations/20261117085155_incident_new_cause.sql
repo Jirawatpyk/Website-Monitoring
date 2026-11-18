@@ -285,7 +285,9 @@ begin
 
   update public.notifications
     set status = 'cancelled', error = 'Superseded: the new cause cleared', next_retry_at = null
-    where incident_id = p_incident_id and status = 'queued' and attempts = 0
+    where incident_id = p_incident_id and status = 'queued'
+      -- Held or waiting for a retry, never one in flight (db review).
+      and attempts = (select count(*) from public.notification_attempts a where a.notification_id = public.notifications.id)
       and template = 'problem_again' and coalesce((context ->> 'newCause')::boolean, false);
 
   -- The site's round moves on with the monitors', as every other incident writer does (engine re-review
