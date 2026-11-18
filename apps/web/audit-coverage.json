@@ -263,6 +263,9 @@
         "engine_settle_incident"
       ]
     },
+    "app/api/expiry/check/route.ts#POST": {
+      "exempt": "Check now on the Expiry page: re-reads certificate and domain dates into site_expiry (monitoring data, no config or incident state)."
+    },
     "app/api/monitor-test/sin/route.ts#POST": {
       "exempt": "Runs one test check from Singapore and stores nothing."
     },
