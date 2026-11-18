@@ -125,14 +125,20 @@ export async function listSites(now = new Date()): Promise<SiteListRow[]> {
 
 const one = <T>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 
-/** The Expiry column (S13): the soonest half due soon, else the sooner of the two (`expiryCounts`). */
+/**
+ * The Expiry column (S13, spec §20): days to the sooner of SSL and domain; amber when either half is
+ * due soon (an auto-renew certificate only under 30 d), red under either alert line (`expiryCounts`).
+ */
 export function expiryOf(r: ExpiryDates | null, now: Date): Pick<SiteListRow, 'expiryDays' | 'expiryTone'> {
   if (!r) return { expiryDays: null, expiryTone: null };
   const c = expiryCounts(r, now);
   const halves = [c.ssl, c.domain].filter((h): h is ExpiryCount => h !== null);
-  const due = halves.filter((h) => h.tone !== 'plain');
-  const pick = (due.length ? due : halves).sort((a, b) => a.days - b.days)[0];
-  return pick ? { expiryDays: pick.days, expiryTone: pick.tone } : { expiryDays: null, expiryTone: null };
+  if (!halves.length) return { expiryDays: null, expiryTone: null };
+  const rank = { alert: 2, soon: 1, plain: 0 } as const;
+  return {
+    expiryDays: Math.min(...halves.map((h) => h.days)),
+    expiryTone: halves.reduce((t, h) => (rank[h.tone] > rank[t] ? h.tone : t), halves[0]!.tone),
+  };
 }
 
 async function clientOptions(supabase: Client): Promise<ClientOption[]> {

@@ -358,7 +358,7 @@ export function SitesList({
       hideBelow: LATE_FROM,
       render: (r) => (
         <span className={EXPIRY_TONE[r.expiryTone ?? 'none']}>
-          {r.expiryDays === null ? '—' : `${r.expiryDays} d`}
+          {r.expiryDays === null ? '—' : r.expiryDays < 0 ? 'expired' : `${r.expiryDays} d`}
         </span>
       ),
     },
@@ -496,7 +496,7 @@ export function SitesList({
         <div className="flex">
           <Switch
             label={`Needs attention (${attentionCount})`}
-            description="Open incident · draft (setup not finished) · SSL or domain < 60 d · no backup"
+            description="Open incident · draft (setup not finished) · SSL or domain due soon · no backup"
             checked={f.attention}
             onChange={(attention) => set({ attention })}
           />

@@ -302,6 +302,12 @@ describe('expiryOf — the Sites list Expiry column (S13, §15.8)', () => {
       expiryOf(row('2026-11-19T05:00:00Z', '2026-08-21T05:00:00Z', '2026-11-05T05:00:00Z'), FRI),
     ).toEqual({ expiryDays: 41, expiryTone: 'soon' });
   });
+  it('the sooner of the two in days, amber when either half is due (spec §20)', () => {
+    // an auto-renew certificate at 40 days isn't due; its domain at 55 is
+    expect(
+      expiryOf(row('2026-11-04T05:00:00Z', '2026-08-06T05:00:00Z', '2026-11-19T05:00:00Z'), FRI),
+    ).toEqual({ expiryDays: 40, expiryTone: 'soon' });
+  });
   it('nothing due: the sooner of the two, plain; no row: dashes', () => {
     expect(
       expiryOf(row('2026-12-21T05:00:00Z', '2026-09-22T05:00:00Z', '2027-05-03T05:00:00Z'), FRI),

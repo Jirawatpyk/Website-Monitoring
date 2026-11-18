@@ -120,20 +120,47 @@ describe('expiryView — alerts, failures and sites with no read', () => {
       days: null,
       tone: 'none',
       error: 'No registry lookup for .app',
+      evidence: false,
     });
     expect(v.meta).toMatch(/· 1 of 2 read$/);
     expect(v.rows[0]!.status).toBe('failed');
   });
 
-  it('a failed read 10 days out is greyed and never counted: it cannot open a PROBLEM (D-066 item 3)', () => {
+  it('a failed read 10 days out stays listed as due, but not as "Would open a PROBLEM" (D-066 item 3)', () => {
     const v = expiryView(
       [rec('cando', '2026-10-05', 90, '2027-04-24', { ssl_error: 'TLS handshake timed out' })],
       [{ id: 'cando', name: 'Cando Asia' }],
       NOW,
     );
-    expect(v.rows[0]!.ssl).toMatchObject({ days: 10, tone: 'none', date: '5 Oct 2026' });
-    expect(v.rows[0]!.status).toBe('failed');
-    expect(v.kpis.map((k) => k.value)).toEqual(['0', '0', '0']);
+    expect(v.rows[0]!.ssl).toMatchObject({ days: 10, tone: 'alert', evidence: false, date: '5 Oct 2026' });
+    expect(v.rows[0]!.status).toBe('soon');
+    expect(v.kpis.map((k) => k.value)).toEqual(['0', '0', '1']);
+  });
+
+  it('a good read older than 36 h is not evidence either', () => {
+    const stale = '2026-09-23T14:00:00Z'; // 37 h before NOW
+    const v = expiryView(
+      [rec('cando', '2026-10-05', 90, '2027-04-24', { ssl_read_at: stale })],
+      [{ id: 'cando', name: 'Cando Asia' }],
+      NOW,
+    );
+    expect(v.rows[0]!.ssl.evidence).toBe(false);
+    expect(v.kpis[0]!.value).toBe('0');
+    const fresh = expiryView(
+      [rec('cando', '2026-10-05', 90, '2027-04-24')],
+      [{ id: 'cando', name: 'Cando Asia' }],
+      NOW,
+    );
+    expect(fresh.kpis[0]!.value).toBe('1');
+  });
+
+  it('an expired half reads "expired" in the caption, never "-3 d"', () => {
+    const v = expiryView(
+      [rec('cando', '2026-09-22', 90, '2027-04-24')],
+      [{ id: 'cando', name: 'Cando Asia' }],
+      NOW,
+    );
+    expect(v.kpis[2]!.caption).toBe('Cando Asia SSL expired');
   });
 
   it('a site without TLS has one half to read', () => {

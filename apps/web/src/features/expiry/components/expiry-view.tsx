@@ -52,7 +52,7 @@ function DateCell({ half }: { half: ExpiryHalf }) {
 
 function DaysCell({ half }: { half: ExpiryHalf }) {
   if (half.days === null) return <span className="text-fg-secondary">—</span>;
-  // a failed read's old count comes greyed from the model (tone none), never red (D-066 item 3)
+  // a failed read's old count is greyed, never red or amber: it is the last good date, not a reading now
   const words = half.days < 0 ? 'Expired' : String(half.days);
   const label =
     half.tone === 'alert'
@@ -61,7 +61,10 @@ function DaysCell({ half }: { half: ExpiryHalf }) {
         ? `${words}, due soon`
         : undefined;
   return (
-    <span aria-label={label} className={`inline-block rounded-full px-2 leading-6 ${TONE[half.tone]}`}>
+    <span
+      aria-label={label}
+      className={`inline-block rounded-full px-2 leading-6 ${TONE[half.error ? 'none' : half.tone]}`}
+    >
       {words}
     </span>
   );

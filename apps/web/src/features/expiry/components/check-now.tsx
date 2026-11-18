@@ -25,7 +25,9 @@ export function CheckNowButton({ onChecking }: { onChecking: (startedAt: string 
     onChecking(`${formatDay(now, { weekday: true })} ${formatTime(now)}`);
     try {
       const res = await fetch('/api/expiry/check', { method: 'POST' });
-      if (res.ok) setDone('Check finished — the table is up to date');
+      // an expired session is redirected to the sign-in page, which answers 200
+      if (res.redirected) setError('Your session ended — sign in again, then check');
+      else if (res.ok) setDone('Check finished — the table is up to date');
       else {
         const body = (await res.json().catch(() => null)) as { error?: string; failed?: string[] } | null;
         setError(

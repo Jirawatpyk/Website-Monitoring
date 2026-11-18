@@ -2,6 +2,7 @@
  * The Expiry page (board Expiry, spec §14.12, §15.8; S13, D-066) as pure words and numbers, so the
  * rules have tests: days left in Bangkok calendar days, the day tone, the certificate's kind, the KPIs.
  */
+import { EXPIRY_FRESH_MS } from '@dxt/engine';
 import { expiryCounts, formatDay, formatTime, type ExpiryCount } from '@dxt/shared';
 
 /** One `site_expiry` row, as the page reads it. */
@@ -31,8 +32,13 @@ export interface ExpiryHalf {
   date: string | null;
   days: number | null;
   tone: DayTone;
-  /** The latest read failed: the page says "Couldn't read" with this in its tooltip. */
+  /** The latest read failed: the page says "Couldn't read" with this, the last good date greyed. */
   error: string | null;
+  /**
+   * The date is evidence now — the latest read good and the last good one within 36 h — so under the
+   * alert line it would open a PROBLEM (D-066 item 3, the engine's own rule).
+   */
+  evidence: boolean;
 }
 
 export interface ExpiryRowView {
@@ -77,11 +83,24 @@ export function readWords(error: string): string {
   return error;
 }
 
-function half(at: string | null, count: ExpiryCount | null, error: string | null): ExpiryHalf {
-  if (!at || !count) return { date: null, days: null, tone: 'none', error };
-  // A failed read's last date is shown greyed and never counted: it can't open a PROBLEM (D-066 item 3).
-  const tone = error ? 'none' : count.tone;
-  return { date: formatDay(new Date(at), { year: true }), days: count.days, tone, error };
+function half(
+  at: string | null,
+  readAt: string | null,
+  count: ExpiryCount | null,
+  error: string | null,
+  now: Date,
+): ExpiryHalf {
+  if (!at || !count) return { date: null, days: null, tone: 'none', error, evidence: false };
+  // A failed or stale read still lists its last good date (due soon, the filter), but it can't open
+  // a PROBLEM, so it isn't counted under "Would open a PROBLEM".
+  const evidence = !error && !!readAt && now.getTime() - Date.parse(readAt) <= EXPIRY_FRESH_MS;
+  return {
+    date: formatDay(new Date(at), { year: true }),
+    days: count.days,
+    tone: count.tone,
+    error,
+    evidence,
+  };
 }
 
 /**
@@ -98,8 +117,14 @@ export function expiryView(
     const r = bySite.get(s.id);
     const c = r ? expiryCounts(r, now) : { ssl: null, certificate: null, domain: null };
     const cert = c.certificate;
-    const ssl = half(r?.ssl_expires_at ?? null, c.ssl, r?.ssl_error ?? null);
-    const domain = half(r?.domain_expires_at ?? null, c.domain, r?.domain_error ?? null);
+    const ssl = half(r?.ssl_expires_at ?? null, r?.ssl_read_at ?? null, c.ssl, r?.ssl_error ?? null, now);
+    const domain = half(
+      r?.domain_expires_at ?? null,
+      r?.domain_read_at ?? null,
+      c.domain,
+      r?.domain_error ?? null,
+      now,
+    );
     const days = [ssl.days, domain.days].filter((d): d is number => d !== null);
     const soon =
       ssl.tone === 'alert' || ssl.tone === 'soon' || domain.tone === 'alert' || domain.tone === 'soon';
@@ -120,8 +145,8 @@ export function expiryView(
       a.name.localeCompare(b.name),
   );
 
-  const ssl14 = rows.filter((r) => r.ssl.tone === 'alert').length;
-  const dom30 = rows.filter((r) => r.domain.tone === 'alert').length;
+  const ssl14 = rows.filter((r) => r.ssl.tone === 'alert' && r.ssl.evidence).length;
+  const dom30 = rows.filter((r) => r.domain.tone === 'alert' && r.domain.evidence).length;
   const due: { name: string; kind: 'SSL' | 'domain'; days: number }[] = [];
   for (const r of rows) {
     if (r.ssl.days !== null && (r.ssl.tone === 'alert' || r.ssl.tone === 'soon'))
@@ -137,7 +162,9 @@ export function expiryView(
       label: 'Due within 60 days',
       value: String(due.length),
       unit: due.length === 1 ? 'item' : 'items',
-      caption: due.length ? due.map((d) => `${d.name} ${d.kind} ${d.days} d`).join(' · ') : 'Nothing due',
+      caption: due.length
+        ? due.map((d) => `${d.name} ${d.kind} ${d.days < 0 ? 'expired' : `${d.days} d`}`).join(' · ')
+        : 'Nothing due',
     },
   ];
 
