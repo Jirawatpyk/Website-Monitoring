@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { certificateKind, daysLeft, isDueSoon, isExpiryAlert } from './expiry';
+import { certificateKind, daysLeft, expiryCounts, isDueSoon, isExpiryAlert } from './expiry';
 
 // Spec §15.8 / §14.12: days left computed from Fri 25 Sep 2026 (the Expiry board's snapshot date).
 const FRI = new Date('2026-09-25T03:07:00Z'); // 10:07 Bangkok
@@ -77,5 +77,31 @@ describe('certificateKind (D-066 item 5)', () => {
     expect(
       certificateKind(new Date('2026-07-01T00:00:00Z'), new Date('2026-12-28T00:00:00Z'), now).label,
     ).toBe('Paid · 180 d');
+  });
+});
+
+describe('expiryCounts — one site, both halves (§15.8)', () => {
+  it('Cando: an auto-renew certificate at 55 days is plain, its domain at 41 amber', () => {
+    const c = expiryCounts(
+      {
+        ssl_expires_at: '2026-11-19T05:00:00Z',
+        ssl_valid_from: '2026-08-21T05:00:00Z',
+        domain_expires_at: '2026-11-05T05:00:00Z',
+      },
+      FRI,
+    );
+    expect(c).toEqual({
+      ssl: { days: 55, tone: 'plain' },
+      certificate: { autoRenew: true, label: 'Auto-renew · 90 d' },
+      domain: { days: 41, tone: 'soon' },
+    });
+  });
+
+  it('a half with no date is null; under the alert line is red', () => {
+    const c = expiryCounts(
+      { ssl_expires_at: '2026-10-06T05:00:00Z', ssl_valid_from: null, domain_expires_at: null },
+      FRI,
+    );
+    expect(c).toEqual({ ssl: { days: 11, tone: 'alert' }, certificate: null, domain: null });
   });
 });

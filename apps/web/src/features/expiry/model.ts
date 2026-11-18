@@ -2,7 +2,7 @@
  * The Expiry page (board Expiry, spec §14.12, §15.8; S13, D-066) as pure words and numbers, so the
  * rules have tests: days left in Bangkok calendar days, the day tone, the certificate's kind, the KPIs.
  */
-import { certificateKind, daysLeft, formatDay, formatTime, isDueSoon, isExpiryAlert } from '@dxt/shared';
+import { expiryCounts, formatDay, formatTime, type ExpiryCount } from '@dxt/shared';
 
 /** One `site_expiry` row, as the page reads it. */
 export interface ExpiryRecord {
@@ -64,23 +64,9 @@ export interface ExpiryData {
   domains: number;
 }
 
-const date = (v: string | null) => (v ? new Date(v) : null);
-
-function half(
-  kind: 'ssl' | 'domain',
-  expiresAt: Date | null,
-  error: string | null,
-  now: Date,
-  autoRenew = false,
-): ExpiryHalf {
-  if (!expiresAt) return { date: null, days: null, tone: 'none', error };
-  const days = daysLeft(expiresAt, now);
-  const tone: DayTone = isExpiryAlert(kind, days)
-    ? 'alert'
-    : isDueSoon(kind, days, autoRenew)
-      ? 'soon'
-      : 'plain';
-  return { date: formatDay(expiresAt, { year: true }), days, tone, error };
+function half(at: string | null, count: ExpiryCount | null, error: string | null): ExpiryHalf {
+  if (!at || !count) return { date: null, days: null, tone: 'none', error };
+  return { date: formatDay(new Date(at), { year: true }), days: count.days, tone: count.tone, error };
 }
 
 /**
@@ -95,11 +81,10 @@ export function expiryView(
   const bySite = new Map(records.map((r) => [r.site_id, r]));
   const rows = sites.map((s): ExpiryRowView => {
     const r = bySite.get(s.id);
-    const sslAt = date(r?.ssl_expires_at ?? null);
-    const from = date(r?.ssl_valid_from ?? null);
-    const cert = sslAt && from ? certificateKind(from, sslAt, now) : null;
-    const ssl = half('ssl', sslAt, r?.ssl_error ?? null, now, cert?.autoRenew ?? false);
-    const domain = half('domain', date(r?.domain_expires_at ?? null), r?.domain_error ?? null, now);
+    const c = r ? expiryCounts(r, now) : { ssl: null, certificate: null, domain: null };
+    const cert = c.certificate;
+    const ssl = half(r?.ssl_expires_at ?? null, c.ssl, r?.ssl_error ?? null);
+    const domain = half(r?.domain_expires_at ?? null, c.domain, r?.domain_error ?? null);
     const days = [ssl.days, domain.days].filter((d): d is number => d !== null);
     return {
       siteId: s.id,

@@ -1,5 +1,13 @@
 import 'server-only';
-import { CLOSED_INCIDENT_STATES_IN, defaultSlowMs, toMonitorHeaders, type SiteStatus } from '@dxt/shared';
+import {
+  CLOSED_INCIDENT_STATES_IN,
+  defaultSlowMs,
+  expiryCounts,
+  toMonitorHeaders,
+  type ExpiryCount,
+  type ExpiryDates,
+  type SiteStatus,
+} from '@dxt/shared';
 import { siteUptimeOver } from '@dxt/engine';
 import { createClient } from '@/lib/supabase/server';
 import { downEpisodesBySite, maintenanceSpansBySite, slowMsOf, watchedSince } from './detail-queries';
@@ -38,6 +46,7 @@ export async function listSites(now = new Date()): Promise<SiteListRow[]> {
          owner:profiles!sites_primary_owner_id_fkey(id, display_name),
          backup:profiles!sites_backup_owner_id_fkey(id, display_name),
          site_status(status, last_round_at),
+         site_expiry(ssl_expires_at, ssl_valid_from, domain_expires_at),
          monitors(url, is_primary, thresholds),
          incidents(id, number, state, escalation_level, detected_at,
                    acker:profiles!incidents_acked_by_fkey(display_name))`,
@@ -109,9 +118,21 @@ export async function listSites(now = new Date()): Promise<SiteListRow[]> {
           monitoringStartedAt: watchedSince(s),
           maintenance: spans.get(s.id) ?? [],
         })?.uptime ?? null,
-      expiryDays: null,
+      ...expiryOf(one(s.site_expiry), now),
     };
   });
+}
+
+const one = <T>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+
+/** The Expiry column (S13): the soonest half due soon, else the sooner of the two (`expiryCounts`). */
+export function expiryOf(r: ExpiryDates | null, now: Date): Pick<SiteListRow, 'expiryDays' | 'expiryTone'> {
+  if (!r) return { expiryDays: null, expiryTone: null };
+  const c = expiryCounts(r, now);
+  const halves = [c.ssl, c.domain].filter((h): h is ExpiryCount => h !== null);
+  const due = halves.filter((h) => h.tone !== 'plain');
+  const pick = (due.length ? due : halves).sort((a, b) => a.days - b.days)[0];
+  return pick ? { expiryDays: pick.days, expiryTone: pick.tone } : { expiryDays: null, expiryTone: null };
 }
 
 async function clientOptions(supabase: Client): Promise<ClientOption[]> {

@@ -51,9 +51,6 @@ export const NO_FILTERS: SiteListFilters = {
   attention: false,
 };
 
-/** Expiry within this many days needs attention (spec §20; auto-renew certificates 30 d lands with S13). */
-export const EXPIRY_SOON_DAYS = 60;
-
 const RANK: Record<RowKey, number> = { down: 0, problem: 1, maintenance: 2, ok: 3, pending: 4, draft: 5 };
 
 export function rowKey(r: Pick<SiteListRow, 'live' | 'status'>): RowKey {
@@ -67,9 +64,7 @@ export function isMuted(r: Pick<SiteListRow, 'mutedUntil'>, now: Date): boolean 
 
 /** Open incident · draft · SSL or domain due within 60 d · no backup owner (spec §20). */
 export function needsAttention(r: SiteListRow): boolean {
-  return (
-    !!r.openIncident || !r.live || (r.expiryDays !== null && r.expiryDays < EXPIRY_SOON_DAYS) || !r.backup
-  );
+  return !!r.openIncident || !r.live || r.expiryTone === 'soon' || r.expiryTone === 'alert' || !r.backup;
 }
 
 function matchesStatus(r: SiteListRow, f: StatusFilter, now: Date): boolean {

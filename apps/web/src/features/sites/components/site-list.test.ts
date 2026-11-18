@@ -34,6 +34,7 @@ function site(name: string, over: Partial<SiteListRow> = {}): SiteListRow {
     p50Ms: null,
     uptime30d: null,
     expiryDays: null,
+    expiryTone: null,
     ...over,
   };
 }
@@ -75,6 +76,7 @@ const ROWS: SiteListRow[] = [
     owner: person('nok'),
     backup: person('ploy'),
     expiryDays: 50,
+    expiryTone: 'soon',
   }),
   site('Bangkok Airways – Taiwan', {
     tier: 1,
@@ -82,7 +84,13 @@ const ROWS: SiteListRow[] = [
     backup: person('ploy'),
     uptime30d: 0.9997,
   }),
-  site('Cando Asia', { owner: person('nok'), backup: null, uptime30d: 0.9997, expiryDays: 55 }),
+  site('Cando Asia', {
+    owner: person('nok'),
+    backup: null,
+    uptime30d: 0.9997,
+    expiryDays: 55,
+    expiryTone: 'plain',
+  }),
   site('DxT Games', { tier: 3, mutedUntil: '2026-09-25T11:00:00Z', uptime30d: 1 }),
   site('DxT', { mutedUntil: '2026-09-25T01:00:00Z' }), // a mute that has ended
   site('EQHO Academy', {
@@ -136,8 +144,10 @@ describe('Sites list filters (spec §20)', () => {
   it('needsAttention reads each reason on its own', () => {
     expect(needsAttention(site('A'))).toBe(false);
     expect(needsAttention(site('A', { backup: null }))).toBe(true);
-    expect(needsAttention(site('A', { expiryDays: 59 }))).toBe(true);
-    expect(needsAttention(site('A', { expiryDays: 60 }))).toBe(false);
+    expect(needsAttention(site('A', { expiryDays: 59, expiryTone: 'soon' }))).toBe(true);
+    expect(needsAttention(site('A', { expiryDays: 10, expiryTone: 'alert' }))).toBe(true);
+    // an auto-renew certificate at 40 days isn't due yet (D-066 item 5)
+    expect(needsAttention(site('A', { expiryDays: 40, expiryTone: 'plain' }))).toBe(false);
     expect(needsAttention(site('A', { live: false }))).toBe(true);
   });
 });

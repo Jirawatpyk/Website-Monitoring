@@ -1,4 +1,12 @@
-import type { IncidentState, MonitorHeader, Severity, SiteStatus, Tier, Trigger } from '@dxt/shared';
+import type {
+  ExpiryTone,
+  IncidentState,
+  MonitorHeader,
+  Severity,
+  SiteStatus,
+  Tier,
+  Trigger,
+} from '@dxt/shared';
 import {
   SITE_LOCATIONS,
   type IncidentLinkData,
@@ -36,8 +44,12 @@ export interface SiteListRow {
   p50Ms: number | null;
   /** Uptime 30 d as a ratio (spec §5, window from monitoring start, D-031); null for a Draft never started. */
   uptime30d: number | null;
-  /** Days to the sooner of SSL and domain expiry — S13; null until then. */
+  /**
+   * Days to the SSL or domain expiry that matters (S13): the soonest one due soon, else the sooner of
+   * the two; null before the first read. Its tone is the Expiry page's.
+   */
   expiryDays: number | null;
+  expiryTone: ExpiryTone | null;
 }
 
 export interface ClientOption {

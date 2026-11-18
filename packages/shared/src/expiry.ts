@@ -61,3 +61,43 @@ export function isExpiryAlert(kind: 'ssl' | 'domain', days: number): boolean {
 export function isDueSoon(kind: 'ssl' | 'domain', days: number, autoRenew = false): boolean {
   return days < (kind === 'ssl' && autoRenew ? AUTO_RENEW_SOON_DAYS : DUE_SOON_DAYS);
 }
+
+/** Red under the alert line, amber when due soon, plain otherwise. */
+export type ExpiryTone = 'alert' | 'soon' | 'plain';
+
+export interface ExpiryCount {
+  days: number;
+  tone: ExpiryTone;
+}
+
+/** The dates a `site_expiry` row holds (the last good read's, kept through a failed one). */
+export interface ExpiryDates {
+  ssl_expires_at: string | null;
+  ssl_valid_from: string | null;
+  domain_expires_at: string | null;
+}
+
+/**
+ * Days left and tone for each half of a site's expiry — the Expiry page, the Sites list column and the
+ * weekly "Coming up" lines read the same numbers. A half with no date is null.
+ */
+export function expiryCounts(
+  r: ExpiryDates,
+  now: Date,
+): { ssl: ExpiryCount | null; certificate: CertificateKind | null; domain: ExpiryCount | null } {
+  const count = (kind: 'ssl' | 'domain', at: string | null, autoRenew = false): ExpiryCount | null => {
+    if (!at) return null;
+    const days = daysLeft(new Date(at), now);
+    const tone = isExpiryAlert(kind, days) ? 'alert' : isDueSoon(kind, days, autoRenew) ? 'soon' : 'plain';
+    return { days, tone };
+  };
+  const certificate =
+    r.ssl_expires_at && r.ssl_valid_from
+      ? certificateKind(new Date(r.ssl_valid_from), new Date(r.ssl_expires_at), now)
+      : null;
+  return {
+    ssl: count('ssl', r.ssl_expires_at, certificate?.autoRenew ?? false),
+    certificate,
+    domain: count('domain', r.domain_expires_at),
+  };
+}

@@ -37,7 +37,7 @@ import {
   IconTriangleAlert,
   IconX,
 } from '@jirawatpyk/aura-react/icons';
-import { formatPercent, formatTier, formatTimeWithSeconds } from '@dxt/shared';
+import { formatPercent, formatTier, formatTimeWithSeconds, type ExpiryTone } from '@dxt/shared';
 import { SiteStatusBadge } from '@/components/status-badges';
 import type { SiteListRow } from '../types';
 import {
@@ -81,6 +81,14 @@ interface SitesListProps {
   /** The signed-in person: the mute dialog's "recorded as" and phone "Signed in as" lines. */
   viewer?: { name: string; email: string };
 }
+
+/** The Expiry column's days in the Expiry page's tones (S13): red under the alert line, amber when due soon. */
+const EXPIRY_TONE: Record<ExpiryTone | 'none', string> = {
+  alert: 'font-semibold text-alert-danger-fg',
+  soon: 'font-semibold text-alert-warning-fg',
+  plain: '',
+  none: 'text-fg-secondary',
+};
 
 const STATUS_CHIPS: { value: StatusFilter; label: string; icon?: ReactElement }[] = [
   { value: 'all', label: 'All' },
@@ -349,7 +357,9 @@ export function SitesList({
       width: W.expiry,
       hideBelow: LATE_FROM,
       render: (r) => (
-        <span className="text-fg-secondary">{r.expiryDays === null ? '—' : `${r.expiryDays} d`}</span>
+        <span className={EXPIRY_TONE[r.expiryTone ?? 'none']}>
+          {r.expiryDays === null ? '—' : `${r.expiryDays} d`}
+        </span>
       ),
     },
     {
