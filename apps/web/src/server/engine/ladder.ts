@@ -50,12 +50,11 @@ export async function escalationTick(
     // D-023: the home page is back and only a key page fails — the DOWN ladder waits; the PROBLEM
     // AGAIN reply told whoever acts now (D-034).
     if (inc.severity === 'down' && inc.episode_severity === 'problem') continue;
-    const parsed = escalationPlanSchema.safeParse(inc.escalation_plan);
-    if (!parsed.success) {
+    const plan = escalationPlanSchema.safeParse(inc.escalation_plan);
+    if (!plan.success) {
       console.error(JSON.stringify({ event: 'escalation_plan_invalid', incident: inc.id }));
       continue;
     }
-    const plan = parsed;
     try {
       // Confirmed down — or when a mute that silenced it was over and its first alert went (D-036) —
       // then only the minutes it was down: a recovery pauses the clock, a relapse resumes it (D-058).

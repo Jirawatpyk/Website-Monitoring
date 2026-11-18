@@ -123,6 +123,10 @@ function latestNewCause(events: readonly EventRow[]): EventRow | undefined {
 /** A new cause's words; back to an expiry, its days counted again (D-066 item 6). */
 function newCauseLine(e: EventRow | undefined, asOf: Date): string | null {
   if (!e) return null;
+  // A raise to DOWN by hand carries no probe cause: its own words, never the SSL it opened with
+  // (/code-review: the header fell through to the opening expiry).
+  if (e.type === 'escalated_to_down' && !str(e.payload.cause))
+    return e.payload.manual === true ? TRIGGER_LABELS.manual : TRIGGER_LABELS.hard_fail;
   return expiryNow(e.payload.detail, asOf)?.cause ?? str(e.payload.cause);
 }
 
