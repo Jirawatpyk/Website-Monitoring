@@ -17,7 +17,7 @@ body{margin:0;background:#fafafa}
 a{color:#6d28d9}a:hover{color:#5b21b6}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1340px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 1420px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -40,6 +40,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 </aside>
 
 <main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px">
+<div style="position: absolute; top: 10px; right: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)"><span style="font-family: var(--font-mono)">STATE</span><x-import component-from-global-scope="Aura.SegmentedControl" label="Preview state" options="{{states}}" value="{{stateV}}" on-change="{{setState2}}" size="sm"></x-import></div>
 
 <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
 <div style="display: flex; flex-direction: column; gap: 4px">
@@ -47,20 +48,21 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">SSL &amp; domains</h1>
 <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: {{meta.color}}"><sc-if value="{{checking}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Icon" name="loader-circle" size="sm"></x-import></sc-if>{{meta.text}}</span>
 </div>
-<div style="display: flex; align-items: center; gap: 12px">
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
 <x-import component-from-global-scope="Aura.Button" variant="secondary" icon="rotate-ccw" disabled="{{checking}}" on-click="{{checkNow}}">{{meta.btn}}</x-import>
+<sc-if value="{{err}}" hint-placeholder-val="{{false}}"><span role="status" style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import>{{errLine}}</span></sc-if>
 </div>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
-<sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<sc-for list="{{kpis}}" as="k" hint-placeholder-count="3">
 <x-import component-from-global-scope="Aura.Stat" label="{{k.label}}" value="{{k.value}}" unit="{{k.unit}}" caption="{{k.caption}}" icon="{{k.icon}}"></x-import>
 </sc-for>
 </div>
 
 <div style="display: flex; gap: 12px; padding: 14px 18px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); font-size: 13px; line-height: 1.5">
 <span style="display: flex; padding-top: 1px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span>
-<span><b>How it alerts:</b> SSL under 14 days or a domain under 30 days turns the site Problem and opens an incident for the owner. Domains under 60 days are listed here and in the weekly summary — no alert. Auto-renew certificates are only listed when under 30 days or when a renewal fails. An expired certificate is a hard fail, so the primary monitor catches it as Down.</span>
+<span><b>How it alerts:</b> {{alerts}}</span>
 </div>
 
 <section style="display: flex; flex-direction: column; gap: 12px">
@@ -76,119 +78,148 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <div class="aura-table__head" style="text-transform: uppercase">
 <div class="aura-table__gutter"></div>
 <div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Site</div>
-<div class="aura-table__th" style="width: 120px">SSL expires</div>
+<div class="aura-table__th" style="width: 148px">SSL expires</div>
 <div class="aura-table__th" style="width: 72px; justify-content: flex-end; padding-right: 16px">Days</div>
 <div class="aura-table__th" style="width: 150px">Certificate</div>
-<div class="aura-table__th" style="width: 120px">Domain expires</div>
+<div class="aura-table__th" style="width: 220px">Domain expires</div>
 <div class="aura-table__th" style="width: 72px; justify-content: flex-end; padding-right: 16px">Days</div>
-<div class="aura-table__th" style="width: 136px">Renewed by</div>
-<div class="aura-table__th" style="width: 112px">Status</div>
+<div class="aura-table__th" style="width: 152px">Status</div>
 <div class="aura-table__gutter aura-table__gutter--end"></div>
 </div>
 <sc-for list="{{rows}}" as="r" hint-placeholder-count="17">
 <a href="SiteDetail.dc.html" class="aura-table__row" style="color: inherit; text-decoration: none">
 <div class="aura-table__gutter"></div>
 <div class="aura-table__td" style="flex: 1 1 0; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.name}}</div>
-<div class="aura-table__td" style="width: 120px; font-variant-numeric: tabular-nums">{{r.ssl}}</div>
+<div class="aura-table__td" style="width: 148px; font-variant-numeric: tabular-nums; color: {{r.sslTc}}">{{r.ssl}}</div>
 <div class="aura-table__td" style="width: 72px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums; display: flex; align-items: center; justify-content: flex-end"><span style="padding: 0 8px; border-radius: 9999px; line-height: 22px; font-weight: {{r.sslW}}; color: {{r.sslC}}; background: {{r.sslBg}}; box-shadow: {{r.sslBd}}">{{r.sslD}}</span></div>
 <div class="aura-table__td" style="width: 150px; font-size: 12px; color: var(--aura-fg-secondary)">{{r.cert}}</div>
-<div class="aura-table__td" style="width: 120px; font-variant-numeric: tabular-nums">{{r.dom}}</div>
+<div class="aura-table__td" style="width: 220px; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; justify-content: center; line-height: 1.3; white-space: normal"><span style="color: {{r.domTc}}">{{r.dom}}</span><sc-if value="{{r.domHasSub}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-tertiary)">{{r.domSub}}</span></sc-if></div>
 <div class="aura-table__td" style="width: 72px; text-align: right; padding-right: 16px; font-variant-numeric: tabular-nums; display: flex; align-items: center; justify-content: flex-end"><span style="padding: 0 8px; border-radius: 9999px; line-height: 22px; font-weight: {{r.domW}}; color: {{r.domC}}; background: {{r.domBg}}; box-shadow: {{r.domBd}}">{{r.domD}}</span></div>
-<div class="aura-table__td" style="width: 136px; font-size: 13px; display: flex; flex-direction: column; justify-content: center; line-height: 1.3"><span>{{r.who}}</span><sc-if value="{{r.hasRem}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{r.rem}}</span></sc-if></div>
-<div class="aura-table__td" style="width: 112px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" icon="{{r.icon}}">{{r.label}}</x-import></div>
+<div class="aura-table__td" style="width: 152px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.label}}</x-import></div>
 <div class="aura-table__gutter aura-table__gutter--end"></div>
 </a>
 </sc-for>
 </div>
 </section>
+<sc-if value="{{failed}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">A failed read shows “Couldn’t read · reason” (“Registry unavailable”, “Timeout”, “No registry lookup for .de”) with the last known date under it and its day count, all greyed — never red or amber. The row sorts first and stays in Within 60 days until a read works. Check now retries.</span></sc-if>
 
 </main>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1340}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1420}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { view: 'All 17', checking: false };
+    this.state = { view: 'All 17', checking: false, st: 'All read' };
   }
   renderVals() {
     var self = this;
-    // name, ssl date, cert, domain date, renewed by, reminder date. Days left are computed from the snapshot date, Fri 25 Sep 2026.
+
     var MON = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
     var NOW = Date.UTC(2026, 8, 25);
     function left(str) { var p = str.split(' '); return Math.round((Date.UTC(+p[2], MON[p[1]], +p[0]) - NOW) / 86400000); }
+    // name, SSL expiry, certificate kind (read from the certificate itself), domain expiry
     var raw = [
-      ['Cando Asia', '19 Nov 2026', 'Auto-renew · 90 d', '5 Nov 2026', 'Client (Cando)', '21 Sep'],
-      ['WeCare Studio', '2 Dec 2026', 'Auto-renew · 90 d', '14 Nov 2026', 'DxT · Nok'],
-      ['Bangkok Airways – Taiwan', '7 Dec 2026', 'Paid · 1 year', '24 Apr 2027', 'Client (BA IT)'],
-      ['Bangkok Airways – China', '7 Dec 2026', 'Paid · 1 year', '24 Apr 2027', 'Client (BA IT)'],
-      ['Tubtong', '9 Dec 2026', 'Auto-renew · 90 d', '30 Jan 2027', 'DxT · Ploy'],
-      ['VOCA', '11 Dec 2026', 'Auto-renew · 90 d', '8 Mar 2027', 'DxT · Ploy'],
-      ['Fuji Links', '14 Dec 2026', 'Auto-renew · 90 d', '2 Jun 2027', 'DxT · Ploy'],
-      ['MuvMi', '16 Dec 2026', 'CDN managed', '17 Feb 2027', 'Client (MuvMi)'],
-      ['ENEOS Industrial', '18 Dec 2026', 'Auto-renew · 90 d', '1 Oct 2027', 'Client (ENEOS)'],
-      ['realme.link', '19 Dec 2026', 'CDN managed', '12 Jul 2027', 'DxT · Nok'],
-      ['EQHO', '20 Dec 2026', 'Auto-renew · 90 d', '22 Aug 2027', 'DxT · Tao'],
-      ['DxT AI', '21 Dec 2026', 'Renewed Thu · 90 d', '3 May 2027', 'DxT · Tao'],
-      ['ORCA Thailand', '21 Dec 2026', 'Auto-renew · 90 d', '15 Mar 2027', 'DxT · Tao'],
-      ['WeCare Asia', '22 Dec 2026', 'Auto-renew · 90 d', '28 Feb 2027', 'DxT · Nok'],
-      ['DxT', '22 Dec 2026', 'Auto-renew · 90 d', '9 Jan 2027', 'DxT · Tao'],
-      ['DxT Solutions', '22 Dec 2026', 'Auto-renew · 90 d', '9 Jan 2027', 'DxT · Tao'],
-      ['DxT Games', '22 Dec 2026', 'Auto-renew · 90 d', '9 Jan 2027', 'DxT · Tao']
+      ['Cando Asia', '19 Nov 2026', 'Auto-renew · 90 d', '5 Nov 2026'],
+      ['WeCare Studio', '2 Dec 2026', 'Auto-renew · 90 d', '14 Nov 2026'],
+      ['Bangkok Airways – Taiwan', '7 Dec 2026', 'Paid · 1 year', '24 Apr 2027'],
+      ['Bangkok Airways – China', '7 Dec 2026', 'Paid · 1 year', '24 Apr 2027'],
+      ['Tubtong', '9 Dec 2026', 'Auto-renew · 90 d', '30 Jan 2027'],
+      ['VOCA', '11 Dec 2026', 'Auto-renew · 90 d', '8 Mar 2027'],
+      ['Fuji Links', '14 Dec 2026', 'Auto-renew · 90 d', '2 Jun 2027'],
+      ['MuvMi', '16 Dec 2026', 'Auto-renew · 90 d', '17 Feb 2027'],
+      ['ENEOS Industrial', '18 Dec 2026', 'Auto-renew · 90 d', '1 Oct 2027'],
+      ['realme.link', '19 Dec 2026', 'Auto-renew · 90 d', '12 Jul 2027'],
+      ['EQHO', '20 Dec 2026', 'Auto-renew · 90 d', '22 Aug 2027'],
+      ['DxT AI', '21 Dec 2026', 'Renewed Thu · 90 d', '3 May 2027'],
+      ['ORCA Thailand', '21 Dec 2026', 'Auto-renew · 90 d', '15 Mar 2027'],
+      ['WeCare Asia', '22 Dec 2026', 'Auto-renew · 90 d', '28 Feb 2027'],
+      ['DxT', '22 Dec 2026', 'Auto-renew · 90 d', '9 Jan 2027'],
+      ['DxT Solutions', '22 Dec 2026', 'Auto-renew · 90 d', '9 Jan 2027'],
+      ['DxT Games', '22 Dec 2026', 'Auto-renew · 90 d', '9 Jan 2027']
     ];
-    var data = raw.map(function (r) { return [r[0], r[1], left(r[1]), r[2], r[3], left(r[3]), r[4], r[5] || '']; });
-    // Days-left: red only under the alert threshold (SSL < 14 d, domain < 30 d); amber when listed as due soon; plain otherwise.
+    var FAILED = this.state.st === 'One read failed', NOTHING = false, EDGE = this.state.st === 'Expired + new site', ERR = this.state.st === 'Check failed';
+    if (NOTHING) raw = raw.map(function (r) {
+      if (r[0] === 'Cando Asia') return [r[0], '19 Nov 2026', 'Auto-renew · 90 d', '5 Nov 2027'];
+      if (r[0] === 'WeCare Studio') return [r[0], '2 Dec 2026', 'Auto-renew · 90 d', '14 Nov 2027'];
+      return r;
+    });
+    // Edge cases (made up): Cando Asia's certificate expired yesterday; EQHO Academy was added this morning and has no read yet.
+    if (EDGE) { raw = raw.map(function (r) { return r[0] === 'Cando Asia' ? [r[0], '24 Sep 2026', 'Auto-renew · 90 d', '5 Nov 2026'] : r; }); raw.push(['EQHO Academy', '', '', '']); }
+    var GREY = { c: 'var(--aura-fg-tertiary)', bg: 'transparent', bd: 'none', w: 400 };
+    // Day pills: red under the alert line (SSL < 14 d, domain < 30 d) and when expired, amber when due soon, plain otherwise; grey (never red/amber) on a failed read.
     function tone(d, warn, soonAt) {
+      if (d === null) return GREY;
       if (d < warn) return { c: 'var(--aura-alert-danger-fg)', bg: 'var(--aura-alert-danger-bg)', bd: 'inset 0 0 0 1px var(--aura-alert-danger-border)', w: 600 };
       if (d < soonAt) return { c: 'var(--aura-alert-warning-fg)', bg: 'var(--aura-alert-warning-bg)', bd: 'inset 0 0 0 1px var(--aura-alert-warning-border)', w: 600 };
       return { c: 'var(--aura-fg-primary)', bg: 'transparent', bd: 'none', w: 400 };
     }
-    // Domains (and paid certificates) are flagged under 60 days. Auto-renew / CDN certificates only under 30 days or when a renewal fails.
-    var rows = data.map(function (d) {
-      var auto = /Auto-renew|CDN|Renewed/.test(d[3]);
+    var ST = {
+      notyet: { tone: 'neutral', variant: 'outline', icon: 'circle-dot-dashed', label: 'Not checked yet' },
+      fail: { tone: 'neutral', variant: 'outline', icon: 'circle-alert', label: 'Couldn’t read' },
+      expired: { tone: 'danger', variant: 'soft', icon: 'ban', label: 'Expired' },
+      soon: { tone: 'warning', variant: 'soft', icon: 'clock', label: 'Due soon' },
+      ok: { tone: 'success', variant: 'soft', icon: 'circle-check', label: 'OK' }
+    };
+    var rows = raw.map(function (r) {
+      var NEW = !r[1];
+      var domFail = FAILED && r[0] === 'ORCA Thailand' ? 'Registry unavailable' : '';
+      var sslD = NEW ? null : left(r[1]), domLast = NEW ? null : left(r[3]), domD = domFail ? null : domLast;
+      var auto = /Auto-renew|Renewed/.test(r[2]);
       var sslAt = auto ? 30 : 60;
-      var sslSoon = d[2] < sslAt, domSoon = d[5] < 60;
-      var soon = sslSoon || domSoon;
-      var client = d[6].indexOf('Client') === 0;
-      // Client-renewed items: the AM reminds the client at 45 days.
-      var rem = client && domSoon && d[5] <= 45 ? 'Reminder sent ' + d[7] : '';
+      var sslExp = sslD !== null && sslD < 0, domExp = domD !== null && domD < 0;
+      var sslSoon = sslD !== null && sslD < sslAt, domSoon = domD !== null && domD < 60;
+      var fail = !!domFail, soon = sslSoon || domSoon;
+      var ts = NEW ? GREY : tone(sslD, 14, sslAt), td = (NEW || fail) ? GREY : tone(domD, 30, 60);
+      var st = NEW ? ST.notyet : fail ? ST.fail : (sslExp || domExp) ? ST.expired : soon ? ST.soon : ST.ok;
+      var dayTxt = function (d) { return d === null ? '—' : (d < 0 ? 'Expired' : String(d)); };
       return {
-        name: d[0], ssl: d[1], sslD: d[2], cert: d[3], dom: d[4], domD: d[5], who: d[6], rem: rem, hasRem: !!rem,
-        sslC: tone(d[2], 14, sslAt).c, sslBg: tone(d[2], 14, sslAt).bg, sslBd: tone(d[2], 14, sslAt).bd, sslW: tone(d[2], 14, sslAt).w,
-        domC: tone(d[5], 30, 60).c, domBg: tone(d[5], 30, 60).bg, domBd: tone(d[5], 30, 60).bd, domW: tone(d[5], 30, 60).w,
-        sslSoon: sslSoon, domSoon: domSoon,
-        tone: soon ? 'warning' : 'success', icon: soon ? 'clock' : 'circle-check', label: soon ? 'Due soon' : 'OK', soon: soon
+        name: r[0], cert: NEW ? '—' : r[2], certM: NEW ? '' : r[2],
+        ssl: NEW ? 'Not checked yet' : r[1], sslTc: NEW ? 'var(--aura-fg-tertiary)' : 'var(--aura-fg-primary)', sslD: dayTxt(sslD),
+        dom: NEW ? 'Not checked yet' : (fail ? 'Couldn’t read · ' + domFail : r[3]), domTc: (NEW || fail) ? 'var(--aura-fg-tertiary)' : 'var(--aura-fg-primary)',
+        domSub: fail ? 'last ' + r[3] : '', domHasSub: fail, domD: fail ? String(domLast) : dayTxt(domD),
+        sslC: ts.c, sslBg: ts.bg, sslBd: ts.bd, sslW: ts.w, domC: td.c, domBg: td.bg, domBd: td.bd, domW: td.w,
+        sslN: sslD, domN: domD, sslSoon: sslSoon, domSoon: domSoon, sslExp: sslExp, domExp: domExp, soon: soon, fail: fail, isNew: NEW, attention: NEW || fail,
+        tone: st.tone, variant: st.variant, icon: st.icon, label: st.label,
+        aria: r[0] + ', ' + st.label + (NEW ? ', not checked yet' : ', SSL ' + r[1] + (sslExp ? ', expired' : ', ' + sslD + ' days') + ', ' + (fail ? 'domain couldn’t be read, ' + domFail + ', last ' + r[3] : 'domain ' + r[3] + ', ' + domD + ' days'))
       };
     });
-    // KPIs are derived from the same rows so counts always match the table.
-    var ssl14 = rows.filter(function (r) { return r.sslD < 14; }).length;
-    var dom30 = rows.filter(function (r) { return r.domD < 30; }).length;
+    // Not checked yet and couldn't read first (nobody can say they're fine), then soonest expiry as listed.
+    rows.sort(function (a, b) { return (b.attention ? 1 : 0) - (a.attention ? 1 : 0); });
+    var ssl14 = rows.filter(function (r) { return r.sslN !== null && r.sslN < 14; });
+    var dom30 = rows.filter(function (r) { return r.domN !== null && r.domN < 30; });
+    function cap(list, kind, expKey) {
+      var ex = list.filter(function (r) { return r[expKey]; });
+      return ex.length ? ex.map(function (r) { return r.name + ' ' + kind + ' expired'; }).join(' · ') : 'Would open a PROBLEM';
+    }
     var due = [];
-    rows.forEach(function (r) {
-      if (r.sslSoon) due.push({ n: r.name, d: r.sslD, k: 'SSL' });
-      if (r.domSoon) due.push({ n: r.name, d: r.domD, k: 'domain' });
-    });
-    var allDomains = due.every(function (x) { return x.k === 'domain'; });
-    var clientN = rows.filter(function (r) { return r.who.indexOf('Client') === 0; }).length;
+    rows.forEach(function (r) { if (r.sslSoon && !r.sslExp) due.push({ n: r.name, d: r.sslN, k: 'SSL' }); if (r.domSoon && !r.domExp) due.push({ n: r.name, d: r.domN, k: 'domain' }); });
     var kpis = [
-      { label: 'SSL under 14 days', value: String(ssl14), icon: 'lock', caption: 'Would open a PROBLEM' },
-      { label: 'Domains under 30 days', value: String(dom30), icon: 'calendar', caption: 'Would open a PROBLEM' },
-      { label: 'Due within 60 days', value: String(due.length), unit: 'items' + (allDomains && due.length === 2 ? ' · both domains' : ''), icon: 'clock', caption: due.map(function (x) { return x.n.replace(' Asia', '') + ' ' + x.d + ' d'; }).join(' · ') },
-      { label: 'Renewed by the client', value: String(clientN), unit: '/ 17', icon: 'users', caption: 'AM reminds them at 45 days' }
+      { label: 'SSL under 14 days', value: String(ssl14.length), icon: 'lock', caption: cap(ssl14, 'SSL', 'sslExp') },
+      { label: 'Domains under 30 days', value: String(dom30.length), icon: 'calendar', caption: cap(dom30, 'domain', 'domExp') },
+      { label: 'Due within 60 days', value: String(due.length), unit: due.length === 1 ? 'item' : 'items', icon: 'clock', caption: due.length ? due.map(function (x) { return x.n + ' ' + x.k + ' ' + (x.d < 0 ? 'expired' : x.d + ' d'); }).join(' · ') : 'Nothing due' }
     ];
+    var NS = rows.length;
+    var META = 'Checked daily 06:00 · last check Fri 25 Sep 06:00 · ' + (FAILED ? '33 of 34 read · 1 couldn’t be read' : EDGE ? '34 of 36 read · EQHO Academy not checked yet (added today 08:40)' : '34 of 34 read');
+    var CHECKING = 'Checking ' + NS + ' certificates and ' + NS + ' domains now · started Fri 25 Sep 10:07 · results in about 1 min';
+    var ERRLINE = 'Checked less than a minute ago — try again shortly';
+    var ALL = 'All ' + NS;
+    var ALERTS = 'SSL under 14 days or a domain under 30 days turns the site Problem and opens an incident for the owner. Domains and paid certificates under 60 days are listed here and in the weekly summary — no alert. Auto-renew certificates are only listed when under 30 days. An expired certificate is a hard fail, so the primary monitor catches it as Down. Alerts wait for response hours (09:00–18:00 Mon–Fri) on every tier — nobody is paged at night for something days away.';
     var view = this.state.view;
-    var shown = rows.filter(function (r) { return view === 'All 17' || r.soon; });
+    var shown = rows.filter(function (r) { return view !== 'Within 60 days' || r.soon || r.attention; });
     return {
       rows: shown,
       checking: this.state.checking,
       checkNow: function () { self.setState({ checking: true }); },
       meta: this.state.checking
-        ? { text: 'Checking 17 certificates and 17 domains now · started Fri 25 Sep 10:07 · results in about 1 min', color: 'var(--aura-fg-secondary)', btn: 'Checking…' }
-        : { text: 'Checked daily 06:00 from Bangkok · last check Fri 25 Sep 06:00 · 34 of 34 read', color: 'var(--aura-fg-secondary)', btn: 'Check now' },
-      view: view,
-      views: ['All 17', 'Within 60 days'],
+        ? { text: CHECKING, color: 'var(--aura-fg-secondary)', btn: 'Checking…' }
+        : { text: META, color: 'var(--aura-fg-secondary)', btn: 'Check now' },
+      view: view === 'Within 60 days' ? view : ALL,
+      views: [ALL, 'Within 60 days'],
       setView: function (v) { self.setState({ view: v }); },
-      kpis: kpis,
+      kpis: kpis, alerts: ALERTS, failed: FAILED,
+      err: ERR, errLine: ERRLINE,
+      states: ['All read', 'One read failed', 'Expired + new site', 'Check failed'], stateV: this.state.st, setState2: function (v) { self.setState({ st: v }); },
       nav: [
         { items: [
           { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },

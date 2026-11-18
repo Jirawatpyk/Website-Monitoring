@@ -323,6 +323,27 @@ class Component extends DCLogic {
         }
       }
     };
+    var NCAUSE = 'Found “บาคาร่า” on / (as Googlebot). DxT AI was already open as INC-0136 for SSL expiring; this new problem joins it, and the incident now reads Keyword.';
+    var NC = {
+      'New cause · not acknowledged yet': {
+        sentTo: 'Wording example — what INC-0136’s thread would get if the keyword had appeared at 09:14, before anyone acknowledged (not in the sample ledger). Sent 09:19, after the 5-min grace, to Tao (owner, L0 by day) in the same mail thread. Not sent if the keyword had cleared first. Tier 3 outside response hours would be held to 09:00; an on-call L0 (Tier 1 at night) reads “…because you’re on call for DxT AI.”',
+        bar: AMBER, labelColor: AMBER, label: 'PROBLEM — NEW CAUSE: KEYWORD', preStatus: 'PROBLEM — new cause: Keyword ·', pre: '“บาคาร่า” found on / (as Googlebot) · was SSL expiring · same incident INC-0136',
+        headline: 'DxT AI has a new problem',
+        facts: [{ k: 'New cause', v: 'Keyword · found 09:14' }, { k: 'Cause', v: 'Found “บาคาร่า” on / (as Googlebot)' }, { k: 'Was', v: 'SSL expiring — SSL certificate expires in 13 days (Tue 6 Oct)' }, { k: 'Incident', v: 'INC-0136, open since Wed 23 Sep 09:00 · now reads Keyword' }, { k: 'Next step', v: 'Acknowledge to stop the PROBLEM reminders' }],
+        people: {
+          'Tao': { to: 'Tao <tao@[domain]>', lede: NCAUSE, btns: [P('Acknowledge', 'MLogin.dc.html'), Sd('Open incident', 'Incident.dc.html')], why: 'You got this because you own DxT AI.' }
+        }
+      },
+      'New cause · acknowledged': {
+        sentTo: 'Wording example — keyword found at 14:20, after Tao acknowledged the SSL expiry at 09:20 (not in the sample ledger). Sent 14:25, after the 5-min grace, to Tao — the person who acknowledged — in the same mail thread. The acknowledgement of the expiry is set aside, so Keyword needs its own: the Acknowledge button stays.',
+        bar: AMBER, labelColor: AMBER, label: 'PROBLEM — NEW CAUSE: KEYWORD', preStatus: 'PROBLEM — new cause: Keyword ·', pre: '“บาคาร่า” found on / (as Googlebot) · was SSL expiring · same incident INC-0136',
+        headline: 'DxT AI has a new problem',
+        facts: [{ k: 'New cause', v: 'Keyword · found 14:20' }, { k: 'Cause', v: 'Found “บาคาร่า” on / (as Googlebot)' }, { k: 'Was', v: 'SSL expiring — SSL certificate expires in 13 days (Tue 6 Oct)' }, { k: 'Incident', v: 'INC-0136 · now reads Keyword · not acknowledged for it yet' }, { k: 'Acknowledged', v: 'Tao at 09:20 for SSL expiring — set aside, Keyword needs its own' }],
+        people: {
+          'Tao': { to: 'Tao <tao@[domain]>', lede: NCAUSE + ' Tao acknowledged earlier, so only Tao is mentioned. That acknowledgement was for the SSL expiry — please acknowledge the new problem.', btns: [P('Acknowledge', 'MLogin.dc.html'), Sd('Open incident', 'Incident.dc.html')], why: 'You got this because you acknowledged this incident.' }
+        }
+      }
+    };
     var ADMWHY = 'You got this because you’re an Admin.';
     var A = {
       'Verifier unavailable': {
@@ -522,6 +543,7 @@ class Component extends DCLogic {
       'MuvMi · DOWN': { subject: 'MuvMi · Tier 1 · INC-0142', E: E, events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (CEO)', 'L3 FYI (CEO + Bua)', 'Recovered'], first: 'Down', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · PROBLEM': { subject: 'Fuji Links · Tier 2 · INC-0141', E: F, events: ['PROBLEM', 'Acknowledged', 'Recovered'], first: 'PROBLEM', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · auto-resolved': { subject: 'Fuji Links · Tier 2 · INC-0151', E: FA, events: ['Recovered (auto-resolved)'], first: 'Recovered (auto-resolved)', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
+      'DxT AI · new cause (SSL → Keyword)': { subject: 'DxT AI · Tier 3 · INC-0136', E: NC, events: Object.keys(NC), first: 'New cause · not acknowledged yet', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read.' },
       'VOCA · flapping': { subject: 'VOCA · Tier 2 · INC-0133', E: V, events: ['Flapping summary'], first: 'Flapping summary', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Maintenance · request (Bangkok Airways – China)': { subject: 'DxT Monitor · Maintenance request · Bangkok Airways – China · Sat 26 Sep 22:00', E: MR, events: Object.keys(MR), first: 'Request', foot: MXF },
       'Maintenance · window (Tubtong)': { subject: 'Tubtong · Maintenance · Tue 29 Sep 01:00', E: MO, events: Object.keys(MO), first: 'Scheduled', foot: MXF },

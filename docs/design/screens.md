@@ -1,6 +1,6 @@
 # Screen map — canvas board → route → rules
 
-The index `/implement-screen` reads. One row per canvas board (59). The board file is in `docs/design/canvas/`; open the [live canvas](https://claude.ai/artifact/Sqa6gYe5eGqTQtBFmjbyMW) in Play mode to click through flows.
+The index `/implement-screen` reads. One row per canvas board (62). The board file is in `docs/design/canvas/`; open the [live canvas](https://claude.ai/artifact/Sqa6gYe5eGqTQtBFmjbyMW) in Play mode to click through flows.
 
 - **Phase** follows PRD §6 priority: `P0` = MVP (Phase 1), `P1` = team go-live (Phase 2), `P2` = client-facing (Phase 3). **Slice** is the slice in [`../implementation-plan.md`](../implementation-plan.md) that builds the board; work in slice order.
 - **Spec** = sections of `docs/dxt-monitor-design-spec.md` that govern the screen. §11 (badges), §13 (copy & formats) and §14.15–17 (eyebrows, no dead controls, 44 px tap targets) apply to every screen and are not repeated below.
@@ -48,7 +48,10 @@ The index `/implement-screen` reads. One row per canvas board (59). The board fi
 | MEscalation | Mobile — Escalation (view only) | `/escalation` (390) | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §22.5–6 | FR-09a, FR-09b |
 | OnCall | On-call rotation | `/oncall` | P1 | S10 | §2, §15.8, §27, §28 | FR-09b, §8 |
 | MOnCall | Mobile — On-call | `/oncall` (390) | P1 | S10 | §10 (checklist), §27, §28 | §8 |
-| Expiry | SSL & domain expiry | `/expiry` | P1 | S13 | §14.12, §15.8 | FR-11 |
+| Expiry | SSL & domain expiry | `/expiry` | P1 | S13 | §14.12, §15.8, §39 | FR-11 |
+| Expiry820 | SSL & domains at 820 — cards two per row | `/expiry` (820) | P1 | S13 | §39.7 | FR-11 |
+| MExpiry | Mobile — SSL & domains | `/expiry` (390) | P1 | S13 | §22, §39.6 | FR-11 |
+| MExpiryDark | Mobile — SSL & domains · dark | same (390), dark theme | P1 | S13 | §39.6 | FR-11 |
 | Probes | Probes & heartbeat | `/probes` | P1 | S12a | §14.4, §15.3 | §9 |
 | AuditLog | Audit log | `/audit` | P1 | S15 | §16.11 | FR-13 |
 | MAuditLog | Mobile — Audit log | `/audit` (390) | P1 | S15 | §22, §33 | FR-13 |

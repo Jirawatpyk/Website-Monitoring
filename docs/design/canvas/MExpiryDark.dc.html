@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — SSL & domains (dark)</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="aura-tokens-dark.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#08080a}
+a{color:#6d28d9}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.aura-input,.aura-input__control,.aura-select__control{min-height:44px;box-sizing:border-box}
+.mx-btn .aura-btn,.mx-btn button{min-height:44px}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.mx-card{display:flex;flex-direction:column;gap:6px;padding:12px 14px;min-height:44px;box-sizing:border-box;background:var(--aura-bg-surface);border:1px solid var(--aura-border-default);border-radius:var(--aura-radius-lg);color:inherit;text-decoration:none}
+.mx-card:focus-visible{outline:2px solid var(--aura-focus-ring);outline-offset:2px}
+.mx-pill{display:inline-block;padding:0 8px;border-radius:9999px;line-height:22px;font-variant-numeric:tabular-nums;font-size:13px}
+.mx-sk{background:var(--aura-bg-surface-hover);border-radius:6px}
+.mx-more{min-height:44px;min-width:44px;padding:0 4px;border:0;background:none;color:var(--aura-fg-accent,#6d28d9);font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.mx-rail a{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:10px;color:var(--aura-fg-secondary)}
+.mx-rail a[aria-current="page"]{background:var(--aura-bg-selected);color:var(--aura-fg-primary)}
+.mx-grid{display:grid;grid-template-columns:repeat(1,minmax(0,1fr));gap:10px}
+.mx-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column">
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 6px 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<a href="MOverview4.dc.html" aria-label="Back to Overview" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a><span style="flex-grow: 1; font-size: 17px; font-weight: 600; padding-left: 0">SSL &amp; domains</span>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="Arm" size="sm"></x-import></a>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{states}}" value="{{stateV}}" on-change="{{setSt}}"></x-import></div>
+</div>
+
+<span style="display: flex; align-items: flex-start; gap: 6px; font-size: 13px; line-height: 1.45; color: var(--aura-fg-secondary)"><sc-if value="{{busy}}" hint-placeholder-val="{{false}}"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="loader-circle" size="sm"></x-import></span></sc-if><span role="status" aria-live="polite">{{meta}}</span></span>
+<div class="mx-btn" style="display: flex; flex-direction: column; gap: 6px"><x-import component-from-global-scope="Aura.Button" variant="secondary" icon="rotate-ccw" full-width="{{yes}}" disabled="{{busy}}" on-click="{{checkNow}}">{{btn}}</x-import><sc-if value="{{err}}" hint-placeholder-val="{{false}}"><span role="status" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import>{{errLine}}</span></sc-if></div>
+
+<sc-if value="{{loaded}}" hint-placeholder-val="{{true}}">
+<div class="mx-kpis">
+<sc-for list="{{kpis}}" as="k" hint-placeholder-count="3">
+<div style="grid-column: {{k.span}}; display: flex; flex-direction: column"><x-import component-from-global-scope="Aura.Stat" label="{{k.label}}" value="{{k.value}}" unit="{{k.unit}}" caption="{{k.caption}}" icon="{{k.icon}}"></x-import></div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{loading}}" hint-placeholder-val="{{false}}">
+<div class="mx-kpis" aria-hidden="true">
+<sc-for list="{{sk3}}" as="x" hint-placeholder-count="3"><div style="grid-column: {{x.span}}; height: 108px; box-sizing: border-box; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)"><span class="mx-sk" style="width: 60%; height: 12px"></span><span class="mx-sk" style="width: 36px; height: 26px"></span><span class="mx-sk" style="width: 80%; height: 10px"></span></div></sc-for>
+</div>
+</sc-if>
+
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 6px 6px 6px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); font-size: 13px; line-height: 1.5">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><b style="font-weight: 600">How it alerts</b> <span style="color: var(--aura-fg-secondary)">{{alertShort}}</span></span>
+<button type="button" class="mx-more" aria-expanded="{{moreOpen}}" aria-controls="mx-alerts" onClick="{{toggleMore}}">{{moreLabel}}</button>
+</div>
+<sc-if value="{{moreOpen}}" hint-placeholder-val="{{false}}"><span id="mx-alerts" style="padding: 0 8px 8px 0">{{alerts}}</span></sc-if>
+</div>
+
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Show" options="{{views}}" value="{{view}}" on-change="{{setView}}" full-width="{{yes}}" size="sm"></x-import>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{countLine}}</span>
+
+<sc-if value="{{loaded}}" hint-placeholder-val="{{true}}">
+<div class="mx-grid">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+<a href="MSite.dc.html" class="mx-card" aria-label="{{r.aria}}">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="flex-grow: 1; min-width: 0; font-size: 15px; font-weight: 600; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.name}}</span>
+<x-import component-from-global-scope="Aura.Badge" tone="{{r.tone}}" variant="{{r.variant}}" icon="{{r.icon}}">{{r.label}}</x-import>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; line-height: 1.4">
+<span style="width: 52px; color: var(--aura-fg-secondary)">SSL</span><span style="font-variant-numeric: tabular-nums; color: {{r.sslTc}}">{{r.ssl}}</span><span class="mx-pill" style="font-weight: {{r.sslW}}; color: {{r.sslC}}; background: {{r.sslBg}}; box-shadow: {{r.sslBd}}">{{r.sslD}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{r.certM}}</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; line-height: 1.4">
+<span style="width: 52px; color: var(--aura-fg-secondary)">Domain</span>
+<span style="font-variant-numeric: tabular-nums; color: {{r.domTc}}">{{r.dom}}</span><span class="mx-pill" style="font-weight: {{r.domW}}; color: {{r.domC}}; background: {{r.domBg}}; box-shadow: {{r.domBd}}">{{r.domD}}</span><sc-if value="{{r.domHasSub}}" hint-placeholder-val="{{false}}"><span style="flex-basis: 100%; padding-left: 60px; font-size: 12px; color: var(--aura-fg-tertiary)">{{r.domSub}}</span></sc-if>
+</div>
+</a>
+</sc-for>
+</div>
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 28px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-surface-hover); color: var(--aura-fg-positive)"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="md"></x-import></span>
+<span style="font-size: 15px; font-weight: 600">Nothing due within 60 days</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">All 17 certificates and domains are further out. Checked daily at 06:00.</span>
+<span style="padding-top: 6px" class="mx-btn"><x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{showAll}}">Show all</x-import></span>
+</div>
+</sc-if>
+</sc-if>
+<sc-if value="{{loading}}" hint-placeholder-val="{{false}}">
+<div class="mx-grid" aria-hidden="true">
+<sc-for list="{{sk5}}" as="x" hint-placeholder-count="5"><div style="height: 104px; box-sizing: border-box; padding: 14px; display: flex; flex-direction: column; gap: 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)"><div style="display: flex; justify-content: space-between"><span class="mx-sk" style="width: 55%; height: 14px"></span><span class="mx-sk" style="width: 64px; height: 18px; border-radius: 9999px"></span></div><span class="mx-sk" style="width: 85%; height: 12px"></span><span class="mx-sk" style="width: 60%; height: 12px"></span></div></sc-for>
+</div>
+</sc-if>
+
+<div style="flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">SPEC NOTE · PHONE (D-066)</span>
+<span>Phone layout of SSL &amp; domains (§22: tables become cards). One card per site, the whole card opens Site detail; line 1 name + status (OK / Due soon / Couldn’t read), line 2 SSL date + day pill + certificate kind, line 3 domain date + day pill. Same pill colours and sort as desktop; a date that couldn’t be read shows “—” and the reason in the card (no hover on a phone). Reached from the “SSL &amp; domains” row at the foot of Sites (MSites); the back arrow goes to Overview. Not a bottom-nav tab, so nothing in the bar is selected. Sample data as on the desktop board — made up.</span>
+</div>
+</div>
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="" label="Sections"></x-import>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { st: 'List', view: 'All 17', more: false }; }
+  renderVals() {
+    var self = this, STV = this.state.st;
+
+    var MON = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+    var NOW = Date.UTC(2026, 8, 25);
+    function left(str) { var p = str.split(' '); return Math.round((Date.UTC(+p[2], MON[p[1]], +p[0]) - NOW) / 86400000); }
+    // name, SSL expiry, certificate kind (read from the certificate itself), domain expiry
+    var raw = [
+      ['Cando Asia', '19 Nov 2026', 'Auto-renew · 90 d', '5 Nov 2026'],
+      ['WeCare Studio', '2 Dec 2026', 'Auto-renew · 90 d', '14 Nov 2026'],
+      ['Bangkok Airways – Taiwan', '7 Dec 2026', 'Paid · 1 year', '24 Apr 2027'],
+      ['Bangkok Airways – China', '7 Dec 2026', 'Paid · 1 year', '24 Apr 2027'],
+      ['Tubtong', '9 Dec 2026', 'Auto-renew · 90 d', '30 Jan 2027'],
+      ['VOCA', '11 Dec 2026', 'Auto-renew · 90 d', '8 Mar 2027'],
+      ['Fuji Links', '14 Dec 2026', 'Auto-renew · 90 d', '2 Jun 2027'],
+      ['MuvMi', '16 Dec 2026', 'Auto-renew · 90 d', '17 Feb 2027'],
+      ['ENEOS Industrial', '18 Dec 2026', 'Auto-renew · 90 d', '1 Oct 2027'],
+      ['realme.link', '19 Dec 2026', 'Auto-renew · 90 d', '12 Jul 2027'],
+      ['EQHO', '20 Dec 2026', 'Auto-renew · 90 d', '22 Aug 2027'],
+      ['DxT AI', '21 Dec 2026', 'Renewed Thu · 90 d', '3 May 2027'],
+      ['ORCA Thailand', '21 Dec 2026', 'Auto-renew · 90 d', '15 Mar 2027'],
+      ['WeCare Asia', '22 Dec 2026', 'Auto-renew · 90 d', '28 Feb 2027'],
+      ['DxT', '22 Dec 2026', 'Auto-renew · 90 d', '9 Jan 2027'],
+      ['DxT Solutions', '22 Dec 2026', 'Auto-renew · 90 d', '9 Jan 2027'],
+      ['DxT Games', '22 Dec 2026', 'Auto-renew · 90 d', '9 Jan 2027']
+    ];
+    var FAILED = STV === 'One read failed', NOTHING = STV === 'Nothing due within 60 days', EDGE = STV === 'Expired + new site', ERR = STV === 'Check failed';
+    if (NOTHING) raw = raw.map(function (r) {
+      if (r[0] === 'Cando Asia') return [r[0], '19 Nov 2026', 'Auto-renew · 90 d', '5 Nov 2027'];
+      if (r[0] === 'WeCare Studio') return [r[0], '2 Dec 2026', 'Auto-renew · 90 d', '14 Nov 2027'];
+      return r;
+    });
+    // Edge cases (made up): Cando Asia's certificate expired yesterday; EQHO Academy was added this morning and has no read yet.
+    if (EDGE) { raw = raw.map(function (r) { return r[0] === 'Cando Asia' ? [r[0], '24 Sep 2026', 'Auto-renew · 90 d', '5 Nov 2026'] : r; }); raw.push(['EQHO Academy', '', '', '']); }
+    var GREY = { c: 'var(--aura-fg-tertiary)', bg: 'transparent', bd: 'none', w: 400 };
+    // Day pills: red under the alert line (SSL < 14 d, domain < 30 d) and when expired, amber when due soon, plain otherwise; grey (never red/amber) on a failed read.
+    function tone(d, warn, soonAt) {
+      if (d === null) return GREY;
+      if (d < warn) return { c: 'var(--aura-alert-danger-fg)', bg: 'var(--aura-alert-danger-bg)', bd: 'inset 0 0 0 1px var(--aura-alert-danger-border)', w: 600 };
+      if (d < soonAt) return { c: 'var(--aura-alert-warning-fg)', bg: 'var(--aura-alert-warning-bg)', bd: 'inset 0 0 0 1px var(--aura-alert-warning-border)', w: 600 };
+      return { c: 'var(--aura-fg-primary)', bg: 'transparent', bd: 'none', w: 400 };
+    }
+    var ST = {
+      notyet: { tone: 'neutral', variant: 'outline', icon: 'circle-dot-dashed', label: 'Not checked yet' },
+      fail: { tone: 'neutral', variant: 'outline', icon: 'circle-alert', label: 'Couldn’t read' },
+      expired: { tone: 'danger', variant: 'soft', icon: 'ban', label: 'Expired' },
+      soon: { tone: 'warning', variant: 'soft', icon: 'clock', label: 'Due soon' },
+      ok: { tone: 'success', variant: 'soft', icon: 'circle-check', label: 'OK' }
+    };
+    var rows = raw.map(function (r) {
+      var NEW = !r[1];
+      var domFail = FAILED && r[0] === 'ORCA Thailand' ? 'Registry unavailable' : '';
+      var sslD = NEW ? null : left(r[1]), domLast = NEW ? null : left(r[3]), domD = domFail ? null : domLast;
+      var auto = /Auto-renew|Renewed/.test(r[2]);
+      var sslAt = auto ? 30 : 60;
+      var sslExp = sslD !== null && sslD < 0, domExp = domD !== null && domD < 0;
+      var sslSoon = sslD !== null && sslD < sslAt, domSoon = domD !== null && domD < 60;
+      var fail = !!domFail, soon = sslSoon || domSoon;
+      var ts = NEW ? GREY : tone(sslD, 14, sslAt), td = (NEW || fail) ? GREY : tone(domD, 30, 60);
+      var st = NEW ? ST.notyet : fail ? ST.fail : (sslExp || domExp) ? ST.expired : soon ? ST.soon : ST.ok;
+      var dayTxt = function (d) { return d === null ? '—' : (d < 0 ? 'Expired' : String(d)); };
+      return {
+        name: r[0], cert: NEW ? '—' : r[2], certM: NEW ? '' : r[2],
+        ssl: NEW ? 'Not checked yet' : r[1], sslTc: NEW ? 'var(--aura-fg-tertiary)' : 'var(--aura-fg-primary)', sslD: dayTxt(sslD),
+        dom: NEW ? 'Not checked yet' : (fail ? 'Couldn’t read · ' + domFail : r[3]), domTc: (NEW || fail) ? 'var(--aura-fg-tertiary)' : 'var(--aura-fg-primary)',
+        domSub: fail ? 'last ' + r[3] : '', domHasSub: fail, domD: fail ? String(domLast) : dayTxt(domD),
+        sslC: ts.c, sslBg: ts.bg, sslBd: ts.bd, sslW: ts.w, domC: td.c, domBg: td.bg, domBd: td.bd, domW: td.w,
+        sslN: sslD, domN: domD, sslSoon: sslSoon, domSoon: domSoon, sslExp: sslExp, domExp: domExp, soon: soon, fail: fail, isNew: NEW, attention: NEW || fail,
+        tone: st.tone, variant: st.variant, icon: st.icon, label: st.label,
+        aria: r[0] + ', ' + st.label + (NEW ? ', not checked yet' : ', SSL ' + r[1] + (sslExp ? ', expired' : ', ' + sslD + ' days') + ', ' + (fail ? 'domain couldn’t be read, ' + domFail + ', last ' + r[3] : 'domain ' + r[3] + ', ' + domD + ' days'))
+      };
+    });
+    // Not checked yet and couldn't read first (nobody can say they're fine), then soonest expiry as listed.
+    rows.sort(function (a, b) { return (b.attention ? 1 : 0) - (a.attention ? 1 : 0); });
+    var ssl14 = rows.filter(function (r) { return r.sslN !== null && r.sslN < 14; });
+    var dom30 = rows.filter(function (r) { return r.domN !== null && r.domN < 30; });
+    function cap(list, kind, expKey) {
+      var ex = list.filter(function (r) { return r[expKey]; });
+      return ex.length ? ex.map(function (r) { return r.name + ' ' + kind + ' expired'; }).join(' · ') : 'Would open a PROBLEM';
+    }
+    var due = [];
+    rows.forEach(function (r) { if (r.sslSoon && !r.sslExp) due.push({ n: r.name, d: r.sslN, k: 'SSL' }); if (r.domSoon && !r.domExp) due.push({ n: r.name, d: r.domN, k: 'domain' }); });
+    var kpis = [
+      { label: 'SSL under 14 days', value: String(ssl14.length), icon: 'lock', caption: cap(ssl14, 'SSL', 'sslExp') },
+      { label: 'Domains under 30 days', value: String(dom30.length), icon: 'calendar', caption: cap(dom30, 'domain', 'domExp') },
+      { label: 'Due within 60 days', value: String(due.length), unit: due.length === 1 ? 'item' : 'items', icon: 'clock', caption: due.length ? due.map(function (x) { return x.n + ' ' + x.k + ' ' + (x.d < 0 ? 'expired' : x.d + ' d'); }).join(' · ') : 'Nothing due' }
+    ];
+    var NS = rows.length;
+    var META = 'Checked daily 06:00 · last check Fri 25 Sep 06:00 · ' + (FAILED ? '33 of 34 read · 1 couldn’t be read' : EDGE ? '34 of 36 read · EQHO Academy not checked yet (added today 08:40)' : '34 of 34 read');
+    var CHECKING = 'Checking ' + NS + ' certificates and ' + NS + ' domains now · started Fri 25 Sep 10:07 · results in about 1 min';
+    var ERRLINE = 'Checked less than a minute ago — try again shortly';
+    var ALL = 'All ' + NS;
+    var ALERTS = 'SSL under 14 days or a domain under 30 days turns the site Problem and opens an incident for the owner. Domains and paid certificates under 60 days are listed here and in the weekly summary — no alert. Auto-renew certificates are only listed when under 30 days. An expired certificate is a hard fail, so the primary monitor catches it as Down. Alerts wait for response hours (09:00–18:00 Mon–Fri) on every tier — nobody is paged at night for something days away.';
+
+    var LOADING = STV === 'Loading', CHECK = STV === 'Checking…';
+    var view = this.state.view;
+    var shown = rows.filter(function (r) { return view !== 'Within 60 days' || r.soon || r.attention; });
+    return {
+      yes: true,
+      states: ['List', 'One read failed', 'Expired + new site', 'Nothing due within 60 days', 'Checking…', 'Check failed', 'Loading'].map(function (v) { return { value: v, label: v }; }),
+      stateV: STV, setSt: function (e) { var v = e && e.target ? e.target.value : e; self.setState({ st: v, view: v === 'Nothing due within 60 days' ? 'Within 60 days' : self.state.view }); },
+      busy: LOADING || CHECK, loading: LOADING, loaded: !LOADING,
+      meta: LOADING ? 'Loading…' : (CHECK ? CHECKING : META),
+      btn: CHECK ? 'Checking…' : 'Check now',
+      checkNow: function () { self.setState({ st: 'Checking…' }); },
+      kpis: kpis.map(function (k, i) { return Object.assign({ span: i === 2 ? '1 / -1' : 'auto' }, k); }), sk3: [{ span: 'auto' }, { span: 'auto' }, { span: '1 / -1' }], sk5: [1, 2, 3, 4, 5, 6],
+      alertShort: '· SSL < 14 d, domain < 30 d',
+      alerts: ALERTS, moreOpen: !!this.state.more, moreLabel: this.state.more ? 'Less' : 'More',
+      toggleMore: function () { self.setState({ more: !self.state.more }); },
+      views: [ALL, 'Within 60 days'], view: view === 'Within 60 days' ? view : ALL, err: ERR, errLine: ERRLINE, setView: function (v) { self.setState({ view: v }); },
+      countLine: LOADING || !shown.length ? '' : (view !== 'Within 60 days' ? NS + ' sites · soonest expiry first' : shown.length + (shown.length === 1 ? ' site' : ' sites') + ' due within 60 days or not read'),
+      rows: shown, empty: !LOADING && shown.length === 0,
+      showAll: function () { self.setState({ view: ALL }); },
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

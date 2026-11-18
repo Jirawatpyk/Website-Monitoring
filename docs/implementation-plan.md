@@ -676,7 +676,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   - **Board:** the Certificate column comes from the certificate; "Renewed by" and the reminder are left out.
   - **Phone:** waits for an MExpiry board.
   - **Proof:** Done-when 1 is proved with fixture `site_expiry` rows on staging plus the reader and engine tests.
-- **Boards:** Expiry · **Tables:** site_expiry · **Test plan:** T01 cert path
+- **Boards:** Expiry, Expiry820, MExpiry, MExpiryDark (spec §39, drawn 18 Nov) · **Tables:** site_expiry · **Test plan:** T01 cert path
 - **PRs:**
   1. Schema and collector: `site_expiry`, `@dxt/probe` `expiry.ts`, `/api/cron/expiry`.
   2. Engine and messages.
@@ -933,6 +933,9 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | MainFault | S12b |
 | Probes | S12a |
 | Expiry | S13 |
+| Expiry820 | S13 |
+| MExpiry | S13 |
+| MExpiryDark | S13 |
 | WeeklySummary | S14 |
 | WeeklyEmail | S14 |
 | AuditLog | S15 |

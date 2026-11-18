@@ -197,7 +197,7 @@ color-scheme: dark;;color-scheme:dark}
 <sc-if value="{{w.hasComing}}" hint-placeholder-val="{{true}}">
 <div class="wk-sec">
 <span class="wk-h">COMING UP</span>
-<sc-for list="{{w.coming}}" as="c" hint-placeholder-count="3"><span style="font-size: 14px; line-height: 1.45">{{c}}</span></sc-for>
+<sc-for list="{{w.coming}}" as="c" hint-placeholder-count="4"><span style="font-size: 14px; line-height: 1.45">{{c}}</span></sc-for>
 </div>
 </sc-if>
 
@@ -265,7 +265,7 @@ class Component extends DCLogic {
         onTarget: '14 on target', onNames: '— Bangkok Airways – Taiwan, Bangkok Airways – China, realme.link, Fuji Links and 10 more',
         mtta: [{ k: 'Tier 1', v: '12 min · target 15', c: 'var(--aura-fg-positive)' }, { k: 'Tier 2', v: '— (no DOWN in hours)', c: NEU }, { k: 'Client first to report', v: '0', c: 'var(--aura-fg-positive)' }],
         planned: [P('maint', 'Tubtong · Tue 10 Nov 01:00 → 03:00 · every Tue · not counted'), P('mute', 'DxT Games · Fri 13 Nov 13:00 → 15:00 · still counted')],
-        coming: ['On call (Tier 1 nights and weekends): Nok, Mon 16 → Mon 23 Nov. Next: Arm.', 'Maintenance: Tubtong · every Tue 01:00 → 03:00 · next Tue 17 Nov', 'SSL: Bangkok Airways – Taiwan expires Mon 7 Dec — auto-renews, checked daily'],
+        coming: ['On call (Tier 1 nights and weekends): Nok, Mon 16 → Mon 23 Nov. Next: Arm.', 'Maintenance: Tubtong · every Tue 01:00 → 03:00 · next Tue 17 Nov', 'Bangkok Airways – Taiwan SSL in 21 days', 'Bangkok Airways – China SSL in 21 days'],
         mon: ['Ran 100% of rounds on time · 1 probe gap Thu 12 Nov 03:12 → 03:16 (SIN) — BKK and TYO still decided status.']
       },
       'Quiet week': {
