@@ -15,7 +15,12 @@ export const maxDuration = 60;
 export default async function SitesPage() {
   // MSites (§39.6): phones reach SSL & domains from a row at the foot of the list (staff only, as
   // /expiry); read alongside the list, not after it (site_expiry is staff-read, so a client reads none)
-  const [sites, access, expiryData] = await Promise.all([listSites(), getAccess(), getExpiry()]);
+  const [sites, access, expiryData] = await Promise.all([
+    listSites(),
+    getAccess(),
+    // an optional row: a failed read leaves it out rather than failing the Sites page
+    getExpiry().catch(() => null),
+  ]);
   const active = access.status === 'active' ? access : null;
   const isAdmin = active?.profile.role === 'admin';
   const expiry = active && active.profile.role !== 'client' && sites.length > 0 ? expiryData : null;

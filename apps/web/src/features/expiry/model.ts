@@ -76,7 +76,7 @@ export interface ExpiryData {
   certificates: number;
   domains: number;
   /** For the Sites list's phone row: halves due within 60 days, sites whose read failed. */
-  summary: { due: number; failed: number };
+  summary: { due: number; failed: number; unchecked: number };
 }
 
 /**
@@ -236,16 +236,46 @@ export function expiryView(
     meta: parts.join(' · '),
     certificates: sites.length - noTls,
     domains: sites.length,
-    summary: { due: soonList.length, failed: rows.filter((r) => r.status === 'failed').length },
+    summary: {
+      due: soonList.length,
+      failed: rows.filter((r) => r.status === 'failed').length,
+      unchecked: fresh.length,
+    },
   };
 }
 
 /**
  * The line under "SSL & domains" at the foot of the phone Sites list (MSites, §39.6): "2 due within
- * 60 days" (amber), "Nothing due within 60 days", "· 1 couldn't be read" when a read failed.
+ * 60 days" (amber) or "Nothing due within 60 days", then in secondary "· 1 couldn't be read" and
+ * "· 2 not checked yet" — a read that didn't happen is never amber (§39.4).
  */
-export function expirySummaryLine(s: ExpiryData['summary']): { text: string; due: boolean } {
-  const due = s.due ? `${s.due} due within 60 days` : 'Nothing due within 60 days';
-  const failed = s.failed ? ` · ${s.failed} couldn't be read` : '';
-  return { text: `${due}${failed}`, due: s.due > 0 };
+export function expirySummaryLine(s: ExpiryData['summary']): { due: string | null; rest: string } {
+  const extra = [
+    ...(s.failed ? [`${s.failed} couldn't be read`] : []),
+    ...(s.unchecked ? [`${s.unchecked} not checked yet`] : []),
+  ];
+  if (!s.due) return { due: null, rest: ['Nothing due within 60 days', ...extra].join(' · ') };
+  return { due: `${s.due} due within 60 days`, rest: extra.map((e) => ` · ${e}`).join('') };
+}
+
+const halfWords = (kind: 'SSL' | 'domain', h: ExpiryHalf, unchecked: boolean) => {
+  if (unchecked) return `${kind} not checked yet`;
+  if (h.error) return `${kind} couldn't be read, ${readWords(h.error)}${h.date ? `, last ${h.date}` : ''}`;
+  if (h.days === null || !h.date) return `${kind} —`;
+  return `${kind} ${h.date}, ${h.days < 0 ? 'expired' : h.days === 1 ? '1 day' : `${h.days} days`}`;
+};
+
+/** A card's name for a screen reader (MExpiry): "Cando Asia, Due soon, SSL 19 Nov 2026, 55 days, domain 5 Nov 2026, 41 days". */
+export function cardLabel(r: ExpiryRowView): string {
+  const status = {
+    unchecked: 'Not checked yet',
+    failed: "Couldn't read",
+    expired: 'Expired',
+    soon: 'Due soon',
+    ok: 'OK',
+  }[r.status];
+  const unchecked = r.status === 'unchecked';
+  return [r.name, status, halfWords('SSL', r.ssl, unchecked), halfWords('domain', r.domain, unchecked)].join(
+    ', ',
+  );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expiryView, readWords, type ExpiryRecord } from './model';
+import { cardLabel, expirySummaryLine, expiryView, readWords, type ExpiryRecord } from './model';
 
 // Board Expiry / spec §15.8 sample (test data only): today is Fri 25 Sep 2026 (Bangkok).
 const NOW = new Date('2026-09-25T03:00:00Z');
@@ -226,5 +226,40 @@ describe('readWords — a failed read in words (spec §13)', () => {
     ['No registry lookup for .app', 'No registry lookup for .app'],
   ])('%s → %s', (raw, words) => {
     expect(readWords(raw)).toBe(words);
+  });
+});
+
+describe('cardLabel and the Sites row line (MExpiry, MSites, §39.6)', () => {
+  it('names the card as the board does', () => {
+    const v = expiryView(
+      [
+        rec('cando', '2026-11-19', 90, '2026-11-05'),
+        rec('orca', '2026-12-21', 90, '2027-03-15', { domain_error: 'RDAP 503' }),
+      ],
+      [
+        { id: 'cando', name: 'Cando Asia' },
+        { id: 'orca', name: 'ORCA Thailand' },
+        { id: 'new', name: 'EQHO Academy' },
+      ],
+      NOW,
+    );
+    const by = (id: string) => cardLabel(v.rows.find((r) => r.siteId === id)!);
+    expect(by('cando')).toBe('Cando Asia, Due soon, SSL 19 Nov 2026, 55 days, domain 5 Nov 2026, 41 days');
+    expect(by('orca')).toBe(
+      "ORCA Thailand, Couldn't read, SSL 21 Dec 2026, 87 days, domain couldn't be read, Registry unavailable, last 15 Mar 2027",
+    );
+    expect(by('new')).toBe('EQHO Academy, Not checked yet, SSL not checked yet, domain not checked yet');
+    expect(v.summary).toEqual({ due: 1, failed: 1, unchecked: 1 });
+  });
+
+  it('the Sites row: amber only for what is due', () => {
+    expect(expirySummaryLine({ due: 2, failed: 1, unchecked: 0 })).toEqual({
+      due: '2 due within 60 days',
+      rest: " · 1 couldn't be read",
+    });
+    expect(expirySummaryLine({ due: 0, failed: 0, unchecked: 2 })).toEqual({
+      due: null,
+      rest: 'Nothing due within 60 days · 2 not checked yet',
+    });
   });
 });

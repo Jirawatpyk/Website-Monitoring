@@ -18,11 +18,12 @@ export function ExpiryLink({ summary }: { summary: ExpiryData['summary'] }) {
       </span>
       <span className="flex min-w-0 grow flex-col leading-snug">
         <span className="text-sm font-medium">SSL &amp; domains</span>
-        <span className={`text-xs ${line.due ? 'font-medium text-alert-warning-fg' : 'text-fg-secondary'}`}>
-          {line.text}
+        <span className="text-xs text-fg-secondary">
+          {line.due && <span className="font-medium text-alert-warning-fg">{line.due}</span>}
+          {line.rest}
         </span>
       </span>
-      <span className="flex text-fg-secondary" aria-hidden>
+      <span className="flex text-fg-tertiary" aria-hidden>
         <IconChevronRight size="sm" />
       </span>
     </Link>

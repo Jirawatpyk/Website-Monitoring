@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Badge,
   Button,
+  EmptyState,
   PageHeader,
   SegmentedControl,
   Stat,
@@ -26,7 +27,14 @@ import {
   IconLoaderCircle,
   IconLock,
 } from '@jirawatpyk/aura-react/icons';
-import { readWords, type DayTone, type ExpiryData, type ExpiryHalf, type ExpiryRowView } from '../model';
+import {
+  cardLabel,
+  readWords,
+  type DayTone,
+  type ExpiryData,
+  type ExpiryHalf,
+  type ExpiryRowView,
+} from '../model';
 import { TOUCH_HIT } from '@/components/site-cells';
 import { CheckNowButton } from './check-now';
 
@@ -39,8 +47,9 @@ const TONE: Record<DayTone, string> = {
   none: 'text-fg-secondary',
 };
 
-const ALERTS_TEXT =
-  'SSL under 14 days or a domain under 30 days turns the site Problem and opens an incident for the owner. Domains and paid certificates under 60 days are listed here and in the weekly summary — no alert. Auto-renew certificates are only listed when under 30 days. An expired certificate is a hard fail, so the primary monitor catches it as Down. Alerts wait for response hours (09:00–18:00 Mon–Fri) on every tier — nobody is paged at night for something days away.';
+/** The board's "How it alerts" words; the response hours come from the organisation's settings. */
+const alertsText = (hours: string) =>
+  `SSL under 14 days or a domain under 30 days turns the site Problem and opens an incident for the owner. Domains and paid certificates under 60 days are listed here and in the weekly summary — no alert. Auto-renew certificates are only listed when under 30 days. An expired certificate is a hard fail, so the primary monitor catches it as Down. Alerts wait for response hours (${hours}) on every tier — nobody is paged at night for something days away.`;
 
 /** The date; "Couldn't read · Timeout" with the last good date under it, greyed; "Not checked yet" (§39.4). */
 function DateText({ half, unchecked }: { half: ExpiryHalf; unchecked: boolean }) {
@@ -56,16 +65,19 @@ function DateText({ half, unchecked }: { half: ExpiryHalf; unchecked: boolean })
   return <span className={half.date ? '' : 'text-fg-secondary'}>{half.date ?? '—'}</span>;
 }
 
-/** The day pill: red under the alert line and when expired, amber when due soon; greyed on a failed read. */
+/**
+ * The day pill: red under the alert line and when expired, amber when due soon; greyed on a failed
+ * read. Its meaning is in words for a screen reader too, never in the colour alone (§11).
+ */
 function DaysPill({ half }: { half: ExpiryHalf }) {
   if (half.days === null) return <span className="text-fg-secondary">—</span>;
   const words = half.days < 0 ? 'Expired' : String(half.days);
   const tone = half.error ? 'none' : half.tone;
-  const label =
-    tone === 'alert' ? `${words}, under the alert line` : tone === 'soon' ? `${words}, due soon` : undefined;
+  const said = `${half.days >= 0 ? (half.days === 1 ? ' day' : ' days') : ''}${tone === 'alert' ? ', under the alert line' : tone === 'soon' ? ', due soon' : ''}`;
   return (
-    <span aria-label={label} className={`inline-block rounded-full px-2 leading-6 ${TONE[tone]}`}>
+    <span className={`inline-block rounded-full px-2 leading-6 ${TONE[tone]}`}>
       {words}
+      <span className="sr-only">{said}</span>
     </span>
   );
 }
@@ -110,21 +122,20 @@ function Row({ r }: { r: ExpiryRowView }) {
   const unchecked = r.status === 'unchecked';
   return (
     <Tr>
-      {/* the flexible column: at least 176 px, a longer name truncates (the board's ellipsis) */}
-      <Td label="Site" className="min-w-44 font-medium">
+      <Td label="Site" className="font-medium">
         <Link
           href={`/sites/${r.siteId}`}
           title={r.name}
           className={`max-w-full text-fg-primary hover:underline ${TOUCH_HIT}`}
         >
           {/* truncate inside, so the 44 px tap area isn't clipped (as the Sites list) */}
-          <span className="block max-w-72 truncate">{r.name}</span>
+          <span className="block max-w-full truncate">{r.name}</span>
         </Link>
       </Td>
       <Td label="SSL expires" className="whitespace-nowrap tabular-nums">
         <DateText half={r.ssl} unchecked={unchecked} />
       </Td>
-      <Td label="Days" className="whitespace-nowrap text-right tabular-nums">
+      <Td label="SSL days left" className="whitespace-nowrap text-right tabular-nums">
         <DaysPill half={r.ssl} />
       </Td>
       <Td label="Certificate" className="whitespace-nowrap text-xs text-fg-secondary">
@@ -133,7 +144,7 @@ function Row({ r }: { r: ExpiryRowView }) {
       <Td label="Domain expires" className="whitespace-nowrap tabular-nums">
         <DateText half={r.domain} unchecked={unchecked} />
       </Td>
-      <Td label="Days" className="whitespace-nowrap text-right tabular-nums">
+      <Td label="Domain days left" className="whitespace-nowrap text-right tabular-nums">
         <DaysPill half={r.domain} />
       </Td>
       <Td label="Status" className="whitespace-nowrap">
@@ -149,50 +160,58 @@ function Card({ r }: { r: ExpiryRowView }) {
   return (
     <Link
       href={`/sites/${r.siteId}`}
+      aria-label={cardLabel(r)}
       className="flex min-h-11 w-full flex-col gap-1.5 rounded-aura-lg border border-border-default bg-bg-surface px-aura-4 py-3 text-sm text-fg-primary no-underline hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
     >
       <span className="flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate font-medium">{r.name}</span>
+        <span className="min-w-0 truncate font-semibold">{r.name}</span>
         <span className="shrink-0">
           <StatusBadge status={r.status} />
         </span>
       </span>
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums">
-        <span className="text-fg-secondary">SSL</span>
-        <DateText half={r.ssl} unchecked={unchecked} />
-        <DaysPill half={r.ssl} />
-        {r.certificate && <span className="text-xs text-fg-secondary">{r.certificate}</span>}
+      {/* the labels share one 52 px column, so the dates line up (the board) */}
+      <span className="flex items-start gap-x-2 tabular-nums">
+        <span className="w-13 shrink-0 text-fg-secondary">SSL</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <DateText half={r.ssl} unchecked={unchecked} />
+          <DaysPill half={r.ssl} />
+          {r.certificate && <span className="text-xs text-fg-secondary">{r.certificate}</span>}
+        </span>
       </span>
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums">
-        <span className="text-fg-secondary">Domain</span>
-        <DateText half={r.domain} unchecked={unchecked} />
-        <DaysPill half={r.domain} />
+      <span className="flex items-start gap-x-2 tabular-nums">
+        <span className="w-13 shrink-0 text-fg-secondary">Domain</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <DateText half={r.domain} unchecked={unchecked} />
+          <DaysPill half={r.domain} />
+        </span>
       </span>
     </Link>
   );
 }
 
-/** How it alerts: the full box from lg; one line with More / Less below it (§39.6). */
-function HowItAlerts() {
+/** How it alerts: the full box from xl; below it one line with More / Less (§39.6). */
+function HowItAlerts({ hours }: { hours: string }) {
   const [open, setOpen] = useState(false);
   const id = useId();
+  const text = alertsText(hours);
   return (
-    <div className="rounded-aura-lg border border-border-default bg-bg-surface px-aura-4 py-3 text-sm">
-      <div className="flex gap-3 max-lg:hidden">
+    <div className="rounded-aura-lg border border-border-default bg-bg-surface text-sm">
+      <div className="flex gap-3 px-aura-4 py-3 max-xl:hidden">
         <span className="flex pt-0.5 text-fg-secondary" aria-hidden>
           <IconInfo size="sm" />
         </span>
         <p className="m-0">
-          <b>How it alerts:</b> {ALERTS_TEXT}
+          <b>How it alerts:</b> {text}
         </p>
       </div>
-      <div className="flex flex-col gap-2 lg:hidden">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-1 py-1.5 pr-1.5 pl-3.5 xl:hidden">
+        <div className="flex items-center gap-1.5">
           <span className="flex text-fg-secondary" aria-hidden>
             <IconInfo size="sm" />
           </span>
-          <span className="min-w-0 grow truncate">
-            <b>How it alerts</b> <span className="text-fg-secondary">· SSL &lt; 14 d, domain &lt; 30 d</span>
+          <span className="min-w-0 grow">
+            <b>How it alerts</b>{' '}
+            <span className="text-xs text-fg-secondary">· SSL &lt; 14 d, domain &lt; 30 d</span>
           </span>
           {/* the board's text link: 44 px square at least, no button frame so the line fits 390 */}
           <button
@@ -200,23 +219,24 @@ function HowItAlerts() {
             aria-expanded={open}
             aria-controls={id}
             onClick={() => setOpen((o) => !o)}
-            className="-my-3 min-h-11 min-w-11 shrink-0 rounded-aura-sm px-1 font-medium text-fg-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="min-h-11 min-w-11 shrink-0 rounded-aura-sm px-1 font-medium text-fg-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             {open ? 'Less' : 'More'}
           </button>
         </div>
-        {open && (
-          <p id={id} className="m-0 text-fg-secondary">
-            {ALERTS_TEXT}
-          </p>
-        )}
+        <p id={id} hidden={!open} className="m-0 pr-2 pb-2 text-fg-secondary">
+          {text}
+        </p>
       </div>
     </div>
   );
 }
 
-/** `/expiry` — SSL & domains (boards Expiry, Expiry820, MExpiry; spec §14.12, §15.8, §39; S13, D-066). */
-export function ExpiryView({ data, canCheck }: { data: ExpiryData; canCheck: boolean }) {
+/**
+ * `/expiry` — SSL & domains (boards Expiry, Expiry820, MExpiry; spec §14.12, §15.8, §39; S13, D-066).
+ * Below xl the table is cards (D-066 item 9: the board's fixed columns don't fit 1024–1279 either).
+ */
+export function ExpiryView({ data, canCheck }: { data: ExpiryData & { hours?: string }; canCheck: boolean }) {
   const total = data.rows.length;
   const all = `All ${total}`;
   const SOON = 'Within 60 days';
@@ -236,17 +256,20 @@ export function ExpiryView({ data, canCheck }: { data: ExpiryData; canCheck: boo
   );
   const empty =
     total === 0 ? (
-      <p className="m-0 text-sm text-fg-secondary">No live sites yet.</p>
+      <EmptyState bordered headingLevel={2} icon={<IconCircleDotDashed />} title="No live sites yet" />
     ) : (
-      <div className="flex flex-col items-start gap-2 rounded-aura-lg border border-border-default bg-bg-surface p-aura-4 text-sm">
-        <span className="font-medium">Nothing due within 60 days</span>
-        <span className="text-fg-secondary">
-          {`All ${total} certificates and domains are further out. Checked daily at 06:00.`}
-        </span>
-        <Button variant="secondary" size="sm" touchHeight onClick={() => setSoonOnly(false)}>
-          {`Show all ${total}`}
-        </Button>
-      </div>
+      <EmptyState
+        bordered
+        headingLevel={2}
+        icon={<IconCircleCheck />}
+        title="Nothing due within 60 days"
+        description={`All ${total} certificates and domains are further out. Checked daily at 06:00.`}
+        action={
+          <Button variant="secondary" touchHeight onClick={() => setSoonOnly(false)}>
+            {`Show all ${total}`}
+          </Button>
+        }
+      />
     );
 
   return (
@@ -256,32 +279,38 @@ export function ExpiryView({ data, canCheck }: { data: ExpiryData; canCheck: boo
         eyebrow="SITES"
         title="SSL & domains"
         meta={meta}
-        actionsFullWidthBelow="md"
+        actionsFullWidthBelow="lg"
         actions={canCheck ? <CheckNowButton onChecking={setChecking} /> : undefined}
       />
 
       {/* 2 per row on a phone with the third full width; 3 across from md (MExpiry, Expiry820) */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
         {data.kpis.map((k, i) => (
-          <div key={k.label} className={i === 2 ? 'max-md:col-span-2' : ''}>
-            <Stat label={k.label} value={k.value} unit={k.unit} caption={k.caption} icon={KPI_ICONS[i]} />
-          </div>
+          <Stat
+            key={k.label}
+            label={k.label}
+            value={k.value}
+            unit={k.unit}
+            caption={k.caption}
+            icon={KPI_ICONS[i]}
+            className={i === 2 ? 'max-md:col-span-2' : undefined}
+          />
         ))}
       </div>
 
-      <HowItAlerts />
+      <HowItAlerts hours={data.hours ?? 'Mon–Fri 09:00–18:00'} />
 
       <section className="flex flex-col gap-3" aria-labelledby="expiry-all">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-baseline gap-3 max-lg:hidden">
+          <div className="flex flex-wrap items-baseline gap-3 max-xl:sr-only">
             <h2 id="expiry-all" className="m-0 text-2xl font-semibold">
               All sites
             </h2>
             <span className="text-sm text-fg-secondary">Soonest expiry first</span>
           </div>
-          {/* full width below lg (MExpiry, Expiry820), at its own size beside the heading from lg */}
+          {/* full width below xl (MExpiry, Expiry820), at its own size beside the heading from xl */}
           {[true, false].map((wide) => (
-            <div key={String(wide)} className={wide ? 'w-full lg:hidden' : 'max-lg:hidden'}>
+            <div key={String(wide)} className={wide ? 'w-full xl:hidden' : 'max-xl:hidden'}>
               <SegmentedControl
                 label="Show"
                 options={[all, SOON]}
@@ -295,13 +324,13 @@ export function ExpiryView({ data, canCheck }: { data: ExpiryData; canCheck: boo
           ))}
         </div>
 
-        {/* below lg the table becomes cards, one per row on a phone, two at 820 (§39.6–7) */}
-        <div className="flex flex-col gap-2 lg:hidden">
+        {/* below xl the table becomes cards, one per row on a phone, two from md (§39.6–7, D-066 item 9) */}
+        <div className="flex flex-col gap-2 xl:hidden">
           {shown.length > 0 && (
             <span className="text-xs text-fg-secondary">
               {soonOnly
                 ? `${n(shown.length, 'site')} due within 60 days or not read`
-                : `${total} sites · soonest expiry first`}
+                : `${n(total, 'site')} · soonest expiry first`}
             </span>
           )}
           {shown.length === 0 ? (
@@ -317,19 +346,24 @@ export function ExpiryView({ data, canCheck }: { data: ExpiryData; canCheck: boo
           )}
         </div>
 
-        <div className="max-lg:hidden">
+        <div className="max-xl:hidden">
           {shown.length === 0 ? (
             empty
           ) : (
             <Table caption="Certificate and domain expiry" captionHidden align="middle">
               <THead>
                 <Tr>
-                  <Th>Site</Th>
+                  {/* Site takes the room the fixed columns leave (the board's flexible column) */}
+                  <Th className="w-full">Site</Th>
                   <Th className="whitespace-nowrap">SSL expires</Th>
-                  <Th className="text-right">Days</Th>
+                  <Th className="text-right">
+                    Days<span className="sr-only"> left on the certificate</span>
+                  </Th>
                   <Th>Certificate</Th>
                   <Th className="whitespace-nowrap">Domain expires</Th>
-                  <Th className="text-right">Days</Th>
+                  <Th className="text-right">
+                    Days<span className="sr-only"> left on the domain</span>
+                  </Th>
                   <Th>Status</Th>
                 </Tr>
               </THead>
