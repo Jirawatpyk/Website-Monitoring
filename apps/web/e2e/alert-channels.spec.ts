@@ -23,8 +23,10 @@ test.describe('alert channels (local Supabase)', () => {
       await expect(page.getByText('View only on phones.')).toBeVisible();
       await expect(page.getByText('WHO GETS WHAT', { exact: true })).toBeVisible();
     } else {
-      await expect(page.getByRole('link', { name: 'Set per step in Escalation' })).toHaveCount(3);
-      await expect(page.getByText('Read-only · fixed')).toHaveCount(2);
+      await expect(
+        page.getByRole('link', { name: 'Set per step in Escalation' }).filter({ visible: true }),
+      ).toHaveCount(3);
+      await expect(page.getByText('Read-only · fixed').filter({ visible: true })).toHaveCount(2);
       await expect(page.getByRole('heading', { name: 'Delivery log' })).toBeVisible();
     }
   });

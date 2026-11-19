@@ -168,12 +168,12 @@ export function AlertChannelsPageView({ data, now: nowIso }: { data: ChannelsDat
   );
 }
 
+/** A card header's link: on its own, so a ghost button with a 44 px target (§14.17, §22.3). */
 function InlineLink({ href, children }: { href: string; children: React.ReactNode }) {
-  // An inline text link (WCAG 2.5.8): the span keeps the card header from blockifying it.
   return (
-    <span className="text-sm">
-      <Link href={href}>{children}</Link>
-    </span>
+    <Button variant="ghost" size="sm" touchHeight href={href}>
+      {children}
+    </Button>
   );
 }
 
@@ -210,7 +210,7 @@ function ChannelBody({
         {facts.map(([k, v]) => (
           <div key={k} className="flex justify-between gap-2">
             <dt className="text-fg-secondary">{k}</dt>
-            <dd className="m-0 text-right font-medium break-all">{v}</dd>
+            <dd className="m-0 text-right font-medium [overflow-wrap:anywhere]">{v}</dd>
           </div>
         ))}
       </dl>
@@ -268,7 +268,12 @@ function TestButton({
         role="status"
         className={`flex gap-1.5 text-xs leading-normal empty:hidden ${done?.ok ? 'text-fg-positive' : done ? 'text-fg-danger' : 'text-fg-secondary'}`}
       >
-        {done ? done.text : (disabledReason ?? '')}
+        {done && (
+          <span className="flex pt-px" aria-hidden>
+            {done.ok ? <IconCircleCheck size="sm" /> : <IconCircleAlert size="sm" />}
+          </span>
+        )}
+        <span>{done ? done.text : (disabledReason ?? '')}</span>
       </span>
     </>
   );
@@ -364,7 +369,9 @@ function WhoGetsWhat({ rows }: { rows: RoutingRow[] }) {
             {r.onlyAdmin && (
               <span className="flex items-center gap-1 text-fg-warning">
                 <IconTriangleAlert size="sm" aria-hidden />
-                Only {r.onlyAdmin} · no second Admin · <Link href="/settings/users">Users</Link>
+                <span>
+                  Only {r.onlyAdmin} · no second Admin · <Link href="/settings/users">Users</Link>
+                </span>
               </span>
             )}
           </span>
@@ -402,7 +409,7 @@ function WhoGetsWhat({ rows }: { rows: RoutingRow[] }) {
   ];
   return (
     <section className="flex flex-col gap-3" aria-labelledby="who-h">
-      <div className="flex flex-col gap-1 lg:flex-row lg:items-baseline lg:justify-between lg:gap-4">
+      <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
         <h2 id="who-h" className={SECTION_HEADING}>
           <span className="md:hidden">WHO GETS WHAT</span>
           <span className="hidden md:inline">Who gets what</span>
@@ -412,10 +419,10 @@ function WhoGetsWhat({ rows }: { rows: RoutingRow[] }) {
           Escalation; the rest is fixed.
         </span>
       </div>
-      <div className="hidden lg:block">
+      <div className="hidden xl:block">
         <DataTable label="Who gets what" rowKey="id" columns={columns} rows={rows} rowHeight="auto" />
       </div>
-      <ul className="m-0 flex list-none flex-col overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface p-0 lg:hidden">
+      <ul className="m-0 flex list-none flex-col overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface p-0 xl:hidden">
         {rows.map((r) => (
           <li
             key={r.id}
@@ -427,6 +434,23 @@ function WhoGetsWhat({ rows }: { rows: RoutingRow[] }) {
               </Badge>
             </span>
             <span className="text-xs leading-normal text-fg-secondary">{r.note}</span>
+            {r.onlyAdmin && (
+              <span className="flex items-center gap-1 text-xs text-fg-warning">
+                <IconTriangleAlert size="sm" aria-hidden />
+                <span>
+                  Only {r.onlyAdmin} · no second Admin · <Link href="/settings/users">Users</Link>
+                </span>
+              </span>
+            )}
+            <span className="text-xs leading-normal text-fg-secondary">
+              {r.setIn === 'escalation' ? (
+                <>
+                  Read-only · <Link href="/escalation">Set per step in Escalation</Link>
+                </>
+              ) : (
+                'Read-only · fixed'
+              )}
+            </span>
             <span className="text-xs leading-normal">{r.how}</span>
             <span className="text-xs text-fg-secondary">CEO · {r.ceo}</span>
           </li>
@@ -489,7 +513,7 @@ function DeliveryLog({ rows }: { rows: LogRow[] }) {
   ];
   return (
     <section className="flex flex-col gap-3" aria-labelledby="log-h">
-      <div className="flex flex-col gap-1 lg:flex-row lg:items-baseline lg:justify-between lg:gap-4">
+      <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
         <h2 id="log-h" className={SECTION_HEADING}>
           <span className="md:hidden">DELIVERY LOG · TODAY</span>
           <span className="hidden md:inline">Delivery log</span>
@@ -505,10 +529,10 @@ function DeliveryLog({ rows }: { rows: LogRow[] }) {
         </Alert>
       ) : (
         <>
-          <div className="hidden lg:block">
+          <div className="hidden xl:block">
             <DataTable label="Delivery log" rowKey="id" columns={columns} rows={rows} />
           </div>
-          <ul className="m-0 flex list-none flex-col overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface p-0 lg:hidden">
+          <ul className="m-0 flex list-none flex-col overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface p-0 xl:hidden">
             {rows.map((r) => (
               <li
                 key={r.id}
@@ -518,7 +542,7 @@ function DeliveryLog({ rows }: { rows: LogRow[] }) {
                   <span className="text-sm font-medium">
                     {r.inc} · {r.ch}
                   </span>
-                  <span className="truncate text-xs text-fg-secondary">
+                  <span className="line-clamp-2 text-xs text-fg-secondary">
                     {r.at} · {r.to} · {r.lat}
                   </span>
                 </span>

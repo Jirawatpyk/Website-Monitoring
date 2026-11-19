@@ -587,10 +587,10 @@ function Same({ data }: { data: ProfileData }) {
       headingLevel={2}
       actions={
         data.me.role === 'admin' ? (
-          // An inline text link (WCAG 2.5.8): the span keeps the card header from blockifying it.
-          <span className="text-sm">
-            <Link href="/settings/organisation">Edit in Organisation</Link>
-          </span>
+          // On its own in the header, so a ghost button with a 44 px target (§14.17).
+          <Button variant="ghost" size="sm" touchHeight href="/settings/organisation">
+            Edit in Organisation
+          </Button>
         ) : undefined
       }
     >

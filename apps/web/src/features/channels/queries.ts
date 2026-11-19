@@ -97,6 +97,7 @@ export async function loadChannels(
     ['escalation_steps', steps],
     ['organisation_settings', settings],
     ['profiles', admins],
+    ['profiles', me],
     ['notifications', lastChat],
     ['notifications', sent],
     ['notifications', failed],

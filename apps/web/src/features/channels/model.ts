@@ -215,8 +215,13 @@ function statusOf(n: LogNotification, now: Date): Pick<LogRow, 'status' | 'tone'
   }
   if (n.status === 'failed') return { status: 'Failed', tone: 'danger', icon: 'circle-alert' };
   if (n.status === 'cancelled') return { status: 'Not sent', tone: 'neutral', icon: 'minus' };
-  if (n.holdUntil && Date.parse(n.holdUntil) > now.getTime())
-    return { status: `Held until ${formatTime(new Date(n.holdUntil))}`, tone: 'neutral', icon: 'clock' };
+  if (n.holdUntil && Date.parse(n.holdUntil) > now.getTime()) {
+    const until = new Date(n.holdUntil);
+    const when = isSameBangkokDay(until, now)
+      ? formatTime(until)
+      : `${formatDay(until, { weekday: true })} ${formatTime(until)}`;
+    return { status: `Held until ${when}`, tone: 'neutral', icon: 'clock' };
+  }
   return { status: n.attempts > 0 ? 'Retrying' : 'Queued', tone: 'neutral', icon: 'clock' };
 }
 
