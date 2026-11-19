@@ -11,6 +11,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => 
 
 const data: OrganisationData = {
   hours: { days: 'Mon–Fri', from: '09:00', to: '18:00' },
+  storedOther: null,
   sites: [
     { name: 'MuvMi', tier: 1 },
     { name: 'Fuji Links', tier: 2 },
@@ -48,8 +49,24 @@ describe('Organisation (S17, D-069)', () => {
     render(<OrganisationPageView data={data} />);
     await user.selectOptions(field('To'), '08:00');
     expect(within(editor()).getByText('Must be after From')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    // Save is disabled with its reason in the bar (spec §14.16), never a dead button.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByText(/Fix the hours first/)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('counts the fields changed, and “Back to editing” returns focus to Save', async () => {
+    const user = userEvent.setup();
+    render(<OrganisationPageView data={data} />);
+    await user.selectOptions(field('From'), '08:30');
+    await user.selectOptions(field('To'), '17:30');
+    expect(screen.getByText('2 unsaved changes')).toBeInTheDocument();
+    const save = screen.getByRole('button', { name: 'Save' });
+    await user.click(save);
+    const dialog = await screen.findByRole('dialog', { name: 'Change response hours?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Back to editing' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(save).toHaveFocus());
   });
 
   it('the confirm needs a note, shows who it affects, saves and focuses the saved line', async () => {
@@ -81,9 +98,21 @@ describe('Organisation (S17, D-069)', () => {
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     const line = screen.getByText(/^Saved — /);
-    expect(line).toHaveTextContent('Saved — Mon–Sat 09:00–18:00 from the next engine run.');
+    expect(line).toHaveTextContent('Saved — Mon–Sat 09:00–18:00, in use within a minute.');
     await waitFor(() => expect(line).toHaveFocus());
     expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it('days written by SQL that aren’t a choice: shown as stored, with a warning that saving replaces them', () => {
+    render(<OrganisationPageView data={{ ...data, storedOther: 'Mon, Wed, Fri 09:00–18:00' }} />);
+    // Saving is how odd stored hours are replaced, so the page starts with one change.
+    expect(screen.getByText('1 unsaved change')).toBeInTheDocument();
+    expect(screen.getAllByText('Mon, Wed, Fri 09:00–18:00').length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        'Saved as Mon, Wed, Fri 09:00–18:00, which isn’t one of these choices — saving replaces it.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('a refusal stays in the dialog', async () => {

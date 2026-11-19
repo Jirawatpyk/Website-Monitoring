@@ -14,12 +14,14 @@ import {
 } from '@jirawatpyk/aura-react';
 import { IconCheck, IconPlus } from '@jirawatpyk/aura-react/icons';
 import { useRouter } from 'next/navigation';
+import { FOCUS_TARGET } from '@/components/focus-target';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { UnsavedBar } from '@/components/unsaved-bar';
-import { SettingsHeader, ViewOnlyLine } from '@/features/settings';
+import { SECTION_HEADING, SettingsHeader, ViewOnlyLine } from '@/features/settings';
 import { saveResponseHours } from '../actions';
 import {
   BUDGET,
+  changedFields,
   clientRows,
   DAY_SET_LABELS,
   DB_INCLUDED_BYTES,
@@ -28,7 +30,6 @@ import {
   hoursError,
   hoursText,
   RETENTION,
-  sameHours,
   tierCards,
   TIME_OPTIONS,
   type ClientRow,
@@ -38,8 +39,7 @@ import {
 } from '../model';
 import type { OrganisationData } from '../queries';
 
-const HEADING =
-  'm-0 font-mono text-xs font-normal text-fg-tertiary md:font-sans md:text-2xl md:font-semibold md:text-fg-primary';
+const HEADING = SECTION_HEADING;
 
 const sitesWord = (n: number) => `${n} ${n === 1 ? 'site' : 'sites'}`;
 
@@ -50,16 +50,23 @@ const sitesWord = (n: number) => `${n} ${n === 1 ? 'site' : 'sites'}`;
  */
 export function OrganisationPageView({ data }: { data: OrganisationData }) {
   const router = useRouter();
-  const [hours, setHours] = useState<Hours>(data.hours);
+  const [hours, setDraft] = useState<Hours>(data.hours);
   const [open, setOpen] = useState(false);
-  const [saved, setSaved] = useState<string | null>(null);
+  // Each opening starts a fresh dialog (an empty note); the Dialog stays mounted so focus returns.
+  const [opened, setOpened] = useState(0);
+  // The saved line and a counter, so focus moves on every save even when the words repeat.
+  const [saved, setSaved] = useState<{ text: string; n: number } | null>(null);
+  const setHours = (h: Hours) => {
+    setDraft(h);
+    setSaved(null);
+  };
   const statusRef = useRef<HTMLSpanElement>(null);
 
   // A save (or another Admin's) refreshes the data: start again from what is stored.
   const [stored, setStored] = useState(data.hours);
   if (stored !== data.hours) {
     setStored(data.hours);
-    setHours(data.hours);
+    setDraft(data.hours);
   }
   // After a save the dialog is gone: focus the saved line once React has rendered it.
   useEffect(() => {
@@ -67,9 +74,11 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
   }, [saved]);
 
   const tiers = tierCards(data.sites);
-  const dirty = !sameHours(hours, data.hours);
+  // Hours written outside the choices count as a change: saving is how they are replaced.
+  const changes = changedFields(hours, data.hours) || (data.storedOther ? 1 : 0);
+  const dirty = changes > 0;
   const toError = hoursError(hours);
-  const diff = hoursDiff(data.hours, hours, data.sites);
+  const diff = hoursDiff(data.hours, hours, data.sites, data.storedOther);
   const t23 = data.sites.filter((s) => s.tier !== 1).length;
   const t1 = data.sites.filter((s) => s.tier === 1).length;
 
@@ -125,12 +134,14 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
             badge={sitesWord(t1)}
             text="Covered 24/7: the owner inside the response hours, the person on call outside them. Tier 1 uses the Tier 2–3 hours."
             hours={data.hours}
+            stored={data.storedOther}
           />
           <HoursPanel
             title="Tier 2–3 · response hours"
             badge={`One setting for both tiers · ${sitesWord(t23)}`}
             text="Outside these hours DOWN still posts, but escalation timers wait until the start time. PROBLEM is held until then. Tier 2–3 have no on-call. The same hours decide when Tier 1 hands over to on-call."
             hours={hours}
+            stored={data.storedOther}
             onChange={setHours}
             error={toError}
           />
@@ -139,9 +150,9 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
           ref={statusRef}
           role="status"
           tabIndex={-1}
-          className="text-sm text-fg-positive empty:hidden focus-visible:outline-none"
+          className={`self-start text-sm text-fg-positive empty:hidden ${FOCUS_TARGET}`}
         >
-          {saved}
+          {saved?.text}
         </span>
       </section>
 
@@ -155,28 +166,35 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
       {dirty && (
         <div className="hidden md:block">
           <UnsavedBar
-            label="1 unsaved change"
+            label={changes === 1 ? '1 unsaved change' : `${changes} unsaved changes`}
             hint={
               toError
                 ? 'Fix the hours first — “To” must be after “From”'
-                : 'Response hours apply from the next engine run · the next step shows who is affected'
+                : 'Response hours apply within a minute of saving · the next step shows who is affected'
             }
             onDiscard={() => setHours(data.hours)}
+            saveDisabled={!!toError}
             onSave={() => {
-              if (!toError) setOpen(true);
+              setOpened((n) => n + 1);
+              setOpen(true);
             }}
           />
         </div>
       )}
 
-      {open && (
+      {opened > 0 && (
         <SaveHoursDialog
+          key={opened}
+          open={open}
           hours={hours}
           diff={diff}
           onClose={() => setOpen(false)}
           onSaved={() => {
             setOpen(false);
-            setSaved(`Saved — ${hoursText(hours)} from the next engine run.`);
+            setSaved((s) => ({
+              text: `Saved — ${hoursText(hours)}, in use within a minute.`,
+              n: (s?.n ?? 0) + 1,
+            }));
             router.refresh();
           }}
         />
@@ -190,6 +208,7 @@ function HoursPanel({
   badge,
   text,
   hours,
+  stored,
   onChange,
   error,
 }: {
@@ -197,6 +216,8 @@ function HoursPanel({
   badge: string;
   text: string;
   hours: Hours;
+  /** The stored hours when they aren't one of the editor's choices. */
+  stored: string | null;
   onChange?: (h: Hours) => void;
   error?: string | null;
 }) {
@@ -231,10 +252,15 @@ function HoursPanel({
               error={error ?? undefined}
             />
           </div>
-          <span className="text-base font-semibold md:hidden">{hoursText(hours)}</span>
+          <span className="text-base font-semibold md:hidden">{stored ?? hoursText(hours)}</span>
         </>
       ) : (
-        <span className="text-base font-semibold">{hoursText(hours)}</span>
+        <span className="text-base font-semibold">{stored ?? hoursText(hours)}</span>
+      )}
+      {onChange && stored && (
+        <span className="text-xs leading-normal text-fg-warning">
+          Saved as {stored}, which isn’t one of these choices — saving replaces it.
+        </span>
       )}
       <span className="text-xs leading-normal text-fg-secondary">{text}</span>
     </div>
@@ -243,11 +269,13 @@ function HoursPanel({
 
 /** "Change response hours?" (board): before → after per row, who it affects, a required note. */
 function SaveHoursDialog({
+  open,
   hours,
   diff,
   onClose,
   onSaved,
 }: {
+  open: boolean;
   hours: Hours;
   diff: HoursDiff[];
   onClose: () => void;
@@ -275,13 +303,15 @@ function SaveHoursDialog({
 
   return (
     <Dialog
-      open
-      onClose={onClose}
+      open={open}
+      onClose={() => {
+        if (!pending) onClose();
+      }}
       title="Change response hours?"
-      description="New hours apply from the next engine run, open incidents included. A PROBLEM already held keeps the time it was held until."
+      description="New hours apply within a minute, open incidents included. A PROBLEM already held keeps the time it was held until."
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={pending}>
             Back to editing
           </Button>
           <Button variant="primary" icon={<IconCheck />} loading={pending} onClick={save}>
@@ -324,7 +354,7 @@ function SaveHoursDialog({
           hint="Saved with the change in the audit log."
         />
         {failure && (
-          <Alert tone="danger" title="Not saved">
+          <Alert tone="danger" title="Not saved" role="alert">
             {failure}
           </Alert>
         )}
@@ -364,7 +394,7 @@ function ClientsSection({ rows }: { rows: ClientRow[] }) {
   ];
   return (
     <section className="flex flex-col gap-3" aria-labelledby="clients-h">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:gap-3">
           <h2 id="clients-h" className={HEADING}>
             <span className="md:hidden">CLIENTS · {rows.length}</span>
@@ -376,7 +406,7 @@ function ClientsSection({ rows }: { rows: ClientRow[] }) {
         </div>
         <div className="hidden items-center gap-2.5 md:flex">
           <span className="text-xs text-fg-secondary">New clients are created with their first site</span>
-          <Button variant="secondary" size="sm" icon={<IconPlus />} href="/sites/new">
+          <Button variant="secondary" size="sm" touchHeight icon={<IconPlus />} href="/sites/new">
             Add client
           </Button>
         </div>

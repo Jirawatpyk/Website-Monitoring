@@ -7,6 +7,10 @@ export default function Loading() {
     <Container>
       <PageSkeleton label="Loading organisation settings">
         <PageHeaderSkeleton phoneBar="title" />
+        {/* Below md the Settings select has a visible label above its 44 px field. */}
+        <div className="md:hidden">
+          <Skeleton variant="text" width="30%" />
+        </div>
         <Skeleton variant="rect" width="100%" height={44} />
         <div className="md:hidden">
           <Skeleton variant="rect" width="100%" height={44} />

@@ -8,4 +8,5 @@ export { devicesOf, previewDevices, type Device, type SessionRef } from './secur
 export { signOutDevice } from './actions';
 export { SettingsHeader } from './components/settings-header';
 export { ViewOnlyLine } from './components/view-only-line';
+export { SECTION_HEADING } from './components/heading';
 export type { UsersData } from './model';

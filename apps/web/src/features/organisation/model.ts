@@ -1,4 +1,5 @@
-import { formatPercent, formatResponseHours, TIER_CONFIG, type Tier } from '@dxt/shared';
+import { CLIENT_UPDATE_MIN } from '@dxt/engine';
+import { formatPercent, formatResponseHours, TIER_CONFIG, timeToMinutes, type Tier } from '@dxt/shared';
 
 /**
  * Settings › Organisation (board Organisation, spec §7, §14.14, D-069): the tier cards, the one
@@ -27,15 +28,12 @@ export interface Hours {
   to: string;
 }
 
-const toMin = (t: string) => {
-  const [h = '0', m = '0'] = t.split(':');
-  return Number(h) * 60 + Number(m);
-};
+const toMin = timeToMinutes;
 
-/** The saved days as one of the board's sets; a set made by SQL by hand reads as the nearest wider one. */
-export function daySetOf(days: readonly number[]): DaySet {
+/** The saved days as one of the board's sets, or null for a set written by SQL before S17. */
+export function daySetOf(days: readonly number[]): DaySet | null {
   const sorted = [...new Set(days)].sort((a, b) => a - b).join(',');
-  return DAY_SET_LABELS.find((k) => DAY_SETS[k].join(',') === sorted) ?? 'Mon–Fri';
+  return DAY_SET_LABELS.find((k) => DAY_SETS[k].join(',') === sorted) ?? null;
 }
 
 /** "Must be after From" under To while the hours are backwards (board). */
@@ -45,6 +43,11 @@ export function hoursError(h: Hours): string | null {
 
 export function sameHours(a: Hours, b: Hours): boolean {
   return a.days === b.days && a.from === b.from && a.to === b.to;
+}
+
+/** How many of Days / From / To differ, for "N unsaved changes" (board). */
+export function changedFields(a: Hours, b: Hours): number {
+  return Number(a.days !== b.days) + Number(a.from !== b.from) + Number(a.to !== b.to);
 }
 
 /** "Mon–Fri 09:00–18:00", as every other page words the hours. */
@@ -85,7 +88,12 @@ export function tierCards(sites: readonly OrgSite[]): TierCard[] {
         { k: 'Covered', v: cfg.alwaysOn ? '24/7' : 'Response hours only' },
         {
           k: tier === 3 ? 'Client update' : 'Client update after',
-          v: tier === 1 ? '15 min down' : tier === 2 ? '60 min down, in hours' : 'Report only',
+          v:
+            tier === 1
+              ? `${CLIENT_UPDATE_MIN[1]} min down`
+              : tier === 2
+                ? `${CLIENT_UPDATE_MIN[2]} min down, in hours`
+                : 'Report only',
         },
         { k: 'Uptime target', v: formatPercent(cfg.uptimeTarget) },
       ],
@@ -107,8 +115,15 @@ export interface HoursDiff {
  * The save dialog's rows (board; D-069): the Tier 2–3 hours and, since the one setting also moves
  * Tier 1's hand-over to on-call (D-048 item 10), what that means for Tier 1. Counts are live sites.
  */
-export function hoursDiff(saved: Hours, next: Hours, sites: readonly OrgSite[]): HoursDiff[] {
-  if (sameHours(saved, next)) return [];
+export function hoursDiff(
+  saved: Hours,
+  next: Hours,
+  sites: readonly OrgSite[],
+  /** The stored hours in words when they aren't one of the editor's choices (`storedOther`). */
+  storedText: string | null = null,
+): HoursDiff[] {
+  if (sameHours(saved, next) && !storedText) return [];
+  const before = storedText ?? hoursText(saved);
   const t1 = sites.filter((s) => s.tier === 1);
   const t2 = sites.filter((s) => s.tier === 2).length;
   const t3 = sites.filter((s) => s.tier === 3).length;
@@ -116,14 +131,14 @@ export function hoursDiff(saved: Hours, next: Hours, sites: readonly OrgSite[]):
   return [
     {
       where: 'Tier 2–3 · response hours',
-      before: hoursText(saved),
+      before,
       after,
       affects: `Affects ${sitesWord(t2 + t3)} · ${t2} in Tier 2, ${t3} in Tier 3`,
       covers: `Outside ${after} DOWN still posts and escalation timers wait until ${next.from}; PROBLEM is held until ${next.from}. Tier 2–3 have no on-call.`,
     },
     {
       where: 'Tier 1 · owner hours',
-      before: hoursText(saved),
+      before,
       after,
       affects: t1.length
         ? `Affects ${sitesWord(t1.length)} · ${t1.map((s) => s.name).join(', ')}`
@@ -196,7 +211,7 @@ export const BUDGET = {
   lines: [
     { k: 'Supabase · Micro compute', v: '~$10' },
     { k: 'Thai VPS · probe + verifier', v: '~$10–25' },
-    { k: 'Twilio voice · off until approved', v: '$0 (~$23–26 if yes)' },
+    { k: 'Twilio voice · off', v: '$0 (~$23–26 if turned on)' },
     { k: 'Vercel Pro, Resend, Healthchecks.io', v: 'Already paid / free' },
   ],
 } as const;

@@ -44,7 +44,7 @@ test.describe('organisation (local Supabase)', () => {
       await dialog.getByRole('button', { name: 'Save and log' }).click();
 
       await expect(
-        page.getByText(new RegExp(`^Saved — .* 09:00–${next} from the next engine run\\.$`)),
+        page.getByText(new RegExp(`^Saved — .* 09:00–${next}, in use within a minute\\.$`)),
       ).toBeFocused();
       await expect(page.getByRole('region', { name: 'Unsaved changes' })).toHaveCount(0);
     } finally {

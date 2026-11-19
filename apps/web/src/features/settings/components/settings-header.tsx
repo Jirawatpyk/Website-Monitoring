@@ -15,11 +15,14 @@ export type SettingsTab = (typeof SETTINGS_TABS)[number]['id'];
 /**
  * The Settings pages' header (Users / Security / Organisation boards): eyebrow SETTINGS, the page's one
  * action, and the section tabs as links. Below md three pages no longer fit a segmented control at
- * 390, so the phone gets a select that opens the page picked (§35.1: "then a select").
+ * 390, so the phone gets a select (§35.1: "then a select"). AURA's Select is a combobox whose value
+ * changes only when a choice is committed (a click, Enter; the native picker's Done on a touch screen)
+ * — an arrow key on the closed field opens the list — so opening the page on change is safe (WCAG 3.2.2).
  */
 export function SettingsHeader({ current, actions }: { current: SettingsTab; actions?: React.ReactNode }) {
   const router = useRouter();
   const tabs = SETTINGS_TABS.map((t) => ({ id: t.id, label: t.label, href: t.href }));
+  const here = SETTINGS_TABS.find((t) => t.id === current)?.href ?? SETTINGS_TABS[0].href;
   return (
     <div className="flex flex-col gap-4">
       <PageHeader titleHideBelow="lg" eyebrow="SETTINGS" title="Settings" actions={actions} />
@@ -30,8 +33,10 @@ export function SettingsHeader({ current, actions }: { current: SettingsTab; act
         <Select
           label="Settings page"
           options={SETTINGS_TABS.map((t) => ({ value: t.href, label: t.label }))}
-          value={SETTINGS_TABS.find((t) => t.id === current)?.href}
-          onChange={(e) => router.push(e.target.value)}
+          value={here}
+          onChange={(e) => {
+            if (e.target.value !== here) router.push(e.target.value);
+          }}
           touchHeight="always"
         />
       </div>

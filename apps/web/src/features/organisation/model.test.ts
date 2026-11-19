@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  changedFields,
   clientRows,
   daySetOf,
   gigabytes,
@@ -45,6 +46,8 @@ describe('the hours editor (Organisation board)', () => {
     expect(daySetOf([1, 2, 3, 4, 5])).toBe('Mon–Fri');
     expect(daySetOf([6, 1, 2, 3, 4, 5])).toBe('Mon–Sat');
     expect(daySetOf([1, 2, 3, 4, 5, 6, 7])).toBe('Every day');
+    // Days written by SQL before S17 aren't silently read as Mon–Fri.
+    expect(daySetOf([1, 3, 5])).toBeNull();
   });
 
   it('says “Must be after From” when the hours run backwards or are empty', () => {
@@ -107,6 +110,12 @@ describe('the save dialog (Change response hours?)', () => {
     expect(t1!.covers).toBe(
       'Owners cover Mon–Sat 08:30–17:30; the person on call covers the rest. The on-call week still changes over on Monday at 09:00.',
     );
+  });
+
+  it('hours SQL wrote outside the choices: listed as “Was” even with the editor unchanged', () => {
+    const [t23] = hoursDiff(SAVED, { ...SAVED }, SITES, 'Mon, Wed, Fri 09:00–18:00');
+    expect(t23).toMatchObject({ before: 'Mon, Wed, Fri 09:00–18:00', after: 'Mon–Fri 09:00–18:00' });
+    expect(changedFields(SAVED, { days: 'Mon–Sat', from: '08:30', to: '18:00' })).toBe(2);
   });
 
   it('words one site and no Tier 1 site', () => {

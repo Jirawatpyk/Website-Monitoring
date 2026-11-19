@@ -73,10 +73,10 @@ export function stepCondition(p: PolicyDraft, s: EscalationStep, phone = false):
 export function stepNote(
   p: PolicyDraft,
   s: EscalationStep,
-  phone = false,
-  admins: readonly string[] = [],
-  /** "Mon–Fri 09:00–18:00", the organisation's response hours (Escalation board, S10). */
-  hoursText = 'Mon–Fri 09:00–18:00',
+  phone: boolean,
+  admins: readonly string[],
+  /** The organisation's response hours in words (Settings › Organisation, S17). */
+  hoursText: string,
 ): string | null {
   if (s.fyi) return phone ? 'FYI only, never a call. Recovered by then → nothing is sent.' : null;
   // Tier 2–3 L2 (Escalation board / MEscalation): a reminder to the Admin, no CEO page.

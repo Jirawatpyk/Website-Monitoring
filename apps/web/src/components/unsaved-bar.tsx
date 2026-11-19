@@ -12,11 +12,14 @@ export function UnsavedBar({
   hint,
   onDiscard,
   onSave,
+  saveDisabled = false,
 }: {
   label: string;
   hint?: string;
   onDiscard: () => void;
   onSave: () => void;
+  /** Save can't go yet; the hint says why (spec §14.16, Organisation board's `saveOff`). */
+  saveDisabled?: boolean;
 }) {
   return (
     <ActionBar
@@ -31,7 +34,7 @@ export function UnsavedBar({
       <Button variant="ghost" touchHeight onClick={onDiscard}>
         Discard
       </Button>
-      <Button variant="primary" icon={<IconCheck />} touchHeight onClick={onSave}>
+      <Button variant="primary" icon={<IconCheck />} touchHeight onClick={onSave} disabled={saveDisabled}>
         Save
       </Button>
     </ActionBar>
