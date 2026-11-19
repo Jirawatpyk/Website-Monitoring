@@ -49,7 +49,7 @@ describe('who gets what (read-only, D-069 item 3)', () => {
   });
 
   it('DOWN, PROBLEM and SSL are set in Escalation; Recovery and Monitor fault are fixed', () => {
-    const rows = routingRows({ t1Down: T1, t23Down: T23, problem: PROBLEM }, ['Tao']);
+    const rows = routingRows({ t1Down: T1, t2Down: T23, t3Down: T23, problem: PROBLEM }, ['Tao']);
     expect(rows.map((r) => [r.id, r.setIn])).toEqual([
       ['down', 'escalation'],
       ['problem', 'escalation'],
@@ -64,8 +64,15 @@ describe('who gets what (read-only, D-069 item 3)', () => {
     // One active Admin: the board's warning names them.
     expect(rows[4]!.onlyAdmin).toBe('Tao');
     expect(
-      routingRows({ t1Down: T1, t23Down: T23, problem: PROBLEM }, ['Tao', 'Nok'])[4]!.onlyAdmin,
+      routingRows({ t1Down: T1, t2Down: T23, t3Down: T23, problem: PROBLEM }, ['Tao', 'Nok'])[4]!.onlyAdmin,
     ).toBeNull();
+  });
+
+  it('Tier 2 and Tier 3 get their own line once their ladders differ (D-034)', () => {
+    const t3 = [step(0, 0, ['chat', 'space', 'email']), step(1, 30)];
+    expect(routingRows({ t1Down: T1, t2Down: T23, t3Down: t3, problem: PROBLEM }, [])[0]!.how).toBe(
+      'Tier 1: L0 Chat + Space + email · L1 +15 · L2 +30 · L3 +60 · Tier 2: L0 Chat + Space + email · L1 +15 · L2 +30 · Tier 3: L0 Chat + Space + email · L1 +30',
+    );
   });
 
   it('flapping shows the engine’s numbers', () => {
@@ -147,7 +154,7 @@ describe('delivery log', () => {
       NOW,
     );
     expect(rows.map((r) => [r.inc, r.to])).toEqual([
-      ['Test', 'Own “TEST — no action” thread'],
+      ['Test', '@them · “TEST — no action” thread'],
       ['INC-0142', 'Bua · client update due'],
       ['Digest', 'DxT Website Reports Space'],
     ]);
@@ -156,5 +163,6 @@ describe('delivery log', () => {
   it('the newest Chat post as the card’s "Last sent"', () => {
     expect(lastSentLine({ at: '2026-09-25T03:03:44Z', latencyMs: 1200 }, NOW)).toBe('10:03:44 · 1.2 s');
     expect(lastSentLine(null, NOW)).toBe('Nothing sent yet');
+    expect(lastSentLine({ at: '2026-09-24T09:40:00Z', latencyMs: null }, NOW)).toBe('Thu 24 Sep 16:40');
   });
 });

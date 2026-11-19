@@ -1,5 +1,6 @@
 import { FLAP_CHANGES, FLAP_STABLE_MS, FLAP_WINDOW_MS } from '@dxt/engine';
 import {
+  formatDay,
   formatDurationSeconds,
   formatIncidentId,
   formatMs,
@@ -56,7 +57,8 @@ export interface RoutingRow {
 
 export interface Ladders {
   t1Down: readonly EscalationStep[];
-  t23Down: readonly EscalationStep[];
+  t2Down: readonly EscalationStep[];
+  t3Down: readonly EscalationStep[];
   problem: readonly EscalationStep[];
 }
 
@@ -74,7 +76,11 @@ export function routingRows(l: Ladders, admins: readonly string[]): RoutingRow[]
       icon: 'ban',
       note: 'Posted at once, any hour · who and how per level',
       setIn: 'escalation',
-      how: `Tier 1: ${ladderLine(l.t1Down)} · Tier 2–3: ${ladderLine(l.t23Down)}`,
+      // Tier 2 and Tier 3 are stored and edited apart (D-034): one line while they match.
+      how:
+        ladderLine(l.t2Down) === ladderLine(l.t3Down)
+          ? `Tier 1: ${ladderLine(l.t1Down)} · Tier 2–3: ${ladderLine(l.t2Down)}`
+          : `Tier 1: ${ladderLine(l.t1Down)} · Tier 2: ${ladderLine(l.t2Down)} · Tier 3: ${ladderLine(l.t3Down)}`,
       ceo: 'Tier 1: L2 page · L3 FYI',
     },
     {
@@ -154,6 +160,8 @@ export interface LogNotification {
   oncallKind: string | null;
   /** The email's recipient. */
   to: string | null;
+  /** A channel test's tester (its Chat card @mentions only them). */
+  chatTo?: string | null;
 }
 
 export interface LogRow {
@@ -215,7 +223,9 @@ function statusOf(n: LogNotification, now: Date): Pick<LogRow, 'status' | 'tone'
 /** What a row was and to whom: "DOWN · Alerts Space thread", "Bua · client update due", "Tao · test". */
 function toWords(n: LogNotification): string {
   if (n.oncallKind === 'channel_test')
-    return n.channel === 'email' ? `${n.to ?? 'Them'} · TEST — no action` : 'Own “TEST — no action” thread';
+    return n.channel === 'email'
+      ? `${n.to ?? '—'} · “TEST — no action”`
+      : `@${n.chatTo ?? 'them'} · “TEST — no action” thread`;
   if (n.reportKind)
     return n.channel === 'email'
       ? `${n.to ?? '—'} · ${n.reportKind === 'daily' ? 'daily digest' : 'weekly summary'}`
@@ -246,7 +256,8 @@ export function logRows(rows: readonly LogNotification[], now: Date, limit = 50)
       const lat = latencyMs(n);
       return {
         id: n.id,
-        at: isSameBangkokDay(at, now) ? formatTimeWithSeconds(at) : `Yesterday ${formatTimeWithSeconds(at)}`,
+        // The log is today only (the query starts at Bangkok midnight).
+        at: formatTimeWithSeconds(at),
         inc:
           n.incidentNumber !== null
             ? formatIncidentId(n.incidentNumber)
@@ -281,6 +292,9 @@ export interface ChannelFacts {
 export function lastSentLine(last: ChannelFacts['lastChat'], now: Date): string {
   if (!last) return 'Nothing sent yet';
   const at = new Date(last.at);
-  const when = isSameBangkokDay(at, now) ? formatTimeWithSeconds(at) : `${formatTime(at)} (not today)`;
+  // Spec §13: a time today, "Fri 25 Sep 16:40" otherwise.
+  const when = isSameBangkokDay(at, now)
+    ? formatTimeWithSeconds(at)
+    : `${formatDay(at, { weekday: true })} ${formatTime(at)}`;
   return last.latencyMs === null ? when : `${when} · ${formatMs(last.latencyMs)}`;
 }

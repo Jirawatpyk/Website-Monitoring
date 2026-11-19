@@ -24,7 +24,9 @@ import {
 } from '@jirawatpyk/aura-react/icons';
 import { formatTime } from '@dxt/shared';
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
+
+const TEST_COOLDOWN_MS = 60_000;
 import { SECTION_HEADING, SettingsHeader, ViewOnlyLine } from '@/features/settings';
 import { sendChannelTest } from '../actions';
 import type { TestChannel } from '../mutations';
@@ -235,6 +237,13 @@ function TestButton({
 }) {
   const [pending, start] = useTransition();
   const [done, setDone] = useState<{ ok: boolean; text: string } | null>(null);
+  // The SQL allows one test a minute: the button waits that minute instead of failing (§14.16).
+  const [cooling, setCooling] = useState(false);
+  useEffect(() => {
+    if (!cooling) return;
+    const t = setTimeout(() => setCooling(false), TEST_COOLDOWN_MS);
+    return () => clearTimeout(t);
+  }, [cooling]);
   return (
     <>
       <Button
@@ -244,11 +253,12 @@ function TestButton({
         fullWidth
         icon={icon}
         loading={pending}
-        disabled={!!disabledReason}
+        disabled={!!disabledReason || cooling}
         onClick={() =>
           start(async () => {
             const r = await sendChannelTest(channel);
             setDone(r.ok ? { ok: true, text: doneText(r.at) } : { ok: false, text: r.message });
+            if (r.ok) setCooling(true);
           })
         }
       >

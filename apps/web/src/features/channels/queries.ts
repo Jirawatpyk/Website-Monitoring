@@ -83,12 +83,14 @@ export async function loadChannels(
       .from('notifications')
       .select(
         `id, channel, template, status, attempts, created_at, hold_until, sent_at,
-         incident:incidents(number), report:reports(kind), event:oncall_events(kind),
+         incident:incidents(number), report:reports(kind), event:oncall_events(kind, tester:profiles!oncall_events_user_id_fkey(display_name)),
          person:profiles(display_name)`,
       )
       .gte('created_at', dayStart)
+      // The log's own rows, filtered in SQL so a busy day's other messages can't crowd them out.
+      .or('incident_id.not.is.null,report_id.not.is.null,oncall_event_id.not.is.null,attempts.gt.1')
       .order('created_at', { ascending: false })
-      .limit(300),
+      .limit(200),
   ]);
   for (const [name, r] of [
     ['escalation_policies', policies],
@@ -125,7 +127,12 @@ export async function loadChannels(
         : null,
       email24h: { sent: sent.count ?? 0, failed: failed.count ?? 0 },
     },
-    ladders: { t1Down: stepsOf('down', 1), t23Down: stepsOf('down', 2), problem: stepsOf('problem', null) },
+    ladders: {
+      t1Down: stepsOf('down', 1),
+      t2Down: stepsOf('down', 2),
+      t3Down: stepsOf('down', 3),
+      problem: stepsOf('problem', null),
+    },
     admins: (admins.data ?? []).map((a) => a.display_name),
     reminders: { downMin: s.down_reminder_min, problemMin: s.problem_reminder_min },
     hours: {
@@ -145,6 +152,7 @@ export async function loadChannels(
       incidentNumber: n.incident?.number ?? null,
       reportKind: (n.report?.kind as 'daily' | 'weekly' | undefined) ?? null,
       oncallKind: n.event?.kind ?? null,
+      chatTo: n.event?.tester?.display_name ?? null,
       to: n.person?.display_name ?? null,
     })),
     canTestChat: !!me.data?.google_chat_user_id?.trim(),

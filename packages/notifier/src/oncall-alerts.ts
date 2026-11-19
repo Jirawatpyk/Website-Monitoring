@@ -289,14 +289,15 @@ export function buildOncallEmail(input: OncallEmailInput): EmailMessage | null {
       {
         subject: subjectOf(f),
         why: 'You got this because you sent yourself a test from DxT Monitor.',
-        footer: ONCALL_EMAIL_FOOTER,
+        // Every role gets it, so not the on-call footer (message-check, 19 Nov).
+        footer: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read.',
         headers: { References: threadId },
       },
       {
         color: C.primary,
         bar: C.primary,
         label: 'TEST — no action',
-        pre: 'Test email — nothing to do',
+        pre: `nothing to do · sent ${when(f.at)}`,
         headline: 'Test email — nothing to do',
         lede: 'This shows DxT Monitor alert emails reach you. Real alerts come from this address, one email thread per incident, with the status first.',
         facts: [['Sent', when(f.at)]],
