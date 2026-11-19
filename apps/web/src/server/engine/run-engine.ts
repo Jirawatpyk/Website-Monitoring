@@ -1448,7 +1448,7 @@ async function apply(
         // A mute stops new alerts only (§15.1, D-036): RECOVERED still closes a thread that alerted.
         p_notify: alertQueued,
         // Not-OK → OK only when every monitor is OK: D-023's partial recovery is no flip (D-024).
-        p_flip_ok: d.allOk,
+        p_flip_ok: d.allOk || !!d.then?.stillExpiry,
         p_auto_resolve: d.autoResolve,
         // Flapping: one summary 15 min after the recovery instead of RECOVERED (spec §19.4).
         p_hold_summary: d.holdSummary,

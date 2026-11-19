@@ -82,7 +82,10 @@ describe('render — a new cause (D-067)', () => {
     expect(email.text).toContain('Incident: INC-0136, open since Wed 23 Sep 09:00 · now reads Keyword');
     expect(email.html).toContain('?ack=1');
     // The preheader (html only).
-    expect(email.html).toContain('DxT AI · new cause: Keyword · was SSL expiring · same incident INC-0136');
+    // EmailAlert NC preheader (message-checker M1).
+    expect(email.html).toContain(
+      'PROBLEM — new cause: Keyword · “บาคาร่า” found on the page (as Googlebot) · was SSL expiring · same incident INC-0136',
+    );
     expect(email.text).not.toMatch(/AGAIN|again/);
     expect(email.text).toContain('You got this because you own DxT AI.');
   });
@@ -223,6 +226,19 @@ describe('render — a new cause (D-067)', () => {
       expect(email.text).toContain('Incident: INC-0136 · now reads Keyword · not acknowledged for it yet');
       expect(email.html).toContain('?ack=1');
       expect(email.text).toContain('You got this because you acknowledged this incident.');
+    });
+
+    it('the Chat reply failed: the backup’s fallback copy is no “you acknowledged” email (message-checker M2)', () => {
+      const ploy = { id: 'u-ploy', email: 'ploy@example.test', display_name: 'Ploy' };
+      const email = renderEmail(
+        row({ channel: 'email', user_id: 'u-ploy', context: aside }),
+        incident,
+        ploy,
+        appUrl,
+        thread,
+      )!;
+      expect(email.text).toContain('couldn’t be delivered');
+      expect(email.text).not.toContain('please acknowledge the new problem');
     });
 
     it('acknowledged again for the new cause meanwhile: no ask, the new ack named', () => {

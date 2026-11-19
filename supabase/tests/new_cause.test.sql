@@ -1,7 +1,7 @@
 -- S13 (D-067): engine_new_cause_incident — an expiry incident takes a more urgent PROBLEM as its cause.
 begin;
 \ir _helpers.psql
-select plan(81);
+select plan(87);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -580,6 +580,34 @@ select results_eq(
   'only Nok is emailed (not the owner)'
 );
 
+-- Security review M1: an acker since demoted to viewer can't act — the new cause goes to L0 as before.
+reset role;
+insert into ids values ('pim', tests.create_user('pim@pgtap.test', 'responder'));
+insert into public.sites (id, client_id, name, tier, primary_owner_id, is_active) values
+  ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000c1', 'Pim acked', 3,
+   (select id from ids where name = 'arm'), true);
+insert into public.monitors (id, site_id, type, is_primary, url) values
+  ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000b2', 'http', true, 'https://p.pgtap.test');
+insert into public.incidents (id, site_id, monitor_id, trigger, severity, episode_severity, state, started_at, detected_at,
+                              acked_at, acked_by, escalation_plan)
+  values ('00000000-0000-0000-0000-0000000000b8', '00000000-0000-0000-0000-0000000000b2',
+          '00000000-0000-0000-0000-0000000000f2', 'ssl', 'problem', 'problem', 'acknowledged',
+          now() - interval '1 day', now() - interval '1 day', now() - interval '20 hours',
+          (select id from ids where name = 'pim'), public.escalation_plan_for(3::smallint, 'problem'));
+update public.profiles set role = 'viewer' where id = (select id from ids where name = 'pim');
+set local role service_role;
+select ok(
+  public.engine_new_cause_incident('00000000-0000-0000-0000-0000000000b8', null, 'keyword', now(), '{"summary": "p"}', true),
+  'Pim''s acknowledged SSL incident takes the keyword after Pim became a viewer'
+);
+reset role;
+select results_eq(
+  $$select user_id from public.notifications
+      where incident_id = '00000000-0000-0000-0000-0000000000b8' and channel = 'email' and template = 'problem_again'$$,
+  $$select id from ids where name = 'arm'$$,
+  'the owner (L0) is emailed, not the demoted acker'
+);
+
 -- S13 PR 4 (spec §40.2, D-068): a raise to DOWN remembers the drop came from the expiry; the way back
 -- to it (back up, still SSL expiring) forgets it.
 reset role;
@@ -602,6 +630,10 @@ select ok(
   'a DOWN on a cause taken from the expiry came from it too'
 );
 update public.incidents set state = 'monitoring', recovered_at = now() where id = '00000000-0000-0000-0000-0000000000b9';
+-- Its RECOVERED recorded the OK change (p_flip_ok, D-068).
+insert into public.site_status (site_id, status, since, last_evaluated_at, last_round_at, flip_ok)
+  values ('00000000-0000-0000-0000-0000000000b1', 'problem', now(), now() - interval '1 minute',
+          now() - interval '1 minute', true);
 set local role service_role;
 select ok(
   public.engine_relapse_incident('00000000-0000-0000-0000-0000000000b9', 'problem', 'ssl', now(), now(), now(),
@@ -613,12 +645,34 @@ select ok(
   (select not down_from_expiry and cause_trigger = 'ssl' from public.incidents where id = '00000000-0000-0000-0000-0000000000b9'),
   'on the expiry again: down_from_expiry cleared'
 );
-select is(
-  (select count(*)::int from public.notifications
-     where incident_id = '00000000-0000-0000-0000-0000000000b9' and template = 'problem_again'
-       and context ? 'stillExpiry'),
-  0,
-  'nothing posted for it (the RECOVERED says it)'
+select ok(
+  (select flip_ok is distinct from false from public.site_status where site_id = '00000000-0000-0000-0000-0000000000b1'),
+  'the silent way back records no not-OK change (engine review H1)'
+);
+-- DOWN AGAIN on the SSL drop (D-023 path: open, Unacked): it came from it. Then a clean recovery and another
+-- DOWN AGAIN (hard_fail → hard_fail): a drop of its own, not from the expiry (db review, engine review M1).
+set local role service_role;
+select ok(
+  public.engine_relapse_incident('00000000-0000-0000-0000-0000000000b9', 'down', 'hard_fail', now(), now(), now(),
+    '{}', false, false),
+  'DOWN AGAIN on the SSL drop'
+);
+reset role;
+select ok(
+  (select down_from_expiry from public.incidents where id = '00000000-0000-0000-0000-0000000000b9'),
+  'a DOWN AGAIN from the expiry came from it'
+);
+update public.incidents set state = 'monitoring', recovered_at = now() where id = '00000000-0000-0000-0000-0000000000b9';
+set local role service_role;
+select ok(
+  public.engine_relapse_incident('00000000-0000-0000-0000-0000000000b9', 'down', 'hard_fail', now(), now(), now(),
+    '{}', false, false),
+  'DOWN AGAIN after a clean recovery'
+);
+reset role;
+select ok(
+  (select not down_from_expiry from public.incidents where id = '00000000-0000-0000-0000-0000000000b9'),
+  'hard_fail → hard_fail: not from the expiry'
 );
 
 select * from finish();

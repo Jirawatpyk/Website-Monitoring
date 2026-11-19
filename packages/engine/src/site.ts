@@ -459,7 +459,9 @@ function judgeSiteRound(
         trigger: 'hard_fail',
         startedAt: primaryDown.startedAt,
         detectedAt: primaryDown.confirmedAt,
-        flapping: false,
+        // D-068 (engine review H1): back up on an expiry is an OK change, so a site going up and down
+        // under its SSL incident flaps (D-024). A key page's partial recovery records none: false, as before.
+        flapping: isFlapping(s.flips ?? [], s.flipOk, roundAt),
         down: facts,
         ...judgedDown,
       };
@@ -489,6 +491,14 @@ function judgeSiteRound(
         primaryVerdict.kind === 'ok' || primaryVerdict.kind === 'problem'
           ? (primaryVerdict.reachable ?? [])
           : [];
+      // D-068: back up with the expiry the DOWN joined still due — the site really answered (an OK
+      // change for D-024). A flapping incident keeps its one summary instead (§19.4, engine review H1):
+      // a plain recovery, held; the expiry rejoins by the usual rule after it.
+      const still = isExpiryTrigger(problem.v.trigger);
+      if (still && open.isFlapping && stillFlapping(s.flips ?? [], earliest(reachable))) {
+        const plain = recoverDecision(s, open, base, reachable, 'problem', true);
+        if (plain) return plain;
+      }
       const d = recoverDecision(s, open, base, reachable, 'problem', false);
       if (d?.kind === 'recover') {
         return {
@@ -500,7 +510,7 @@ function judgeSiteRound(
             detail: problem.v.detail,
             startedAt: problem.v.startedAt,
             // Only `backUpOnExpiry` lets an expiry through on a DOWN drop (`expiryNow`).
-            ...(isExpiryTrigger(problem.v.trigger) ? { stillExpiry: true } : {}),
+            ...(still ? { stillExpiry: true } : {}),
           },
         };
       }

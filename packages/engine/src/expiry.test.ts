@@ -484,9 +484,10 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
   // back at 16:18 with the certificate 13 days out — RECOVERED "back up, still SSL expiring", the
   // incident stays open for SSL expiring, silently (one RECOVERED, no PROBLEM AGAIN post).
   describe('back up, still SSL expiring (spec §40.2, D-068)', () => {
+    // As engine_escalate_incident leaves it (engine review M3: severity down).
     const raised: OpenIncident = {
       ...open,
-      severity: 'problem',
+      severity: 'down',
       episodeSeverity: 'down',
       trigger: 'hard_fail',
       downFromExpiry: true,
@@ -555,6 +556,51 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
       );
       expect(d.kind).not.toBe('recover');
       expect(d).toMatchObject({ status: 'down' });
+    });
+
+    // Engine review H1 (D-024, §19.4): a site going up and down under its SSL incident flaps.
+    const flips = [new Date(NOW.getTime() - 9 * 60_000), new Date(NOW.getTime() - 5 * 60_000)];
+    it('flapping: one held summary instead (a plain recovery, no still-expiring)', () => {
+      const d = backUp(fact('2026-10-06', null), { flips, flipOk: false }, []);
+      // Not tagged flapping yet: still the back-up.
+      expect(d).toMatchObject({ kind: 'recover', then: { stillExpiry: true } });
+      const flapping = decideSite(
+        site([monitor(clean, { carry, expiry: fact('2026-10-06', null) })], {
+          open: { ...raised, isFlapping: true },
+          okRounds: 1,
+          flips,
+          flipOk: false,
+        }),
+      );
+      expect(flapping).toMatchObject({ kind: 'recover', allOk: true, holdSummary: true });
+      expect(flapping).not.toHaveProperty('then');
+    });
+
+    it('the DOWN AGAIN after a back-up counts toward flapping (its OK change was recorded)', () => {
+      const backOnSsl: OpenIncident = {
+        ...raised,
+        episodeSeverity: 'problem',
+        trigger: 'ssl',
+        downFromExpiry: false,
+      };
+      const d = decideSite(
+        site([monitor(failed(), { carry: heldSsl, expiry: fact('2026-10-06', null) })], {
+          open: backOnSsl,
+          flips,
+          flipOk: true,
+        }),
+      );
+      expect(d).toMatchObject({ kind: 'relapse', severity: 'down', flapping: true });
+      // A key page's partial recovery records no OK change: not flapping, as before.
+      expect(
+        decideSite(
+          site([monitor(failed(), { carry: heldSsl, expiry: fact('2026-10-06', null) })], {
+            open: backOnSsl,
+            flips,
+            flipOk: false,
+          }),
+        ),
+      ).toMatchObject({ kind: 'relapse', flapping: false });
     });
   });
 

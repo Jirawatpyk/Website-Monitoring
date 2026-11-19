@@ -820,11 +820,13 @@ export function renderEmail(
             'Problem',
           was: TRIGGER_LABELS[str(ctx.was, 'ssl') as Trigger] ?? 'SSL expiring',
           cause: str(ctx.cause, 'Problem'),
+          summary: typeof ctx.summary === 'string' ? ctx.summary : null,
           wasCause: expiryBefore(i, new Date(n.created_at), sentAt),
           at: new Date(n.created_at),
           openedAt: new Date(i.detected_at),
           acknowledged,
-          setAside: acknowledged ? null : setAsideOf(ctx),
+          // Only the acker's own email (message-checker M2: a fallback copy goes to the backup and Admins).
+          setAside: acknowledged || base.reason !== 'acked' ? null : setAsideOf(ctx),
           afterDown: ctx.afterDown === true,
         });
       }

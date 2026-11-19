@@ -1155,7 +1155,7 @@ export function timelineOf(
               e,
               'ack',
               'Acknowledgement given back',
-              `Acknowledged by ${back.by} ${formatTime(back.at)} again — it was for ${label(trig)}`,
+              `Acknowledged by ${back.by} ${formatShortWhen(back.at, new Date(e.at))} again — it was for ${label(trig)}`,
             );
           return;
         }
@@ -1173,7 +1173,7 @@ export function timelineOf(
             'ack',
             'Acknowledgement set aside',
             aside
-              ? `${aside.by}’s acknowledgement of ${label(was)} (${formatTime(aside.at)}) doesn’t cover ${label(trig)} — it needs its own`
+              ? `${aside.by}’s acknowledgement of ${label(was)} (${formatShortWhen(aside.at, new Date(e.at))}) doesn’t cover ${label(trig)} — it needs its own`
               : `The acknowledgement of ${label(was)} doesn’t cover ${label(trig)} — it needs its own`,
           );
         }

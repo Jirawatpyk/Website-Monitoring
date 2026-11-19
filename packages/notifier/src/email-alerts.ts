@@ -319,6 +319,8 @@ interface Body {
   label: string;
   /** Rest of the preheader, after "LABEL —". */
   pre: string;
+  /** The preheader's status when it differs from the label (EmailAlert `preStatus`). */
+  preStatus?: string;
   headline: string;
   lede: string;
   facts: [string, string][];
@@ -403,7 +405,7 @@ function sectionsText(sections: EmailSection[] | undefined): string[] {
 
 /** The EmailAlert layout: status bar, label, headline, lede, facts table, buttons, footer. */
 export function emailLayout({ subject, why, footer, headers }: Envelope, b: EmailBody): EmailMessage {
-  const preheader = `${b.label} — ${b.pre}`;
+  const preheader = `${b.preStatus ?? b.label} — ${b.pre}`;
   const facts = b.facts
     .map(
       ([k, v]) =>
@@ -594,31 +596,12 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
   const isOwner = addsRootCause(input.reason);
   const ackFact = ack ? [['Acknowledged', `${ack.by} at ${formatTime(ack.at)}`] as [string, string]] : [];
   const still = input.stillExpiry;
-  if (still) {
-    // D-068, Tao 19 Nov: the Chat card's words (EmailAlert draws no such email).
-    return render(input, {
-      template: 'recovered',
-      color: C.positive,
-      bar: C.positive,
-      label: 'RECOVERED',
-      pre: `${site} back at ${formatTime(input.recoveredAt)} · down ${duration} · still ${still.label}`,
-      headline: `${site} is back up, still ${still.label}`,
-      lede:
-        `${site} answered again at ${formatTime(input.recoveredAt)} after ${duration} down. ` +
-        `The incident stays open for ${still.label}${still.cause ? ` — ${still.cause}` : ''}. ` +
-        'The DOWN needs a root cause before it can be resolved.',
-      facts: [
-        ['Down for', `${duration} (${range})`],
-        ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)}`],
-        ['Still open for', still.cause ? `${still.label} — ${still.cause}` : still.label],
-        ...ackFact,
-        ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
-      ],
-      buttons: isOwner
-        ? [{ label: 'Add root cause', href: `${input.incidentUrl}#resolve`, primary: true }]
-        : [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
-    });
-  }
+  // D-068 (Tao, 19 Nov): back up with the expiry still open — the Chat card's words lead, then this
+  // reader's part as on any DOWN RECOVERED (message-checker M3).
+  const stillLine = still
+    ? `${site} answered again at ${formatTime(input.recoveredAt)} after ${duration} down. ` +
+      `The incident stays open for ${still.label}${still.cause ? ` — ${still.cause}` : ''}.`
+    : null;
   if (problem) {
     return render(input, {
       template: 'recovered',
@@ -655,23 +638,42 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
     color: C.positive,
     bar: C.positive,
     label: 'RECOVERED',
-    pre: `${site} back at ${formatTime(input.recoveredAt)} · down ${duration} · root cause needed`,
-    headline: `${site} is back`,
+    pre: `${site} back at ${formatTime(input.recoveredAt)} · down ${duration} · ${still ? `still ${still.label}` : 'root cause needed'}`,
+    headline: still ? `${site} is back up, still ${still.label}` : `${site} is back`,
     // The owner's root cause comes first, even when the owner is also the AM (message-check L4).
-    lede: isOwner
-      ? 'Needs a root cause before it can be resolved.'
-      : input.amReader
-        ? input.amReader.notNeeded
-          ? `${site} is back after ${duration}. The client update was marked not needed (${input.amReader.notNeeded}) — let the client know it’s back if they need to hear it.`
-          : input.amReader.marked
-            ? `${site} is back after ${duration}. Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
-            : `${site} is back after ${duration}. Let the client know it’s back, and mark the client update on the incident page.`
-        : owner
-          ? `Nothing needed from you. ${owner} adds the root cause.`
-          : 'Nothing needed from you.',
+    lede: [
+      stillLine,
+      isOwner
+        ? still
+          ? 'The DOWN needs a root cause before it can be resolved.'
+          : 'Needs a root cause before it can be resolved.'
+        : input.amReader
+          ? input.amReader.notNeeded
+            ? `${site} is back after ${duration}. The client update was marked not needed (${input.amReader.notNeeded}) — let the client know it’s back if they need to hear it.`
+            : input.amReader.marked
+              ? `${site} is back after ${duration}. Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
+              : `${site} is back after ${duration}. Let the client know it’s back, and mark the client update on the incident page.`
+          : owner
+            ? `Nothing needed from you. ${owner} adds the root cause.`
+            : 'Nothing needed from you.',
+    ]
+      .filter(Boolean)
+      .join(' '),
     facts: [
       ['Down for', `${duration} (${range})`],
-      ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)} → Monitoring`],
+      // Back up, still expiring: the incident stays open, it doesn't go to Monitoring (D-068).
+      [
+        'Confirmed by',
+        `First OK round from ${formatLocations(input.okLocations)}${still ? '' : ' → Monitoring'}`,
+      ],
+      ...(still
+        ? [
+            ['Still open for', still.cause ? `${still.label} — ${still.cause}` : still.label] as [
+              string,
+              string,
+            ],
+          ]
+        : []),
       ...ackFact,
       ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
       ...(() => {
@@ -1074,6 +1076,8 @@ export interface NewCauseEmailInput extends EmailBaseInput {
   wasCause?: string | null;
   /** The full cause: "Found “บาคาร่า” on / (as Googlebot)". */
   cause: string;
+  /** Its short form for the preheader: "“บาคาร่า” found on / (as Googlebot)". */
+  summary?: string | null;
   /** When the new cause was seen (the round), and when the incident opened. */
   at: Date;
   openedAt: Date;
@@ -1110,7 +1114,10 @@ export function buildNewCauseEmail(input: NewCauseEmailInput): EmailMessage {
     color: C.warning,
     bar: C.warning,
     label: `PROBLEM — NEW CAUSE: ${now.toUpperCase()}`,
-    pre: `${input.site} · new cause: ${now} · was ${was} · same incident ${inc}`,
+    preStatus: 'PROBLEM',
+    pre: [`new cause: ${now}`, input.summary, `was ${was}`, `same incident ${inc}`]
+      .filter(Boolean)
+      .join(' · '),
     headline: `${input.site} has a new problem`,
     lede: acknowledged
       ? `${what} ${acknowledged.by} acknowledged it at ${formatTime(acknowledged.at)}.`
@@ -1136,9 +1143,11 @@ export function buildNewCauseEmail(input: NewCauseEmailInput): EmailMessage {
         : setAside
           ? [
               'Acknowledged',
-              `${setAside.by} at ${formatTime(setAside.at)} for ${was} — set aside, ${now} needs its own`,
+              `${setAside.by} at ${withDayIfNot(setAside.at, input.at, formatTime)} for ${was} — set aside, ${now} needs its own`,
             ]
-          : ['Next step', 'Acknowledge to stop the PROBLEM reminders'],
+          : asks
+            ? ['Next step', 'Acknowledge to stop the PROBLEM reminders']
+            : ['Next step', 'Open the incident — the person it was sent to acknowledges it'],
     ],
     buttons: asks
       ? [

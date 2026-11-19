@@ -173,6 +173,23 @@ describe('RECOVERED · back up, still SSL expiring (§40.2)', () => {
       stillExpiry: still,
     });
     expect(other.text).toContain('Acknowledged: Nok at 16:12');
+    // Their own part, as on any DOWN RECOVERED (message-checker M3).
+    expect(other.text).toContain('Nothing needed from you. Tao adds the root cause.');
+    expect(other.text).not.toContain('→ Monitoring');
+    const am = buildRecoveredEmail({
+      ...email,
+      ...times,
+      reason: 'step',
+      owner: 'Tao',
+      ack: null,
+      amReader: { marked: null, draftUrl: 'https://monitor.example.test/incidents/inc-136#client-update' },
+      amName: 'Bua',
+      clientUpdate: 'Due 16:25 · Bua (AM) notified — the AM sends it',
+      stillExpiry: still,
+    });
+    expect(am.text).toContain('Let the client know it’s back');
+    expect(am.text).toContain('tell the client it’s back (Bua)');
+    expect(am.html).toContain('Open draft');
     expect(other.text).toContain('Client update: Due 16:25');
     expect(other.html).not.toContain('#resolve');
   });

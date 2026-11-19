@@ -14,6 +14,8 @@ set local lock_timeout = '5s';
 --    acknowledged"): the reply @mentions them and only they get the email.
 -- 3. The ack given back when the incident goes back to the expiry is recorded with the event, for the
 --    timeline row "Acknowledgement given back" (§40.5).
+-- 4. engine_relapse_incident records no not-OK change for that silent way back: its RECOVERED recorded
+--    the OK one, so a site going up and down under its SSL incident flaps (D-024, engine review H1).
 
 alter table public.incidents add column down_from_expiry boolean not null default false;
 
@@ -23,10 +25,13 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if new.cause_trigger is distinct from old.cause_trigger then
-    new.down_from_expiry := coalesce(new.episode_severity, new.severity) = 'down'
-      and (coalesce(old.cause_trigger, old.trigger) in ('ssl', 'domain') or old.expiry_left);
-  end if;
+  -- Every writer of cause_trigger moves the cause (raise, relapse, new cause, back), so recompute each
+  -- time — a DOWN AGAIN (hard_fail → hard_fail) after a clean recovery is a new drop of its own (db review).
+  -- …and only from an incident still open for the expiry: a recovered one (Monitoring, Needs root cause)
+  -- keeps its old cause, but a DOWN on it is a fresh drop (engine review M1).
+  new.down_from_expiry := coalesce(new.episode_severity, new.severity) = 'down'
+    and old.state in ('unacked', 'escalated', 'acknowledged')
+    and (coalesce(old.cause_trigger, old.trigger) in ('ssl', 'domain') or old.expiry_left);
   return new;
 end;
 $$;
@@ -140,7 +145,9 @@ begin
   -- D-068 item 3 (Tao, 19 Nov; EmailAlert "New cause · acknowledged"): the ack of the expiry set aside
   -- names its acker — they were on it, at any hour. The reply @mentions them and only they get the
   -- email ("because you acknowledged this incident"), which keeps the Acknowledge button.
-  if v_expiry_ack and exists (select 1 from public.profiles p where p.id = v_acked_by and p.is_active) then
+  -- Someone who can still act on it (security review M1: a demoted acker falls back to L0 / on call).
+  if v_expiry_ack and exists (select 1 from public.profiles p where p.id = v_acked_by and p.is_active
+                                and p.role in ('admin', 'responder')) then
     v_oncall := v_acked_by;
     v_acker := true;
   end if;
@@ -312,6 +319,142 @@ begin
   update public.site_status
     set ok_rounds = 0, last_evaluated_at = now(), last_round_at = p_round_at
     where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
+
+  perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
+  return true;
+end;
+$$;
+
+create or replace function public.engine_relapse_incident(
+  p_incident_id uuid,
+  p_severity public.severity,
+  p_trigger public.incident_trigger,
+  p_started_at timestamptz,
+  p_detected_at timestamptz,
+  p_round_at timestamptz,
+  p_context jsonb,
+  p_flapping boolean,
+  p_notify boolean,
+  p_monitors jsonb default null,
+  p_status public.site_state default null,
+  p_hold_until timestamptz default null
+)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_site_id uuid;
+  v_from public.incident_state;
+  v_before public.severity;
+  v_to public.incident_state;
+  v_after public.severity;
+  v_expiry_ack boolean;
+  v_acked_at timestamptz;
+  v_acked_by uuid;
+begin
+  select site_id, state, severity,
+         coalesce(p_severity = 'down' and acked_at is not null and acked_cause in ('ssl', 'domain'), false),
+         acked_at, acked_by
+    into v_site_id, v_from, v_before, v_expiry_ack, v_acked_at, v_acked_by
+  from public.incidents
+  where id = p_incident_id
+    -- A DOWN never relapses a PROBLEM incident: that is engine_escalate_incident (D-021), which
+    -- writes the escalated_to_down event (S06 engine-review L2).
+    and not (p_severity = 'down' and severity = 'problem')
+    and (state in ('monitoring', 'needs_root_cause')
+         -- D-023: the DOWN ended, a key page carried on as a PROBLEM, and the home page fails again.
+         or (p_severity = 'down' and severity = 'down' and episode_severity = 'problem'
+             and state not in ('resolved', 'in_review', 'closed')))
+  for update;
+
+  if v_site_id is null then
+    return false;
+  end if;
+
+  update public.incidents
+    set severity = case when p_severity = 'down' then 'down'::public.severity else severity end,
+        episode_severity = p_severity,
+        -- D-067: the trigger is the cause the incident carries now, and a DOWN AGAIN keeps it (a DOWN by
+        -- hand passes 'manual', which the reports read as true of the whole incident).
+        -- Only on a PROBLEM incident (engine re-review M2: a DOWN incident keeps hard_fail / manual).
+        trigger = case when p_severity = 'problem' and severity = 'problem' then p_trigger else trigger end,
+        -- A new drop brings its own cause: nothing to go back to.
+        expiry_left = false,
+        expiry_ack_at = null,
+        expiry_ack_by = null,
+        cause_trigger = p_trigger,
+        recovered_at = null,
+        is_flapping = is_flapping or coalesce(p_flapping, false),
+        -- Tao, 17 Nov: an ack of the expiry never silences a real outage (DOWN AGAIN as D-021).
+        acked_at = case when v_expiry_ack then null else acked_at end,
+        acked_by = case when v_expiry_ack then null else acked_by end,
+        state = case when acked_at is not null and not v_expiry_ack then 'acknowledged'::public.incident_state
+                     -- Escalated only when a step of this severity really paged someone (D-034).
+                     when exists (select 1 from public.incident_events e
+                                  where e.incident_id = p_incident_id and e.type = 'step_fired'
+                                    and e.payload ->> 'severity' = severity::text
+                                    and jsonb_array_length(e.payload -> 'notified') > 0)
+                       then 'escalated'::public.incident_state
+                     else 'unacked'::public.incident_state end
+    where id = p_incident_id
+    returning state, severity into v_to, v_after;
+
+  -- The cleared ack's ACKNOWLEDGED: one still held is cancelled (it would post after the DOWN — message-
+  -- checker); one sent stays as the record under its own key, so the next ack posts a fresh one (one live
+  -- message per incident / channel / template / person / key). Undo reads only the current ack's rows.
+  if v_expiry_ack then
+    update public.notifications
+      set status = 'cancelled', error = 'Superseded: went down', next_retry_at = null
+      where incident_id = p_incident_id and template = 'acknowledged' and status = 'queued'
+        and attempts = (select count(*) from public.notification_attempts a where a.notification_id = public.notifications.id);
+    update public.notifications
+      set dedupe_key = coalesce(dedupe_key, '') || ':expiry-ack:' || to_char(p_detected_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+      where incident_id = p_incident_id and template = 'acknowledged' and status <> 'cancelled'
+        and coalesce(dedupe_key, '') not like '%:expiry-ack:%';
+  end if;
+
+  insert into public.incident_events (incident_id, type, payload, at)
+  values (p_incident_id, 'relapsed',
+          coalesce(p_context, '{}') || jsonb_build_object(
+            'severity', p_severity, 'trigger', p_trigger, 'startedAt', p_started_at,
+            'flapping', coalesce(p_flapping, false))
+            || case when v_expiry_ack then jsonb_build_object('ackCleared', true) else '{}'::jsonb end,
+          p_detected_at);
+
+  insert into public.audit_log (action, entity, entity_id, before, after)
+  values ('incident.relapsed', 'incident', p_incident_id,
+          jsonb_build_object('state', v_from, 'severity', v_before)
+            || case when v_expiry_ack then jsonb_build_object('expiry_ack_cleared', true,
+                 'acked_at', v_acked_at, 'acked_by', v_acked_by) else '{}'::jsonb end,
+          jsonb_build_object('state', v_to, 'severity', v_after, 'episode', p_severity));
+
+  update public.site_status
+    set ok_rounds = 0, last_evaluated_at = p_detected_at, last_round_at = p_round_at
+    where site_id = v_site_id and (last_round_at is null or last_round_at <= p_round_at);
+
+  -- D-068 (engine review H1): back up on the expiry the DOWN joined, the incident goes back to it in
+  -- the round its RECOVERED recorded an OK change — the site answered, so that one stands.
+  if not coalesce((p_context ->> 'stillExpiry')::boolean, false) then
+    perform public.engine_record_flip(v_site_id, p_round_at, false);
+  end if;
+  perform public.engine_cancel_flap_summary(p_incident_id);
+
+  if p_notify then
+    insert into public.notifications (incident_id, channel, template, thread_key, context, dedupe_key, hold_until)
+    values (p_incident_id, 'google_chat', p_severity::text || '_again', p_incident_id::text,
+            p_context, to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+            case when p_severity = 'problem' and p_hold_until > p_detected_at then p_hold_until end)
+    on conflict do nothing;
+
+    -- D-047: an L0 person who hasn't been emailed about this incident (every earlier drop came back inside
+    -- its grace): this drop's email waits out its own 5 min, as the first alert's did.
+    perform public.engine_queue_l0_emails(
+      p_incident_id, p_severity::text || '_again', p_context,
+      greatest(case when p_severity = 'problem' and p_hold_until > p_detected_at then p_hold_until end,
+               now() + interval '5 minutes'),
+      to_char(p_round_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), true);
+  end if;
 
   perform public.engine_write_monitors(v_site_id, p_round_at, p_monitors, p_status);
   return true;

@@ -271,6 +271,24 @@ describe('S13 · an SSL incident takes a new cause and goes back, round after ro
     expect(await incidentOf(siteId)).toMatchObject({ episode_severity: 'problem', state: 'unacked' });
   });
 
+  // Engine review H1 (D-024, §19.4): up and down under its SSL incident is flapping — one summary.
+  it('an SSL incident going DOWN / back up / DOWN flaps: the next recovery is one held summary', async () => {
+    const { siteId, monitorId } = await newSite('Flap');
+    const kinds: Kind[] = ['ok', 'down', 'ok', 'down'];
+    for (const [k, kind] of kinds.entries()) {
+      await round(monitorId, k, kind);
+      await judge(k);
+    }
+    let inc = await incidentOf(siteId);
+    expect(inc).toMatchObject({ episode_severity: 'down', is_flapping: true });
+    await round(monitorId, 4, 'ok');
+    await judge(4);
+    inc = await incidentOf(siteId);
+    const chat = await chatOf(inc.id);
+    expect(chat.filter((t) => t === 'recovered')).toHaveLength(1);
+    expect(chat).toContain('flap_summary');
+  });
+
   it('a DOWN back up on SSL: a keyword a window hid is told on the first round after it, then back to SSL with no RECOVERED', async () => {
     const { siteId, monitorId } = await newSite('Down');
     await round(monitorId, 0, 'down');
