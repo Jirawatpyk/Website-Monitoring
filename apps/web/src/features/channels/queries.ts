@@ -13,6 +13,8 @@ export interface ChannelsData {
   log: LogNotification[];
   /** The viewer can send a Chat test (has a Chat id). */
   canTestChat: boolean;
+  /** The viewer's own test per channel inside the last minute: the button waits it out after a reload. */
+  lastTest: { chat: string | null; email: string | null };
 }
 
 type StepRow = {
@@ -45,7 +47,8 @@ export async function loadChannels(
 ): Promise<ChannelsData> {
   const dayStart = bangkokDayStart(now).toISOString();
   const dayAgo = new Date(now.getTime() - 86_400_000).toISOString();
-  const [policies, steps, settings, admins, me, lastChat, sent, failed, log] = await Promise.all([
+  const minuteAgo = new Date(now.getTime() - 60_000).toISOString();
+  const [policies, steps, settings, admins, me, lastChat, sent, failed, log, myTests] = await Promise.all([
     db.from('escalation_policies').select('id, severity, tier'),
     db.from('escalation_steps').select('policy_id, level, delay_min, targets, channels, fyi').order('level'),
     db
@@ -91,6 +94,15 @@ export async function loadChannels(
       .or('incident_id.not.is.null,report_id.not.is.null,oncall_event_id.not.is.null,attempts.gt.1')
       .order('created_at', { ascending: false })
       .limit(200),
+    // The SQL cooldown reads the event's time; its message is queued in the same transaction.
+    db
+      .from('notifications')
+      .select('channel, created_at, event:oncall_events!inner(kind, user_id)')
+      .eq('event.kind', 'channel_test')
+      .eq('event.user_id', viewerId)
+      .gte('created_at', minuteAgo)
+      .order('created_at', { ascending: false })
+      .limit(4),
   ]);
   for (const [name, r] of [
     ['escalation_policies', policies],
@@ -102,6 +114,7 @@ export async function loadChannels(
     ['notifications', sent],
     ['notifications', failed],
     ['notifications', log],
+    ['notifications', myTests],
   ] as const)
     if (r.error) throw new Error(`${name}: ${r.error.message}`);
 
@@ -157,5 +170,9 @@ export async function loadChannels(
       to: n.person?.display_name ?? null,
     })),
     canTestChat: !!me.data?.google_chat_user_id?.trim(),
+    lastTest: {
+      chat: (myTests.data ?? []).find((t) => t.channel === 'google_chat')?.created_at ?? null,
+      email: (myTests.data ?? []).find((t) => t.channel === 'email')?.created_at ?? null,
+    },
   };
 }

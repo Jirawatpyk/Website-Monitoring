@@ -245,6 +245,7 @@ function TestButton({
   icon,
   disabledReason,
   doneText,
+  lastAt,
 }: {
   channel: TestChannel;
   label: string;
@@ -252,16 +253,22 @@ function TestButton({
   icon: React.ReactElement;
   disabledReason: string | null;
   doneText: (at: string) => string;
+  /** The viewer's last test on this channel (the page's load), so a reload keeps the minute. */
+  lastAt: string | null;
 }) {
   const [pending, start] = useTransition();
   const [done, setDone] = useState<{ ok: boolean; text: string } | null>(null);
   // The SQL allows one test a minute: the button waits that minute instead of failing (§14.16).
-  const [cooling, setCooling] = useState(false);
+  const [sentAt, setSentAt] = useState(lastAt);
+  const [cooling, setCooling] = useState(
+    () => !!lastAt && Date.now() - Date.parse(lastAt) < TEST_COOLDOWN_MS,
+  );
   useEffect(() => {
     if (!cooling) return;
-    const t = setTimeout(() => setCooling(false), TEST_COOLDOWN_MS);
+    const left = sentAt ? TEST_COOLDOWN_MS - (Date.now() - Date.parse(sentAt)) : 0;
+    const t = setTimeout(() => setCooling(false), Math.max(left, 0));
     return () => clearTimeout(t);
-  }, [cooling]);
+  }, [cooling, sentAt]);
   return (
     <>
       <Button
@@ -276,7 +283,10 @@ function TestButton({
           start(async () => {
             const r = await sendChannelTest(channel);
             setDone(r.ok ? { ok: true, text: doneText(r.at) } : { ok: false, text: r.message });
-            if (r.ok) setCooling(true);
+            if (r.ok) {
+              setSentAt(r.at);
+              setCooling(true);
+            }
           })
         }
       >
@@ -332,6 +342,7 @@ function ChatCard({ data, now }: { data: ChannelsData; now: Date }) {
                 : null
           }
           doneText={(at) => `Posted ${hhmm(at)} in “TEST — no action” · mentions only you`}
+          lastAt={data.lastTest.chat}
         />
       </ChannelBody>
     </Card>
@@ -364,6 +375,7 @@ function EmailCard({ data }: { data: ChannelsData }) {
           icon={<IconMail />}
           disabledReason={f.emailConnected ? null : 'Can’t test — email isn’t set up.'}
           doneText={(at) => `Sent to you ${hhmm(at)} · “TEST — no action”`}
+          lastAt={data.lastTest.email}
         />
       </ChannelBody>
     </Card>

@@ -142,6 +142,7 @@ describe('delivery log', () => {
           channel: 'email',
           to: 'Bua',
           createdAt: '2026-09-25T03:03:13Z',
+          sentAt: '2026-09-25T03:03:14Z',
         }),
         n({
           id: 'b',
@@ -149,6 +150,7 @@ describe('delivery log', () => {
           reportKind: 'daily',
           template: 'daily_digest',
           createdAt: '2026-09-25T02:00:02Z',
+          sentAt: '2026-09-25T02:00:03Z',
         }),
         n({
           id: 'c',
@@ -156,6 +158,7 @@ describe('delivery log', () => {
           oncallKind: 'channel_test',
           template: 'oncall',
           createdAt: '2026-09-25T03:08:12Z',
+          sentAt: '2026-09-25T03:08:14Z',
         }),
         n({ id: 'd', incidentNumber: null, oncallKind: 'swap_requested', template: 'oncall' }),
       ],
@@ -165,6 +168,27 @@ describe('delivery log', () => {
       ['Test', '@them · “TEST — no action” thread'],
       ['INC-0142', 'Bua · client update due'],
       ['Digest', 'DxT Website Reports Space'],
+    ]);
+  });
+
+  it('newest first by the time shown: a held email sits where it went, not where it was queued', () => {
+    const rows = logRows(
+      [
+        n({ id: 'chat', createdAt: '2026-09-25T04:02:01Z', sentAt: '2026-09-25T04:02:03Z' }),
+        n({
+          id: 'email',
+          channel: 'email',
+          to: 'Bua',
+          createdAt: '2026-09-25T04:02:00Z',
+          holdUntil: '2026-09-25T04:07:00Z',
+          sentAt: '2026-09-25T04:07:20Z',
+        }),
+      ],
+      NOW,
+    );
+    expect(rows.map((r) => [r.id, r.at])).toEqual([
+      ['email', '11:07:20'],
+      ['chat', '11:02:03'],
     ]);
   });
 

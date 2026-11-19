@@ -248,47 +248,52 @@ function toWords(n: LogNotification): string {
   return n.channel === 'email' ? `${n.to ?? '—'} · ${what}` : `${what} · incident thread`;
 }
 
+const shownAt = (n: LogNotification) => n.sentAt ?? n.createdAt;
+
 /**
  * The log (board, "Filtered: today's open incidents, digest and retried sends"): today's (Bangkok)
  * incident messages, reports, channel tests and any send that needed a retry, newest first; set-aside
  * messages (cancelled) are left out unless they were retried.
  */
 export function logRows(rows: readonly LogNotification[], now: Date, limit = 50): LogRow[] {
-  return rows
-    .filter(
-      (n) =>
-        (n.incidentNumber !== null ||
-          n.reportKind !== null ||
-          n.oncallKind === 'channel_test' ||
-          n.attempts > 1) &&
-        (n.status !== 'cancelled' || n.attempts > 1),
-    )
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
-    .slice(0, limit)
-    .map((n) => {
-      const at = new Date(n.sentAt ?? n.createdAt);
-      const lat = latencyMs(n);
-      return {
-        id: n.id,
-        // The log is today only (the query starts at Bangkok midnight).
-        at: formatTimeWithSeconds(at),
-        inc:
-          n.incidentNumber !== null
-            ? formatIncidentId(n.incidentNumber)
-            : n.reportKind === 'daily'
-              ? 'Digest'
-              : n.reportKind === 'weekly'
-                ? 'Weekly'
-                : n.oncallKind === 'channel_test'
-                  ? 'Test'
-                  : 'On-call',
-        ch: n.channel === 'google_chat' ? 'Google Chat' : n.channel === 'email' ? 'Email' : 'Voice',
-        to: toWords(n),
-        tries: String(Math.max(n.attempts, n.status === 'sent' ? 1 : 0)),
-        lat: lat === null ? '—' : lat < 60_000 ? formatMs(lat) : formatDurationSeconds(lat / 1000),
-        ...statusOf(n, now),
-      };
-    });
+  return (
+    rows
+      .filter(
+        (n) =>
+          (n.incidentNumber !== null ||
+            n.reportKind !== null ||
+            n.oncallKind === 'channel_test' ||
+            n.attempts > 1) &&
+          (n.status !== 'cancelled' || n.attempts > 1),
+      )
+      // Newest first by the time the row shows (sent, else queued), so a held email sits where it went.
+      .sort((a, b) => Date.parse(shownAt(b)) - Date.parse(shownAt(a)))
+      .slice(0, limit)
+      .map((n) => {
+        const at = new Date(shownAt(n));
+        const lat = latencyMs(n);
+        return {
+          id: n.id,
+          // The log is today only (the query starts at Bangkok midnight).
+          at: formatTimeWithSeconds(at),
+          inc:
+            n.incidentNumber !== null
+              ? formatIncidentId(n.incidentNumber)
+              : n.reportKind === 'daily'
+                ? 'Digest'
+                : n.reportKind === 'weekly'
+                  ? 'Weekly'
+                  : n.oncallKind === 'channel_test'
+                    ? 'Test'
+                    : 'On-call',
+          ch: n.channel === 'google_chat' ? 'Google Chat' : n.channel === 'email' ? 'Email' : 'Voice',
+          to: toWords(n),
+          tries: String(Math.max(n.attempts, n.status === 'sent' ? 1 : 0)),
+          lat: lat === null ? '—' : lat < 60_000 ? formatMs(lat) : formatDurationSeconds(lat / 1000),
+          ...statusOf(n, now),
+        };
+      })
+  );
 }
 
 // ── Channel cards ────────────────────────────────────────────────────────
