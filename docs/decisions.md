@@ -89,6 +89,10 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 4. **Email words.** The RECOVERED email leads with the Chat card's words (as D-066 item 9 did for the weekly email), then each reader's own part as on any DOWN RECOVERED: the owner's root cause, the AM's client update, "Nothing needed from you" for the rest (message-checker M3). The new-cause email's preheader is the board's ("PROBLEM — new cause: Keyword · … · was SSL expiring · same incident …"); a Chat-failure copy to the backup and Admins never reads as the acker's email.
 5. **Timeline (§40.5).** "Acknowledgement set aside" and "Acknowledgement given back" are rows of their own. The events store who and when (`setAside`, `ackBack`).
 
+6. **Addendum (19 Nov 2026, Tao — the close-out): the §40.5 timeline wording.**
+   - **Going back to an expiry:** the rows read as the boards draw them, "Back to SSL expiring — Keyword cleared · SSL certificate expires in 13 days (Tue 6 Oct) · no message sent" and "Now Domain expiring — SSL renewed · domain expires in 9 days (Thu 5 Nov) · no message sent". This replaces the words D-067 item 4 quoted ("… · nobody was told"); the behaviour is unchanged.
+   - **A raise to DOWN:** the row reads "Raised to DOWN" on every board, not the code's earlier "PROBLEM became DOWN". It adds "DOWN ladder from L0" when no ack of the outage stood, which is D-021's restart.
+
 **Why.** One message that says what is still open beats a RECOVERED that reads "back to normal" followed a minute later by a PROBLEM AGAIN, or by nothing until 09:00. The person who acknowledged the certificate is the one already working on that incident.
 
 **Impact.** Migration `expiry_back_up` (`down_from_expiry` + trigger; `engine_new_cause_incident`, `engine_cause_back_incident` replaced; pgTAP `new_cause.test.sql`); `@dxt/engine` `OpenIncident.downFromExpiry`, `backUpOnExpiry`, `then.stillExpiry`; the runner (reads the column with schema-lag fallback, a silent relapse); `@dxt/notifier` `buildRecoveredAlert` / `buildRecoveredEmail` `stillExpiry`, `buildNewCauseAlert` `setAside`, `buildNewCauseEmail`; `render.ts`; the Incident timeline.

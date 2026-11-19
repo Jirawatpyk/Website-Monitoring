@@ -600,7 +600,8 @@ describe('timelineOf (§16.11, §19.7)', () => {
     expect(t.map((x) => [x.title, x.detail])).toEqual([
       ['First failed check', 'Keyword'],
       ['PROBLEM detected 09:00:00', 'Keyword missing on /'],
-      ['PROBLEM became DOWN', 'HTTP 500 (SIN, TYO)'],
+      // Every board: "Raised to DOWN"; nobody acknowledged, so the DOWN ladder starts from L0 (D-021).
+      ['Raised to DOWN', 'HTTP 500 (SIN, TYO) · DOWN ladder from L0'],
       ['Down again · flapping', 'HTTP 502'],
       ['Recovered', 'First OK round · OK from 2 locations'],
       ['Resolved automatically', 'Short PROBLEM, never acknowledged — no root cause needed'],

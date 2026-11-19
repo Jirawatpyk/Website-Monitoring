@@ -549,6 +549,25 @@ function ackOf(v: unknown): { by: string; at: Date } | null {
   return a && str(a.by) && at && !Number.isNaN(Date.parse(at)) ? { by: str(a.by)!, at: new Date(at) } : null;
 }
 
+/**
+ * Whether an acknowledgement stood just before this event (D-021: an ack of the outage keeps the ladder
+ * where it was; none, or one an expiry gave and the raise cleared, starts the DOWN ladder from L0).
+ */
+function ackStanding(sorted: readonly EventRow[], at: EventRow): boolean {
+  let acked = false;
+  for (const e of sorted) {
+    if (e === at) break;
+    if (e.type === 'acknowledged') acked = true;
+    else if (e.type === 'ack_undone') acked = false;
+    else if (e.payload.ackCleared === true) acked = false;
+    else if (e.type === 'new_cause' && e.payload.ackBack) acked = true;
+  }
+  return acked;
+}
+
+/** "Domain expires in 9 days (…)" read mid-line: "domain expires …" (SSL keeps its capitals). */
+const midSentence = (s: string | null) => (s && s.startsWith('Domain ') ? `d${s.slice(1)}` : s);
+
 /** An SSL / domain detail's cause, days counted for `asOf` (D-066 item 6). */
 const expiryNowWords = (detail: unknown, asOf: Date) => expiryNow(detail, asOf)?.cause ?? null;
 const num = (v: unknown) => (typeof v === 'number' ? v : null);
@@ -1149,7 +1168,15 @@ export function timelineOf(
             e,
             'problem',
             `${fromExpiry ? 'Now' : 'Back to'} ${label(trig)}`,
-            fromExpiry ? `was ${label(was)} · nobody was told` : `${label(was)} cleared · nobody was told`,
+            // Spec §40.5 boards (D-068 addendum): "Keyword cleared · SSL certificate expires in 13 days
+            // (Tue 6 Oct) · no message sent"; from SSL to the domain, "SSL renewed · domain expires in …".
+            [
+              fromExpiry ? (was === 'ssl' ? 'SSL renewed' : `was ${label(was)}`) : `${label(was)} cleared`,
+              midSentence(expiryNowWords(e.payload.detail, new Date(e.at))),
+              'no message sent',
+            ]
+              .filter(Boolean)
+              .join(' · '),
           );
           // Spec §40.5 (D-068): the ack the new cause set aside comes back with the expiry.
           const back = ackOf(e.payload.ackBack);
@@ -1262,11 +1289,14 @@ export function timelineOf(
           item(
             e,
             'down',
-            'PROBLEM became DOWN',
-            // D-067 item 6: an ack of the expiry doesn't silence the outage.
+            // Every board says "Raised to DOWN" (§30, §40.5); spec-checker 19 Nov.
+            'Raised to DOWN',
+            // D-067 item 6: an ack of the expiry doesn't silence the outage. D-021: with no ack of the
+            // outage standing, the DOWN ladder starts from L0.
             [
               str(e.payload.cause),
               e.payload.ackCleared === true ? 'the acknowledgement of the expiry was cleared' : null,
+              e.payload.ackCleared === true || !ackStanding(sorted, e) ? 'DOWN ladder from L0' : null,
             ]
               .filter(Boolean)
               .join(' · ') || null,
