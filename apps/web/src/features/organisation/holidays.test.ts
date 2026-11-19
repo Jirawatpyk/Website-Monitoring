@@ -51,6 +51,16 @@ describe('holiday list', () => {
     expect(years[2]!.head).toBe('2028 · 1 day · 1 on weekdays');
   });
 
+  it('hours that aren’t a run of days (Mon, Wed, Fri stored by SQL): an off weekday says so in full', () => {
+    const MWF = { ...MON_FRI, days: [1, 3, 5] };
+    const tue = h('2026-10-13', 'King Bhumibol Memorial Day');
+    const [y26] = holidayYears([tue], MWF, NOW);
+    expect(y26!.rows[0]!.sub).toBe('Not a response-hours day — no effect on Mon, Wed, Fri hours');
+    expect(removeEffect(tue, MWF).body).toBe(
+      'It isn’t one of the response-hours days (Mon, Wed, Fri), so removing it changes no timer.',
+    );
+  });
+
   it('follows the hours setting: with Mon–Sat a Saturday counts', () => {
     const [y26] = holidayYears(LIST, MON_SAT, NOW);
     expect(y26!.head).toBe('2026 · 4 left this year · 4 on working days');
