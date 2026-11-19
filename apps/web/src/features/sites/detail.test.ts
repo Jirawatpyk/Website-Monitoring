@@ -103,9 +103,9 @@ describe('chartLines', () => {
 });
 
 describe('labels (SiteDetail header, spec §7)', () => {
-  it('Tier 1 is 24/7 and every minute; Tier 2–3 respond in office hours', () => {
-    expect(responseHoursLabel(1)).toBe('24/7 response');
-    expect(responseHoursLabel(2)).toBe('Mon–Fri 09:00–18:00');
+  it('Tier 1 is 24/7 and every minute; Tier 2–3 respond in the organisation’s hours', () => {
+    expect(responseHoursLabel(1, 'Mon–Sat 08:30–17:30')).toBe('24/7 response');
+    expect(responseHoursLabel(2, 'Mon–Sat 08:30–17:30')).toBe('Mon–Sat 08:30–17:30');
     expect(intervalLabel(1)).toBe('Every 1 min');
     expect(intervalLabel(3)).toBe('Every 5 min');
   });

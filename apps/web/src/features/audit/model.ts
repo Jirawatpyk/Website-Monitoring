@@ -5,6 +5,8 @@ import {
   ROOT_CAUSE_LABELS,
   TRIGGER_LABELS,
   bangkokDayStart,
+  formatResponseHours,
+  timeToMinutes,
   formatDay,
   formatTime,
   formatTimeWithSeconds,
@@ -171,6 +173,7 @@ export const ACTION_WORDS: Record<string, string> = {
   'holiday.update': 'Changed holiday',
   'holiday.delete': 'Removed holiday',
   'escalation.update': 'Changed escalation',
+  'organisation.response_hours': 'Changed response hours',
   'page_baseline.accept': 'Accepted page change',
   'page_baseline.undo': 'Undid page baseline',
   'page_baseline.auto': 'Page baseline set',
@@ -226,7 +229,15 @@ export function wordsOf(action: string): string {
 
 const MONITOR_ACTIONS = new Set(['site.hand_check']);
 const MUTE_ACTIONS = new Set(['site.mute', 'site.mute_end']);
-const CONFIG_PREFIXES = ['site.', 'monitor.', 'client.', 'holiday.', 'escalation.', 'page_baseline.'];
+const CONFIG_PREFIXES = [
+  'site.',
+  'monitor.',
+  'client.',
+  'holiday.',
+  'escalation.',
+  'organisation.',
+  'page_baseline.',
+];
 const ACCESS_PREFIXES = ['user.', 'session.', 'signin.', 'security.', 'profile.'];
 
 /** The category a code belongs to (D-061 item 3); null = shown under All only. */
@@ -622,6 +633,20 @@ export function escalationSides(b: Side, a: Side): AuditSides {
   };
 }
 
+/** `organisation.response_hours` (S17, D-069): "Mon–Fri 09:00–18:00" → "Mon–Sat 08:30–17:30 · “note”". */
+function hoursSides(b: Record<string, Json>, a: Record<string, Json>): AuditSides {
+  const words = (h: Record<string, Json>) => {
+    const days = Array.isArray(h.days) ? h.days.filter((d): d is number => typeof d === 'number') : [];
+    const start = typeof h.start === 'string' ? h.start : '';
+    const end = typeof h.end === 'string' ? h.end : '';
+    return days.length && start && end
+      ? formatResponseHours({ startMin: timeToMinutes(start), endMin: timeToMinutes(end), days })
+      : '—';
+  };
+  const note = typeof a.note === 'string' && a.note.trim() ? ` · “${a.note.trim()}”` : '';
+  return { before: words(b), after: `${words(a)}${note}`, struck: true };
+}
+
 export interface AuditSides {
   before: string;
   after: string;
@@ -647,6 +672,7 @@ export function sidesOf(action: string, before: Json | null, after: Json | null,
     changed = flat.changed;
   }
   if (action === 'escalation.update' && b && a) return escalationSides(b, a);
+  if (action === 'organisation.response_hours' && b && a) return hoursSides(b, a);
   // A monitor fault: the Entity names it already ("Probe location missing · TYO"), so the change is
   // its state — open, then cleared — with the last beat when known (/verify, 13 Nov).
   if (action === 'system_alert.opened' || action === 'system_alert.cleared') {
@@ -708,6 +734,7 @@ export function entityFallback(entity: string, before: Json | null, after: Json 
     return isObject(ctx) && typeof ctx.location === 'string' ? `${kind} · ${ctx.location}` : kind;
   }
   if (entity === 'escalation') return 'Escalation policies';
+  if (entity === 'organisation') return 'Response hours';
   if (entity === 'oncall_rotation') return 'On-call rotation';
   // An invite or a refused sign-in has no person yet: its address, or the domain (D-062 item 7).
   // A revoke keeps the address only on the before side, so both sides are read.

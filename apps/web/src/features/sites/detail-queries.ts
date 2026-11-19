@@ -1,4 +1,5 @@
 import 'server-only';
+import { loadResponseHours } from '@/server/escalation/response-hours';
 import { cache } from 'react';
 import {
   downEpisodesFromTimeline,
@@ -14,6 +15,7 @@ import {
   bangkokDayStart,
   CLOSED_INCIDENT_STATES,
   defaultSlowMs,
+  formatResponseHours,
   type IncidentState,
   type Severity,
   type SiteStatus,
@@ -270,7 +272,7 @@ export async function loadSiteDetail(
   const primary = monitors.find((m) => m.is_primary);
   const ids = monitors.map((m) => m.id);
 
-  const [incidents, series, latest, log, today, lastDay, downs, spans, counted] = await Promise.all([
+  const [incidents, series, latest, log, today, lastDay, downs, spans, counted, hours] = await Promise.all([
     supabase
       .from('incidents')
       .select(
@@ -335,6 +337,7 @@ export async function loadSiteDetail(
       .or(
         `started_at.gte.${historyFrom.toISOString()},resolved_at.is.null,resolved_at.gte.${historyFrom.toISOString()}`,
       ),
+    loadResponseHours(supabase, now),
   ]);
   if (counted.error) throw new Error(`incidents: ${counted.error.message}`);
   if (incidents.error) throw new Error(`incidents: ${incidents.error.message}`);
@@ -452,6 +455,7 @@ export async function loadSiteDetail(
     id: s.id,
     name: s.name,
     tier,
+    hoursText: formatResponseHours(hours),
     live: s.is_active,
     status: s.is_active ? ((status?.status as SiteStatus | undefined) ?? null) : null,
     statusSince: s.is_active ? (status?.since ?? null) : null,

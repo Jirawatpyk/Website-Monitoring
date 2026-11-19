@@ -259,6 +259,22 @@ describe('sidesOf', () => {
     { severity: 'problem', tier: null, steps: [step(0, 0), step(1, 60, ['backup'])] },
   ];
 
+  it('response hours: before → after in words, with the note (S17)', () => {
+    expect(
+      sidesOf(
+        'organisation.response_hours',
+        { start: '09:00', end: '18:00', days: [1, 2, 3, 4, 5] },
+        { start: '08:30', end: '17:30', days: [1, 2, 3, 4, 5, 6], note: 'office opens earlier' },
+        names,
+      ),
+    ).toEqual({
+      before: 'Mon–Fri 09:00–18:00',
+      after: 'Mon–Sat 08:30–17:30 · “office opens earlier”',
+      struck: true,
+    });
+    expect(categoryOf('organisation.response_hours')).toBe('Config');
+  });
+
   it('escalation shows only the step that changed, and the note (review H1)', () => {
     const s = sidesOf(
       'escalation.update',

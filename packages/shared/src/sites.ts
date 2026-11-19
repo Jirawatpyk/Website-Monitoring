@@ -228,6 +228,8 @@ export interface ChecklistInput {
   keyPages: readonly string[];
   keyword: string;
   tier: Tier;
+  /** The response hours in words ("Mon–Fri 09:00–18:00"), from Settings › Organisation. */
+  hoursText: string;
   primary: ChecklistPerson | null;
   backup: ChecklistPerson | null;
   client: { name: string; internal: boolean; amName: string | null } | null;
@@ -237,12 +239,10 @@ export interface ChecklistInput {
   allowlistConfirmed: boolean;
 }
 
-/** The checklist row for each tier (AddSite). */
-export const TIER_SUMMARY: Record<Tier, string> = {
-  1: 'Tier 1 · every 1 min · 24/7',
-  2: 'Tier 2 · every 3 min · Mon–Fri 09:00–18:00',
-  3: 'Tier 3 · every 5 min · Mon–Fri 09:00–18:00',
-};
+/** The checklist row for a tier (AddSite); Tier 2–3 name the organisation's response hours (S17). */
+export function tierSummary(tier: Tier, hoursText: string): string {
+  return `Tier ${tier} · every ${TIER_CONFIG[tier].intervalSec / 60} min · ${TIER_CONFIG[tier].alwaysOn ? '24/7' : hoursText}`;
+}
 
 const filled = (v: string) => v.trim().length > 0;
 const done = { state: 'done' as const };
@@ -296,7 +296,7 @@ export function registrationChecklist(input: ChecklistInput): ChecklistItem[] {
         ? { detail: `“${input.keyword.trim()}” must appear on the page`, ...done }
         : { detail: 'Add the brand name the page must contain', ...todo }),
     },
-    { key: 'tier', label: 'Tier', short: 'Tier', detail: TIER_SUMMARY[input.tier], ...done },
+    { key: 'tier', label: 'Tier', short: 'Tier', detail: tierSummary(input.tier, input.hoursText), ...done },
     {
       key: 'primary',
       label: 'Primary owner',

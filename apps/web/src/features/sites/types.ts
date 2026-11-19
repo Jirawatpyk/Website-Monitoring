@@ -73,6 +73,8 @@ export interface ExistingUrl {
 }
 
 export interface RegistrationOptions {
+  /** The response hours in words, for the tier choices and the checklist (S17). */
+  hoursText: string;
   clients: ClientOption[];
   people: PersonOption[];
   existingUrls: ExistingUrl[];
@@ -186,6 +188,8 @@ export interface SiteDetail {
   id: string;
   name: string;
   tier: Tier;
+  /** The response hours in words (Settings › Organisation, S17). */
+  hoursText: string;
   live: boolean;
   status: SiteStatus | null;
   statusSince: string | null;

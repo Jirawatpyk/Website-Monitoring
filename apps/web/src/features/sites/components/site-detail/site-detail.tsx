@@ -174,7 +174,7 @@ export function SiteDetailView({
                       {intervalLabel(detail.tier)}
                     </Badge>
                     <Badge tone="neutral" variant="outline">
-                      {responseHoursLabel(detail.tier)}
+                      {responseHoursLabel(detail.tier, detail.hoursText)}
                     </Badge>
                   </span>
                 </span>
@@ -182,7 +182,7 @@ export function SiteDetailView({
                   {[
                     formatTier(detail.tier),
                     intervalLabel(detail.tier).toLowerCase(),
-                    responseHoursLabel(detail.tier),
+                    responseHoursLabel(detail.tier, detail.hoursText),
                     detail.owner && `owner ${detail.owner}`,
                     detail.backup && `backup ${detail.backup}`,
                   ]

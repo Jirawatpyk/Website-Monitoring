@@ -152,20 +152,20 @@ describe('S10 — the CEO, the FYI step, moving steps (Escalation board, §14.7,
     const l2rem = { ...l1({ targets: ['admins'] }), level: 2, delayMin: 30 };
     expect(stepCondition(t1full(), l3fyi)).toBe('Still DOWN — sent even after acknowledge');
     expect(stepCondition(t2, l2rem)).toBe('Still no acknowledgement');
-    expect(stepNote(t2, l2rem, false, ['Tao'])).toBe(
+    expect(stepNote(t2, l2rem, false, ['Tao'], 'Mon–Fri 09:00–18:00')).toBe(
       'Reminder to Tao. No CEO page — the CEO sees it in the daily digest.',
     );
-    expect(stepNote(t1full(), l3fyi, true)).toBe(
+    expect(stepNote(t1full(), l3fyi, true, [], 'Mon–Fri 09:00–18:00')).toBe(
       'FYI only, never a call. Recovered by then → nothing is sent.',
     );
     // L0 (Escalation board, S10): owner by day, on call otherwise; the pencil @mentions everyone on it.
     expect(stepNote(t1full(), l0, false, [], 'Mon–Sat 08:30–17:00')).toBe(
       'Chat @mention and Alerts Space are locked on. Owner by day (Mon–Sat 08:30–17:00), the person on call otherwise. Only they are @mentioned; the backup is named in plain text.',
     );
-    expect(stepNote(t1full(), l0, true)).toBe(
+    expect(stepNote(t1full(), l0, true, [], 'Mon–Fri 09:00–18:00')).toBe(
       'Only this person is @mentioned; the backup is named in plain text.',
     );
-    expect(stepNote(t1full(), { ...l0, targets: ['owner', 'backup'] }, true)).toBe(
+    expect(stepNote(t1full(), { ...l0, targets: ['owner', 'backup'] }, true, [], 'Mon–Fri 09:00–18:00')).toBe(
       'Everyone on this step is @mentioned.',
     );
     expect(fyiNote(l3fyi)).toBe(

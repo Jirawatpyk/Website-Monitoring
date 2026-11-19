@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DxT Monitor — Settings, organisation: holidays and forbidden words</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:var(--aura-fg-accent)}
+main > *{flex-shrink:0}
+.ol-row{display:grid;grid-template-columns:150px minmax(0,1fr) 170px 96px;align-items:center;gap:12px;min-height:48px;padding:4px 8px 4px 20px;border-top:1px solid var(--aura-border-subtle);font-size:14px;line-height:1.4}
+.ol-ph{display:inline-flex;align-items:center;gap:2px;padding:0 2px 0 10px;min-height:32px;border:1px solid var(--aura-border-default);border-radius:9999px;background:var(--aura-bg-surface);font-size:13px}
+.ol-x{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:0;background:none;border-radius:9999px;color:var(--aura-fg-secondary);cursor:pointer}
+.ol-x:hover{background:var(--aura-bg-surface-hover);color:var(--aura-fg-primary)}
+.ol-x:focus-visible{outline:var(--aura-focus-ring-width,2px) solid var(--aura-focus-ring);outline-offset:1px}
+</style>
+</helmet>
+<div style="width: 1440px; height: 2720px; position: relative; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+
+<aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
+<div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
+<div style="height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm)">
+<span style="font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em">DxT</span>
+<span style="width: 6px; height: 6px; border-radius: 9999px; background: var(--aura-accent-dot)"></span>
+</div>
+<span style="font-size: 14px; font-weight: 600">Monitor</span>
+</div>
+<div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--aura-border-default)">
+<x-import component-from-global-scope="Aura.SideNav" sections="{{nav}}" value="settings" label="Main navigation" style="height: 100%"></x-import>
+</div>
+<a href="Profile.dc.html" style="padding: 16px 20px; border-top: 1px solid var(--aura-border-default); display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none">
+<x-import component-from-global-scope="Aura.Avatar" name="Tao" size="md"></x-import>
+<div style="display: flex; flex-direction: column; line-height: 1.3; min-width: 0">
+<span style="font-size: 13px; font-weight: 500">Tao</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Jirawat Piyakit · Admin</span>
+</div>
+</a>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px; position: relative">
+<div style="position: absolute; top: 10px; right: 40px; padding: 6px 12px; display: flex; align-items: center; gap: 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)"><span style="font-family: var(--font-mono)">STATE</span><div style="width: 280px"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{stOpts}}" value="{{stV}}" on-change="{{setSt}}" size="sm"></x-import></div></div>
+
+<div style="display: flex; flex-direction: column; gap: 4px; min-height: 48px; justify-content: flex-end">
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)">SETTINGS</span>
+<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Settings</h1>
+</div>
+<x-import component-from-global-scope="Aura.Tabs" label="Settings sections" tabs="{{tabs}}" value="org"></x-import>
+<nav aria-label="On this page" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--aura-fg-secondary)"><span>On this page:</span><a href="Organisation.dc.html">Tiers</a><span>·</span><a href="Organisation.dc.html">Clients</a><span>·</span><a href="#ol-hol" style="font-weight: 600">Company holidays</a><span>·</span><a href="#ol-words" style="font-weight: 600">Shared forbidden words</a><span>·</span><a href="Organisation.dc.html">Data kept</a><span>·</span><a href="Organisation.dc.html">Monthly cost</a></nav>
+<div style="display: flex; align-items: center; gap: 10px; padding: 8px 14px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; color: var(--aura-fg-secondary)"><span style="display: flex"><x-import component-from-global-scope="Aura.Icon" name="arrow-up-down" size="sm"></x-import></span><span>Same page as the Organisation board, scrolled: Tiers and Clients sit above, Data kept and Monthly cost below.</span></div>
+
+<section id="ol-hol" style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Company holidays</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">On these days Tier 2–3 timers wait for the next working day and Tier 1 is with the person on call all day. Changes are logged.</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="plus" on-click="{{addHol}}">Add holiday</x-import>
+</div>
+<sc-for list="{{years}}" as="y" hint-placeholder-count="2">
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<div style="padding: 10px 20px; font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">{{y.head}}</div>
+<sc-for list="{{y.rows}}" as="h" hint-placeholder-count="7">
+<div class="ol-row" role="group" aria-label="{{h.aria}}">
+<span style="font-variant-numeric: tabular-nums; font-weight: 500">{{h.date}}</span>
+<span style="display: flex; flex-direction: column; min-width: 0"><span>{{h.name}}</span><sc-if value="{{h.hasSub}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{h.sub}}</span></sc-if></span>
+<span style="display: flex"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="{{h.kindVariant}}">{{h.kind}}</x-import></span>
+<span style="display: flex; justify-content: flex-end; gap: 4px"><x-import component-from-global-scope="Aura.IconButton" icon="pencil" label="{{h.renameLabel}}" size="sm" on-click="{{h.rename}}"></x-import><x-import component-from-global-scope="Aura.IconButton" icon="trash-2" label="{{h.removeLabel}}" size="sm" on-click="{{h.remove}}"></x-import></span>
+</div>
+</sc-for>
+<sc-if value="{{y.missing}}" hint-placeholder-val="{{false}}"><div style="display: flex; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span>{{y.missingText}}</span></div></sc-if>
+</div>
+</sc-for>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Past days aren’t listed and can’t be added or changed. The audit log keeps every add, rename and remove.</span>
+</section>
+
+<section id="ol-words" style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Shared forbidden words</h2>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Every site is checked for these on top of its own “Must not contain”. A hit opens PROBLEM · Keyword on that site. {{total}} phrases.</span>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="plus" on-click="{{addPh}}">Add phrase</x-import>
+</div>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div style="border-top: 1px solid var(--aura-border-subtle)">
+<div style="display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 4px 12px 4px 20px">
+<span style="flex-grow: 1; font-weight: 600">{{g.name}}</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">{{g.count}}</span>
+<x-import component-from-global-scope="Aura.Button" variant="ghost" size="sm" icon="{{g.btnIcon}}" aria-label="{{g.aria}}" on-click="{{g.toggle}}">{{g.btn}}</x-import>
+</div>
+<sc-if value="{{g.open}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 20px 16px">
+<sc-for list="{{g.phrases}}" as="p" hint-placeholder-count="12"><span class="ol-ph" lang="{{p.lang}}"><span>{{p.p}}</span><button type="button" class="ol-x" aria-label="{{p.rmLabel}}" onClick="{{p.rm}}"><x-import component-from-global-scope="Aura.Icon" name="x" size="sm"></x-import></button></span></sc-for>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">Collapsed by default — the phrases are offensive spam, so they show only when an Admin opens a group. Every add and remove needs a note and is logged.</span>
+</section>
+
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
+<span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — holidays and shared forbidden words (§41, D-069)</span>
+<span>• Both sit on Settings › Organisation below Clients, above Data kept — one page, an “On this page” line under the tabs. Admin only; view only on phones.</span>
+<span>• Holidays: a list per year (date · name · kind · rename · remove), “Add holiday” at the section head. One change at a time in a dialog, no note (the date and name say what changed; who and when go to the audit log). Removing a weekday says what that day turns into.</span>
+<span>• Forbidden words: groups collapsed with a count; Show opens one group. Add and remove one phrase at a time in a dialog with a required note — each phrase is checked against every live site before it can be saved, which a list-and-save bar can’t do per phrase.</span>
+<span>• Phrase rules: not a single short word (one word under 6 letters, or under 4 Thai characters — “slot” also matches “time slot”); not already in the list; not on any healthy site’s last clean fetch.</span>
+</div>
+
+<sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+<div role="status" aria-live="polite" style="position: absolute; left: 40px; bottom: 24px; width: 560px; box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 12px 18px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-lg); box-shadow: var(--aura-shadow-enterprise); font-size: 13px; line-height: 1.45"><x-import component-from-global-scope="Aura.Icon" name="check" size="sm"></x-import><span>{{toastText}}</span></div>
+</sc-if>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{dAddHol}}" on-close="{{close}}" title="Add a holiday" description="On this day Tier 2–3 timers wait for the next working day and Tier 1 is with the person on call all day." size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<x-import component-from-global-scope="Aura.DatePicker" label="Date" required="{{yes}}" clearable="{{no}}" value="{{hDate}}" min="2026-09-25" max="2027-12-31" today="2026-09-25" on-change="{{setHDate}}" error="{{hDateErr}}" hint="Today or later — past days can’t be added."></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Name" required="{{yes}}" value="{{hNameNew}}" on-change="{{setHNameNew}}" placeholder="e.g. Company outing" error="{{hNameErr}}" hint="{{hNameHint}}"></x-import>
+<div style="display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px"><x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{close}}">Cancel</x-import><x-import component-from-global-scope="Aura.Button" variant="primary" icon="plus" on-click="{{saveHol}}">Add holiday</x-import></div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{dRename}}" on-close="{{close}}" title="Rename holiday" description="Wed 30 Dec 2026 · the date can’t change — remove it and add a new one instead." size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<x-import component-from-global-scope="Aura.TextField" label="Name" required="{{yes}}" value="{{hName}}" on-change="{{setHName}}" error="{{hRenErr}}" hint="{{hRenHint}}"></x-import>
+<div style="display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px"><x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{close}}">Cancel</x-import><x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{saveRename}}">Save name</x-import></div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{dRemoveHol}}" on-close="{{close}}" title="Remove “Company day off — year-end”?" description="Wed 30 Dec 2026 becomes a working day." size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="What changes on Wed 30 Dec">Tier 2–3 timers run 09:00–18:00 and Tier 1 DOWN goes to the owner during the day, the on-call person outside those hours. Incidents already open keep the timers they started with.</x-import>
+<div style="display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px"><x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{close}}">Cancel</x-import><x-import component-from-global-scope="Aura.Button" variant="primary" icon="trash-2" on-click="{{doRemoveHol}}">Remove holiday</x-import></div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{dAddPh}}" on-close="{{close}}" title="Add a forbidden phrase" description="Every site is checked for it on top of its own “Must not contain”." size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<x-import component-from-global-scope="Aura.Select" label="Group" options="{{groupOpts}}" value="{{pGroup}}" on-change="{{setPGroup}}"></x-import>
+<x-import component-from-global-scope="Aura.TextField" label="Phrase" required="{{yes}}" value="{{pText}}" on-change="{{setPText}}" error="{{pErr}}" hint="A phrase, not a single short word. Case and spacing don’t matter."></x-import>
+<sc-if value="{{pFound}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--aura-alert-danger-bg); border: 1px solid var(--aura-alert-danger-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="display: flex; gap: 8px; color: var(--aura-alert-danger-fg); font-weight: 600"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import></span>Found on MuvMi’s home page — this would open a PROBLEM on a healthy site</span>
+<span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary)" lang="th">… ดาวน์โหลดแอป รับ<mark style="background: var(--aura-alert-warning-bg); color: var(--aura-fg-primary)">เครดิตฟรี</mark> 50 บาท สำหรับเที่ยวแรก …</span>
+<span style="color: var(--aura-fg-secondary)">Last clean fetch of 17 sites · MuvMi, Fri 25 Sep 09:30. Make the phrase longer (e.g. “เครดิตฟรี กดรับเอง”) so it only matches spam.</span>
+</div>
+</sc-if>
+<sc-if value="{{pOk}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--aura-alert-success-bg); border: 1px solid var(--aura-alert-success-border); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="display: flex; gap: 8px; color: var(--aura-alert-success-fg); font-weight: 600"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span>Not found on any of the 17 sites’ last clean fetch</span>
+<span>Every site is checked for it from the next round (about 1–5 min); the Googlebot and Google-search views from the next crawler run (within 30 min). A site that has it then opens PROBLEM · Keyword.</span>
+</div>
+</sc-if>
+<sc-if value="{{pChecking}}" hint-placeholder-val="{{false}}"><span role="status" style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="loader-circle" size="sm"></x-import>Checking 17 sites’ last clean fetch…</span></sc-if>
+<x-import component-from-global-scope="Aura.Textarea" label="Change note" required="{{yes}}" rows="{{two}}" value="{{pNote}}" on-change="{{setPNote}}" error="{{pNoteErr}}" placeholder="Why add it? e.g. seen on a client site this week" hint="Saved with the change in the audit log."></x-import>
+<div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px"><span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">{{pFoot}}</span><x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{close}}">Cancel</x-import><x-import component-from-global-scope="Aura.Button" variant="primary" icon="{{pBtnIcon}}" disabled="{{pBtnOff}}" on-click="{{pBtnDo}}">{{pBtn}}</x-import></div>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{dRemovePh}}" on-close="{{close}}" title="{{rmTitle}}" description="From Gambling · Thai · sites stop being checked for it from the next round." size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<span style="font-size: 13px; line-height: 1.5; color: var(--aura-fg-secondary)">Incidents it already opened stay open until they’re resolved.</span>
+<x-import component-from-global-scope="Aura.Textarea" label="Change note" required="{{yes}}" rows="{{two}}" value="{{rNote}}" on-change="{{setRNote}}" error="{{rNoteErr}}" placeholder="Why remove it?" hint="Saved with the change in the audit log."></x-import>
+<div style="display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px"><x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{close}}">Cancel</x-import><x-import component-from-global-scope="Aura.Button" variant="primary" icon="trash-2" on-click="{{doRemovePh}}">Remove and log</x-import></div>
+</div>
+</x-import>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2720}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { stV: 'Default', dlg: '', openG: '', hDate: '2026-11-20', hNameNew: '', hName: 'Company day off — year-end', pGroup: 'Gambling · Thai', pText: '', pNote: '', pPhase: '', tried: false, rNote: '', rmPh: 'แทงหวยออนไลน์', toast: '' }; }
+  renderVals() {
+    var self = this, st = this.state;
+
+    // Board clock: Fri 25 Sep 2026 10:08. Holidays from today on; Thai public holidays seeded Oct 2026 – 2027 (made-up sample list).
+    var HOL = [
+      ['2026-10-13', 'Tue 13 Oct', 'King Bhumibol Memorial Day', 'pub'],
+      ['2026-10-23', 'Fri 23 Oct', 'Chulalongkorn Day', 'pub'],
+      ['2026-12-05', 'Sat 5 Dec', 'Father’s Day', 'pub'],
+      ['2026-12-07', 'Mon 7 Dec', 'Father’s Day (substitute)', 'pub'],
+      ['2026-12-10', 'Thu 10 Dec', 'Constitution Day', 'pub'],
+      ['2026-12-30', 'Wed 30 Dec', 'Company day off — year-end', 'co'],
+      ['2026-12-31', 'Thu 31 Dec', 'New Year’s Eve', 'pub'],
+      ['2027-01-01', 'Fri 1 Jan', 'New Year’s Day', 'pub'],
+      ['2027-04-06', 'Tue 6 Apr', 'Chakri Day', 'pub'],
+      ['2027-04-13', 'Tue 13 Apr', 'Songkran', 'pub'],
+      ['2027-04-14', 'Wed 14 Apr', 'Songkran', 'pub'],
+      ['2027-04-15', 'Thu 15 Apr', 'Songkran', 'pub'],
+      ['2027-05-01', 'Sat 1 May', 'Labour Day', 'pub'],
+      ['2027-05-04', 'Tue 4 May', 'Coronation Day', 'pub'],
+      ['2027-06-03', 'Thu 3 Jun', 'Queen Suthida’s Birthday', 'pub'],
+      ['2027-07-28', 'Wed 28 Jul', 'King’s Birthday', 'pub'],
+      ['2027-08-12', 'Thu 12 Aug', 'Mother’s Day', 'pub'],
+      ['2027-10-13', 'Wed 13 Oct', 'King Bhumibol Memorial Day', 'pub'],
+      ['2027-10-23', 'Sat 23 Oct', 'Chulalongkorn Day', 'pub'],
+      ['2027-10-25', 'Mon 25 Oct', 'Chulalongkorn Day (substitute)', 'pub'],
+      ['2027-12-05', 'Sun 5 Dec', 'Father’s Day', 'pub'],
+      ['2027-12-06', 'Mon 6 Dec', 'Father’s Day (substitute)', 'pub'],
+      ['2027-12-10', 'Fri 10 Dec', 'Constitution Day', 'pub'],
+      ['2027-12-31', 'Fri 31 Dec', 'New Year’s Eve', 'pub']
+    ];
+    if (st.added) HOL.push(['2026-11-20', 'Fri 20 Nov', st.added, 'co']);
+    if (st.renamed) HOL = HOL.map(function (h) { return h[0] === '2026-12-30' ? [h[0], h[1], st.renamed, h[3]] : h; });
+    if (st.removedHol) HOL = HOL.filter(function (h) { return h[0] !== '2026-12-30'; });
+    HOL.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+    function weekend(lbl) { return /^(Sat|Sun)/.test(lbl); }
+    var years = ['2026', '2027'].map(function (y) {
+      var rows = HOL.filter(function (h) { return h[0].slice(0, 4) === y; }).map(function (h) {
+        var we = weekend(h[1]);
+        return { iso: h[0], date: h[1], name: h[2], co: h[3] === 'co', pub: h[3] !== 'co', kind: h[3] === 'co' ? 'Company day off' : 'Public holiday',
+          kindVariant: h[3] === 'co' ? 'soft' : 'outline', we: we, sub: we ? 'Weekend — no effect on Mon–Fri hours' : '', hasSub: we,
+          aria: h[1] + ', ' + h[2], renameLabel: 'Rename ' + h[2] + ', ' + h[1], removeLabel: 'Remove ' + h[2] + ', ' + h[1],
+          rename: function () { self.setState({ dlg: 'rename', hName: h[2] }); }, remove: function () { self.setState({ dlg: 'removeHol' }); } };
+      });
+      var wd = rows.filter(function (r) { return !r.we; }).length;
+      return { y: y, rows: rows, head: y === '2026' ? y + ' · ' + rows.length + ' left this year · ' + wd + ' on weekdays' : y + ' · ' + rows.length + ' days · ' + wd + ' on weekdays',
+        missing: y === '2027', missingText: 'Makha Bucha, Visakha Bucha and Asanha Bucha 2027 follow the lunar calendar and aren’t announced yet — add them when the dates are announced.' };
+    });
+    // Shared forbidden words (made-up sample list, about 60 phrases)
+    var G = [
+      ['Gambling · Thai', ['บาคาร่า', 'สล็อตออนไลน์', 'แทงบอลออนไลน์', 'เว็บพนันออนไลน์', 'คาสิโนออนไลน์', 'เครดิตฟรี กดรับเอง', 'ฝากถอนไม่มีขั้นต่ำ', 'สล็อตแตกง่าย', 'หวยออนไลน์', 'แทงหวยออนไลน์', 'เว็บตรงไม่ผ่านเอเย่นต์', 'ทดลองเล่นสล็อต', 'โปรสมาชิกใหม่ 100%']],
+      ['Gambling · English', ['online casino', 'slot online', 'free credit bonus', 'sports betting', 'live baccarat', 'no deposit bonus', 'slot gacor', 'judi online', 'auto deposit withdraw', 'betting odds today', 'jackpot slot', 'bet online now']],
+      ['Brands', ['ufabet', 'pg slot', 'joker gaming', 'sbobet', 'sa gaming', 'betflik', 'lsm99 เว็บตรง', 'gclub casino', '168 slot', 'superslot', 'pgslot เว็บตรง']],
+      ['Adult', ['หนังโป๊', 'คลิปหลุด', 'เว็บผู้ใหญ่', 'สาวไซด์ไลน์', 'หาคู่คืนนี้', 'xxx video', 'adult chat', 'porn videos', 'hot cams', 'live cam girls', 'escort service', '18+ only']],
+      ['Pharma', ['viagra online', 'cialis online', 'buy tramadol', 'ยาเพิ่มขนาด', 'ยาปลุกอารมณ์', 'ยาลดความอ้วนแรง', 'ยาทำแท้ง', 'weight loss pills', 'cheap viagra', 'kamagra jelly', 'buy xanax', 'diet pills fast']]
+    ];
+    if (st.addedPh) G[0][1] = G[0][1].concat([st.addedPh]);
+    if (st.removedPh) G[0][1] = G[0][1].filter(function (p) { return p !== 'แทงหวยออนไลน์'; });
+    var total = 0;
+    var groups = G.map(function (g) {
+      total += g[1].length;
+      var open = st.openG === g[0];
+      return { name: g[0], n: g[1].length, count: g[1].length + ' phrases', open: open, closed: !open, btn: open ? 'Hide' : 'Show', btnIcon: open ? 'eye-off' : 'eye',
+        aria: (open ? 'Hide ' : 'Show ') + g[1].length + ' phrases in ' + g[0],
+        toggle: function () { self.setState({ openG: open ? '' : g[0] }); },
+        phrases: g[1].map(function (p) { return { p: p, lang: /[\u0E00-\u0E7F]/.test(p) ? 'th' : 'en', rmLabel: 'Remove ' + p + ' from ' + g[0], rm: function () { self.setState({ dlg: 'removePh', rmPh: p }); } }; }) };
+    });
+
+    // ---- holiday dialog validation ----
+    var TAKEN = {}; HOL.forEach(function (h) { TAKEN[h[0]] = h[1] + ' is already ' + h[2]; });
+    var hDateErr = st.hDate && st.hDate < '2026-09-25' ? 'Pick today or a later day — past days can’t be added.' : (TAKEN[st.hDate] || '');
+    var nn = (st.hNameNew || '').trim();
+    var hNameErr = st.tried && !nn ? 'Give the day a name.' : (nn.length > 100 ? 'Up to 100 characters.' : '');
+    var rn = (st.hName || '').trim();
+    // ---- phrase dialog ----
+    var t = (st.pText || '').trim();
+    var thai = /[฀-๿]/.test(t);
+    var single = !!t && !/\s/.test(t) && (thai ? t.length < 4 : t.length < 6);
+    var all = []; G.forEach(function (g) { g[1].forEach(function (p) { all.push(p.toLowerCase()); }); });
+    var dup = !!t && all.indexOf(t.toLowerCase()) >= 0;
+    var found = st.pPhase === 'checked' && t === 'เครดิตฟรี';
+    var ok = st.pPhase === 'checked' && !found && !single && !dup && !!t;
+    var pErr = single ? 'Use a phrase — a single short word is refused: “slot” would also match “time slot” on a booking page.' : (dup ? 'Already in the list.' : (st.tried && !t ? 'Type the phrase to check.' : ''));
+    var pNoteErr = st.pPhase === 'checked' && st.tried && !(st.pNote || '').trim() ? 'Add a short note — it goes in the audit log with the change.' : '';
+    function go(v) {
+      var base = { stV: v, dlg: '', openG: '', tried: false, pPhase: '', toast: '', added: '', renamed: '', removedHol: false, addedPh: '', removedPh: false };
+      var M = {
+        'Add holiday': { dlg: 'addHol', hDate: '2026-11-20', hNameNew: 'Company outing' },
+        'Add holiday · past or taken date': { dlg: 'addHol', hDate: '2026-12-07', hNameNew: 'Company outing' },
+        'Rename holiday': { dlg: 'rename', hName: 'Company day off — year-end close' },
+        'Remove holiday': { dlg: 'removeHol' },
+        'Group shown': { openG: 'Gambling · Thai' },
+        'Add phrase': { dlg: 'addPh', pText: '', pNote: '' },
+        'Phrase refused · single word': { dlg: 'addPh', pGroup: 'Gambling · English', pText: 'slot', pNote: '' },
+        'Phrase refused · found on a site': { dlg: 'addPh', pGroup: 'Gambling · Thai', pText: 'เครดิตฟรี', pPhase: 'checked', pNote: '' },
+        'Phrase ready to add': { dlg: 'addPh', pGroup: 'Gambling · Thai', pText: 'สล็อตเว็บตรง แตกง่าย', pPhase: 'checked', pNote: 'Seen on a hacked WordPress site this week' },
+        'Remove phrase': { dlg: 'removePh', openG: 'Gambling · Thai', rmPh: 'แทงหวยออนไลน์', rNote: '' },
+        'Saved · toast': { openG: 'Gambling · Thai', addedPh: 'สล็อตเว็บตรง แตกง่าย', toast: 'Added “สล็อตเว็บตรง แตกง่าย” to Gambling · Thai · logged · sites are checked for it from the next round' }
+      };
+      self.setState(Object.assign(base, M[v] || {}));
+    }
+    var pFoot = !t ? '' : (single || dup) ? '' : (st.pPhase === 'checked' ? (found ? 'Not saved — change the phrase and check again.' : 'Checked · ready to add') : 'Checked against every live site before it’s saved.');
+    return {
+      yes: true, no: false, two: 2,
+      stOpts: ['Default', 'Add holiday', 'Add holiday · past or taken date', 'Rename holiday', 'Remove holiday', 'Group shown', 'Add phrase', 'Phrase refused · single word', 'Phrase refused · found on a site', 'Phrase ready to add', 'Remove phrase', 'Saved · toast'].map(function (v) { return { value: v, label: v }; }),
+      stV: st.stV, setSt: function (e) { go(e && e.target ? e.target.value : e); },
+      years: years, groups: groups, total: total,
+      close: function () { self.setState({ dlg: '', tried: false }); },
+      // holidays
+      addHol: function () { self.setState({ dlg: 'addHol', hNameNew: '', hDate: '2026-11-20', tried: false }); },
+      dAddHol: st.dlg === 'addHol', dRename: st.dlg === 'rename', dRemoveHol: st.dlg === 'removeHol',
+      hDate: st.hDate, setHDate: function (v) { var x = v && v.target ? v.target.value : v; self.setState({ hDate: x || '' }); }, hDateErr: hDateErr,
+      hNameNew: st.hNameNew, setHNameNew: function (e) { self.setState({ hNameNew: e && e.target ? e.target.value : e }); }, hNameErr: hNameErr, hNameHint: nn.length + ' / 100',
+      saveHol: function () { if (!nn || nn.length > 100 || hDateErr) { self.setState({ tried: true }); return; } self.setState({ dlg: '', added: nn, toast: 'Added Fri 20 Nov “' + nn + '” · logged · timers treat it as a day off from now on' }); },
+      hName: st.hName, setHName: function (e) { self.setState({ hName: e && e.target ? e.target.value : e }); },
+      hRenErr: !rn ? 'Give the day a name.' : (rn.length > 100 ? 'Up to 100 characters.' : ''), hRenHint: rn.length + ' / 100',
+      saveRename: function () { if (!rn || rn.length > 100) return; self.setState({ dlg: '', renamed: rn, toast: 'Renamed Wed 30 Dec to “' + rn + '” · logged' }); },
+      doRemoveHol: function () { self.setState({ dlg: '', removedHol: true, toast: 'Removed Wed 30 Dec · it’s a working day now · logged' }); },
+      // phrases
+      addPh: function () { self.setState({ dlg: 'addPh', pText: '', pNote: '', pPhase: '', tried: false }); },
+      dAddPh: st.dlg === 'addPh', dRemovePh: st.dlg === 'removePh',
+      groupOpts: G.map(function (g) { return { value: g[0], label: g[0] }; }), pGroup: st.pGroup, setPGroup: function (e) { self.setState({ pGroup: e && e.target ? e.target.value : e }); },
+      pText: st.pText, setPText: function (e) { self.setState({ pText: e && e.target ? e.target.value : e, pPhase: '' }); }, pErr: pErr,
+      pFound: found, pOk: ok, pChecking: st.pPhase === 'checking',
+      pNote: st.pNote, setPNote: function (e) { self.setState({ pNote: e && e.target ? e.target.value : e }); }, pNoteErr: pNoteErr,
+      pFoot: pFoot,
+      pBtn: ok ? 'Add and log' : 'Check phrase', pBtnIcon: ok ? 'plus' : 'search', pBtnOff: !t || single || dup || found,
+      pBtnDo: function () {
+        if (!ok) { if (!t) { self.setState({ tried: true }); return; } self.setState({ pPhase: 'checking' }); setTimeout(function () { self.setState({ pPhase: 'checked' }); }, 700); return; }
+        if (!(st.pNote || '').trim()) { self.setState({ tried: true }); return; }
+        self.setState({ dlg: '', addedPh: t, openG: st.pGroup, toast: 'Added “' + t + '” to ' + st.pGroup + ' · logged · sites are checked for it from the next round' });
+      },
+      rmTitle: 'Remove “' + st.rmPh + '”?', rmPh: st.rmPh, rNote: st.rNote, setRNote: function (e) { self.setState({ rNote: e && e.target ? e.target.value : e }); },
+      rNoteErr: st.tried && st.dlg === 'removePh' && !(st.rNote || '').trim() ? 'Add a short note — it goes in the audit log with the change.' : '',
+      doRemovePh: function () { if (!(st.rNote || '').trim()) { self.setState({ tried: true }); return; } self.setState({ dlg: '', removedPh: true, toast: 'Removed “' + st.rmPh + '” from Gambling · Thai · logged' }); },
+      toast: !!st.toast, toastText: st.toast,
+      tabs: [
+        { id: 'users', label: 'Users & roles', href: 'Users.dc.html' },
+        { id: 'channels', label: 'Alert channels', href: 'AlertChannels.dc.html' },
+        { id: 'sso', label: 'Sign-in & security', href: 'Security.dc.html' },
+        { id: 'org', label: 'Organisation', href: 'Organisation.dc.html' },
+        { id: 'api', label: 'API & webhooks', href: 'ApiWebhooks.dc.html', count: 'Phase 3' }
+      ],
+      nav: [
+        { items: [
+          { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'Main3.dc.html' },
+          { id: 'incidents', label: 'Incidents', icon: 'bell', count: 3, href: 'Incidents.dc.html' },
+          { id: 'sites', label: 'Sites', icon: 'monitor', count: 17, href: 'Sites.dc.html' },
+          { id: 'expiry', label: 'SSL & domains', icon: 'lock', href: 'Expiry.dc.html' }
+        ] },
+        { title: 'Operations', items: [
+          { id: 'oncall', label: 'On-call', icon: 'users', href: 'OnCall.dc.html' },
+          { id: 'maintenance', label: 'Maintenance', icon: 'calendar', href: 'MaintenancePage.dc.html' },
+          { id: 'escalation', label: 'Escalation policies', icon: 'arrow-up-right', href: 'Escalation.dc.html' }
+        ] },
+        { title: 'Reports', items: [
+          { id: 'uptime', label: 'Uptime reports', icon: 'chart-column', href: 'Reports.dc.html' },
+          { id: 'audit', label: 'Audit log', icon: 'file-text', href: 'AuditLog.dc.html' }
+        ] },
+        { title: 'System', items: [
+          { id: 'probes', label: 'Probes & heartbeat', icon: 'monitor', href: 'Probes.dc.html' },
+          { id: 'settings', label: 'Settings', icon: 'settings', href: 'Users.dc.html' },
+          { id: 'guide', label: 'User guide', icon: 'info', href: 'Guide.dc.html' }
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

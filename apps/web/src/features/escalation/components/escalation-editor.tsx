@@ -3,6 +3,7 @@
 import { Alert, Button, Card, SegmentedControl, Select, TextField } from '@jirawatpyk/aura-react';
 import { IconCircleAlert, IconClock, IconPlus, IconTriangleAlert } from '@jirawatpyk/aura-react/icons';
 import type { EscalationStep } from '@dxt/shared';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { UnsavedBar } from '@/components/unsaved-bar';
@@ -150,6 +151,11 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
         <span className="flex items-center gap-2 text-sm text-fg-secondary">
           <IconClock size="sm" aria-hidden />
           {timerBasis(key, hoursText)}
+        </span>
+        {/* The hours are set in Organisation only (spec §7, S17). */}
+        {/* An inline text link (WCAG 2.5.8): the span keeps the flex row from blockifying it. */}
+        <span className="text-sm whitespace-nowrap">
+          <Link href="/settings/organisation">Edit in Organisation</Link>
         </span>
       </div>
 

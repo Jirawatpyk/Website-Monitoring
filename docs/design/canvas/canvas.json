@@ -555,6 +555,38 @@
       "w": 390,
       "x": 9730,
       "y": 24461
+    },
+    "OrganisationLists.dc.html": {
+      "h": 2720,
+      "is_interactive": true,
+      "title": "Settings — organisation: company holidays + shared forbidden words (S17)",
+      "w": 1440,
+      "x": 4560,
+      "y": 27358
+    },
+    "OrganisationListsDark.dc.html": {
+      "h": 2720,
+      "is_interactive": true,
+      "title": "Settings — organisation: holidays + forbidden words · dark",
+      "w": 1440,
+      "x": 6080,
+      "y": 27358
+    },
+    "MOrganisationLists.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Settings: Organisation lists (view only)",
+      "w": 390,
+      "x": 8360,
+      "y": 27358
+    },
+    "MOrganisationListsDark.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Mobile — Settings: Organisation lists · dark",
+      "w": 390,
+      "x": 8830,
+      "y": 27358
     }
   },
   "createdOnFiles": {
@@ -592,8 +624,8 @@
     },
     "row10": {
       "kind": "title1",
-      "maxW": 4480,
-      "text": "Organisation · Phase 3: synthetic checks · API & webhooks",
+      "maxW": 9220,
+      "text": "Organisation · holidays & forbidden words · Phase 3: synthetic checks · API & webhooks",
       "w": 240,
       "x": 0,
       "y": 27058
@@ -738,6 +770,10 @@
     "MExpiry.dc.html",
     "MExpiryDark.dc.html",
     "Organisation.dc.html",
+    "OrganisationLists.dc.html",
+    "OrganisationListsDark.dc.html",
+    "MOrganisationLists.dc.html",
+    "MOrganisationListsDark.dc.html",
     "Synthetic.dc.html",
     "ApiWebhooks.dc.html",
     "Guide.dc.html",

@@ -1357,6 +1357,9 @@ isOneToOne: false
 "open_system_alert":
 { Args: { "p_context": Json,"p_kind": string }; Returns: string
                            },
+"organisation_storage":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "overview_response_24h":
 { Args: Record<PropertyKey, never>; Returns: {
               "bucket_starts": (string)[],"checks": (number)[],"hard_fails": (number)[],"p50_ms": (number)[],"site_id": string
@@ -1418,6 +1421,9 @@ isOneToOne: false
                            },
 "save_oncall_rotation":
 { Args: { "p_note"?: string,"p_user_ids": (string)[] }; Returns: undefined
+                           },
+"save_response_hours":
+{ Args: { "p_days": (number)[],"p_end": string,"p_note": string,"p_start": string }; Returns: undefined
                            },
 "save_root_cause":
 { Args: { "p_category": string,"p_fix": string,"p_incident_id": string,"p_what": string }; Returns: undefined

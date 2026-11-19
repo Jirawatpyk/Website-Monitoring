@@ -60,24 +60,27 @@ interface SiteFormProps {
   started?: string | null;
 }
 
-const TIERS: { value: string; label: string; description: string }[] = [
-  {
-    value: '1',
-    label: 'Tier 1 — 24/7 · every 1 min',
-    description: 'Enterprise / transactions · owner responds by day, on-call at night · CEO step at +30 min',
-  },
-  {
-    value: '2',
-    label: 'Tier 2 — business hours · every 3 min',
-    description:
-      'Client sites · Mon–Fri 09:00–18:00 · DOWN still posts at night, escalation waits until 09:00',
-  },
-  {
-    value: '3',
-    label: 'Tier 3 — business hours · every 5 min',
-    description: 'Internal / DxT group · Mon–Fri 09:00–18:00 · no client updates',
-  },
-];
+/** The tier choices; Tier 2–3 name the organisation's response hours (Settings › Organisation, S17). */
+function tierChoices(hoursText: string): { value: string; label: string; description: string }[] {
+  return [
+    {
+      value: '1',
+      label: 'Tier 1 — 24/7 · every 1 min',
+      description:
+        'Enterprise / transactions · owner responds by day, on-call at night · CEO step at +30 min',
+    },
+    {
+      value: '2',
+      label: 'Tier 2 — business hours · every 3 min',
+      description: `Client sites · ${hoursText} · DOWN still posts at night, escalation waits for the response hours`,
+    },
+    {
+      value: '3',
+      label: 'Tier 3 — business hours · every 5 min',
+      description: `Internal / DxT group · ${hoursText} · no client updates`,
+    },
+  ];
+}
 
 const CHECK_ICON: Record<
   ChecklistItem['state'],
@@ -147,6 +150,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
       : keyPages,
     keyword,
     tier,
+    hoursText: options.hoursText,
     primary: person(primaryOwnerId),
     backup: person(backupOwnerId),
     client: client ? { name: client.name, internal: client.internal, amName: client.amName } : null,
@@ -291,7 +295,7 @@ export function SiteForm({ options, site, bkkIp, secretHeaderName, started = nul
           <RadioGroup
             touchHeight
             label="Tier sets check interval, response hours and escalation timers"
-            options={TIERS}
+            options={tierChoices(options.hoursText)}
             value={String(tier)}
             onChange={(v) => setTier(Number(v) as Tier)}
           />
