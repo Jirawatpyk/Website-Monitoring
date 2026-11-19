@@ -10,7 +10,7 @@ import {
   Select,
   TextField,
 } from '@jirawatpyk/aura-react';
-import { IconCheck, IconInfo, IconPencil, IconPlus, IconTrash2 } from '@jirawatpyk/aura-react/icons';
+import { IconCheck, IconEye, IconInfo, IconPencil, IconPlus, IconTrash2 } from '@jirawatpyk/aura-react/icons';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { FOCUS_TARGET } from '@/components/focus-target';
@@ -57,6 +57,7 @@ export function HolidaysSection({ holidays, hours, now }: { holidays: Holiday[];
   }, [done]);
 
   const show = (o: Exclude<Open, null>) => {
+    setDone(null);
     setOpened((n) => n + 1);
     setOpen(o);
   };
@@ -74,9 +75,12 @@ export function HolidaysSection({ holidays, hours, now }: { holidays: Holiday[];
             <span className="md:hidden">COMPANY HOLIDAYS</span>
             <span className="hidden md:inline">Company holidays</span>
           </h2>
-          <span className="text-sm text-fg-secondary">
+          <span className="hidden text-sm text-fg-secondary md:inline">
             On these days Tier 2–3 timers wait for the next working day and Tier 1 is with the person on call
             all day. Changes are logged.
+          </span>
+          <span className="text-sm text-fg-secondary md:hidden">
+            Tier 2–3 timers wait and Tier 1 is with the person on call all day.
           </span>
         </div>
         <div className="hidden md:flex">
@@ -92,68 +96,6 @@ export function HolidaysSection({ holidays, hours, now }: { holidays: Holiday[];
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
-        {years.map((y) => (
-          <div key={y.year} className="flex flex-col">
-            <h3 className="m-0 border-t border-border-subtle bg-bg-subtle px-4 py-2 text-xs font-semibold text-fg-secondary first:border-t-0">
-              {y.head}
-            </h3>
-            <ul className="m-0 flex list-none flex-col p-0" aria-label={`Holidays ${y.year}`}>
-              {y.rows.map((r) => (
-                <li
-                  key={r.id}
-                  className="grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-t border-border-subtle py-1.5 pr-2 pl-4 text-sm md:grid-cols-[calc(var(--spacing)*36)_minmax(0,1fr)_calc(var(--spacing)*40)_auto]"
-                >
-                  <span className="font-medium tabular-nums">{r.date}</span>
-                  <span className="col-span-2 row-start-2 flex min-w-0 flex-col md:col-span-1 md:row-start-auto">
-                    <span>{r.name}</span>
-                    {r.sub && <span className="text-xs text-fg-secondary">{r.sub}</span>}
-                  </span>
-                  <span className="col-start-2 row-start-1 justify-self-end md:col-start-auto md:row-start-auto md:justify-self-start">
-                    <Badge tone="neutral" variant={r.kind === 'company' ? 'soft' : 'outline'}>
-                      {r.kindLabel}
-                    </Badge>
-                  </span>
-                  <span className="hidden gap-1 md:flex">
-                    <IconButton
-                      icon={<IconPencil />}
-                      label={`Rename ${r.name}, ${r.date}`}
-                      size="sm"
-                      touchHeight
-                      onClick={() => show({ kind: 'rename', row: r })}
-                    />
-                    <IconButton
-                      icon={<IconTrash2 />}
-                      label={`Remove ${r.name}, ${r.date}`}
-                      size="sm"
-                      touchHeight
-                      onClick={() => show({ kind: 'remove', row: r })}
-                    />
-                  </span>
-                </li>
-              ))}
-              {y.rows.length === 0 && (
-                <li className="border-t border-border-subtle px-4 py-3 text-sm text-fg-secondary">
-                  No holidays left in {y.year}.
-                </li>
-              )}
-            </ul>
-            {y.note && (
-              <p className="m-0 flex gap-2 border-t border-border-subtle px-4 py-3 text-xs leading-normal text-fg-secondary">
-                <span className="flex pt-px" aria-hidden>
-                  <IconInfo size="sm" />
-                </span>
-                {y.note}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-      <span className="text-xs text-fg-secondary">
-        <span className="md:hidden">Holidays change on a larger screen. </span>
-        Past days aren’t listed and can’t be added or changed. The audit log keeps every add, rename and
-        remove.
-      </span>
       <span
         ref={statusRef}
         role="status"
@@ -161,6 +103,79 @@ export function HolidaysSection({ holidays, hours, now }: { holidays: Holiday[];
         className={`self-start text-sm text-fg-positive empty:hidden ${FOCUS_TARGET}`}
       >
         {done?.text}
+      </span>
+
+      {years.map((y) => (
+        <div
+          key={y.year}
+          className="flex flex-col overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface"
+        >
+          <h3 className="m-0 bg-bg-canvas px-4 py-2.5 font-mono text-xs font-normal text-fg-secondary md:px-5">
+            {y.head}
+          </h3>
+          <ul className="m-0 flex list-none flex-col p-0" aria-label={`Holidays ${y.year}`}>
+            {y.rows.map((r) => (
+              <li
+                key={r.id}
+                className="grid min-h-12 grid-cols-[calc(var(--spacing)*21)_minmax(0,1fr)] items-start gap-3 border-t border-border-subtle px-4 py-2.5 text-sm md:grid-cols-[calc(var(--spacing)*36)_minmax(0,1fr)_calc(var(--spacing)*40)_auto] md:items-center md:py-1 md:pr-2 md:pl-5"
+              >
+                <span className="font-medium tabular-nums">{r.date}</span>
+                <span className="flex min-w-0 flex-col">
+                  <span>{r.name}</span>
+                  {/* Phones: the kind as a line, company days only (MOrganisationLists). */}
+                  {r.kind === 'company' && (
+                    <span className="text-xs text-fg-secondary md:hidden">{r.kindLabel}</span>
+                  )}
+                  {r.sub && <span className="text-xs text-fg-secondary">{r.sub}</span>}
+                </span>
+                <span className="hidden md:inline">
+                  <Badge tone="neutral" variant={r.kind === 'company' ? 'soft' : 'outline'}>
+                    {r.kindLabel}
+                  </Badge>
+                </span>
+                <span className="hidden gap-1 md:flex">
+                  <IconButton
+                    icon={<IconPencil />}
+                    label={`Rename ${r.name}, ${r.date}`}
+                    size="sm"
+                    touchHeight
+                    onClick={() => show({ kind: 'rename', row: r })}
+                  />
+                  <IconButton
+                    icon={<IconTrash2 />}
+                    label={`Remove ${r.name}, ${r.date}`}
+                    size="sm"
+                    touchHeight
+                    onClick={() => show({ kind: 'remove', row: r })}
+                  />
+                </span>
+              </li>
+            ))}
+            {y.rows.length === 0 && (
+              <li className="border-t border-border-subtle px-4 py-3 text-sm text-fg-secondary">
+                {y.year === years[0]?.year ? 'No holidays left this year.' : `No holidays in ${y.year} yet.`}
+              </li>
+            )}
+          </ul>
+          {y.note && (
+            <p className="m-0 flex gap-2 border-t border-border-subtle px-4 py-3 text-xs leading-normal text-fg-secondary md:px-5">
+              <span className="hidden pt-px md:flex" aria-hidden>
+                <IconInfo size="sm" />
+              </span>
+              {y.note}
+            </p>
+          )}
+        </div>
+      ))}
+      <span className="hidden text-xs text-fg-secondary md:inline">
+        Past days aren’t listed and can’t be added or changed. The audit log keeps every add, rename and
+        remove.
+      </span>
+      <span className="flex items-center gap-2 text-xs text-fg-secondary md:hidden">
+        <span className="flex" aria-hidden>
+          <IconEye size="sm" />
+        </span>
+        Holidays change on a larger screen.
       </span>
 
       {last?.kind === 'add' && (
@@ -244,7 +259,10 @@ function AddDialog({
     setFailure(null);
     start(async () => {
       const r = await addHoliday({ day, name: n, kind });
-      if (r.ok) onDone(`Added ${formatDay(dayDate(day), { weekday: true })} · ${n} · logged`);
+      if (r.ok)
+        onDone(
+          `Added ${formatDay(dayDate(day), { weekday: true })} “${n}” · logged · timers treat it as a day off within a minute`,
+        );
       else setFailure(r.message);
     });
   };
@@ -284,12 +302,14 @@ function AddDialog({
           hint="Today or later — past days can’t be added."
         />
         <Select
+          touchHeight
           label="Kind"
           options={HOLIDAY_KINDS.map((k) => ({ value: k.value, label: k.label }))}
           value={kind}
           onChange={(e) => setKind(e.target.value === 'public' ? 'public' : 'company')}
         />
         <TextField
+          touchHeight
           label="Name"
           required
           value={name}
@@ -330,7 +350,7 @@ function RenameDialog({
     setFailure(null);
     start(async () => {
       const r = await renameHoliday({ id: row.id, name: n });
-      if (r.ok) onDone(`Renamed ${row.date} to ${n} · logged`);
+      if (r.ok) onDone(`Renamed ${row.date} to “${n}” · logged`);
       else setFailure(r.message);
     });
   };
@@ -354,6 +374,7 @@ function RenameDialog({
     >
       <div className="flex flex-col gap-3.5">
         <TextField
+          touchHeight
           label="Name"
           required
           value={name}
@@ -387,7 +408,7 @@ function RemoveDialog({
     setFailure(null);
     start(async () => {
       const r = await removeHoliday(row.id);
-      if (r.ok) onDone(`Removed ${row.date} · ${row.name} · logged`);
+      if (r.ok) onDone(`Removed ${row.date} · ${effect.result} · logged`);
       else setFailure(r.message);
     });
   };
@@ -410,7 +431,10 @@ function RemoveDialog({
       }
     >
       <div className="flex flex-col gap-3.5">
-        <Alert tone="warning" title={`What changes on ${row.date}`}>
+        <Alert
+          tone={effect.offDay ? 'info' : 'warning'}
+          title={effect.offDay ? `Nothing changes on ${row.date}` : `What changes on ${row.date}`}
+        >
           {effect.body}
         </Alert>
         <Failure text={failure} />

@@ -70,7 +70,7 @@ describe('remove a holiday', () => {
     expect(e.title).toBe('Wed 30 Dec 2026 becomes a working day.');
     expect(e.body).toMatch(/^Tier 2–3 timers run 09:00–18:00 and Tier 1 DOWN goes to the owner/);
     expect(e.body).toMatch(
-      /open incidents included; a PROBLEM already held keeps the time it was held until\.$/,
+      /Open incidents use the new calendar too; a PROBLEM already held keeps the time it was held until\.$/,
     );
   });
 

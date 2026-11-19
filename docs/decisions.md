@@ -112,7 +112,11 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - **Kind.** The board shows Public holiday / Company day off, and its 2027 note asks Admins to add the Buddhist public holidays themselves. So the Add dialog gets a Kind select (default Company day off) that the board doesn't draw, stored as `company_holidays.kind`. Rows from before have no kind and are public holidays (the seed).
 - **The words follow the setting.** "Weekend — no effect on Mon–Fri hours", "N on weekdays" and "timers run 09:00–18:00" use the stored hours; with Mon–Sat a Saturday counts.
 - **Range.** From today (Bangkok) to 31 Dec next year: the list shows this year and next.
-- **"On this page"** lists only the sections that exist. Shared forbidden words joins it in 3b.
+- **"On this page"** lists only the sections that exist. Shared forbidden words joins it in 3b. It shows on phones too (MOrganisationLists doesn't draw it; the phone page is just as long).
+- **The result line.** It sits inline under the section heading, not in the board's floating toast, as the hours save on the same page does. Nothing here can be undone, so it isn't `UndoLine`. It goes there, not under the list, so focusing it doesn't jump to the foot of about 24 rows.
+- **The lunar note** under next year is always shown in v1: matching the Buddhist days by name would be fragile.
+- **The kind** can't be changed after a day is added: remove the day and add it again, as Rename's description says for the date.
+- **A day outside the response-hours days.** Its line says "Weekend — no effect on …" only for a Saturday or Sunday; any other day says "Not a response-hours day". Removing it is an information note ("Nothing changes on …"), not a warning.
 - **Phrase rules for 3b:** the spec's proposal (one word under 6 letters, or under 4 Thai characters, is refused) plus "Already in the list".
   - "Check phrase" reads each live site's last clean fetch, which the crawler stores from 3b on (Tao, 20 Nov: option A — store, not fetch on press).
 

@@ -87,19 +87,21 @@ test.describe('organisation (local Supabase)', () => {
     test.skip(await add.getByText(/ is already /).isVisible(), 'today is already a holiday');
     await add.getByRole('textbox', { name: /Name/ }).fill('E2E outing');
     await add.getByRole('button', { name: 'Add holiday' }).click();
-    await expect(page.getByText(/^Added .* · E2E outing · logged$/)).toBeFocused();
+    await expect(page.getByText(/^Added .* “E2E outing” · logged · /)).toBeFocused();
 
     await page.getByRole('button', { name: /^Rename E2E outing, / }).click();
     const rename = page.getByRole('dialog', { name: 'Rename holiday' });
     await rename.getByRole('textbox', { name: /Name/ }).fill('E2E outing — Hua Hin');
     await rename.getByRole('button', { name: 'Save name' }).click();
-    await expect(page.getByText(/^Renamed .* to E2E outing — Hua Hin · logged$/)).toBeFocused();
+    await expect(page.getByText(/^Renamed .* to “E2E outing — Hua Hin” · logged$/)).toBeFocused();
 
     await page.getByRole('button', { name: /^Remove E2E outing — Hua Hin, / }).click();
     const remove = page.getByRole('dialog', { name: 'Remove “E2E outing — Hua Hin”?' });
     await expect(remove.getByText(/becomes a working day\.|stays a day off\./)).toBeVisible();
     await remove.getByRole('button', { name: 'Remove holiday' }).click();
-    await expect(page.getByText(/^Removed .* · E2E outing — Hua Hin · logged$/)).toBeFocused();
+    await expect(
+      page.getByText(/^Removed .* · (it’s a working day now|it stays a day off) · logged$/),
+    ).toBeFocused();
     await expect(page.getByRole('button', { name: /^Remove E2E / })).toHaveCount(0);
   });
 

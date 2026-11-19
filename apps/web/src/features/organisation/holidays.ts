@@ -2,7 +2,6 @@ import { bangkokDayOf, isoWeekdayOf } from '@dxt/engine';
 import {
   formatDay,
   formatResponseDays,
-  HOLIDAY_KINDS as KINDS,
   minutesToClock,
   type HolidayKind,
   type ResponseHours,
@@ -23,7 +22,7 @@ export type Hours = Pick<ResponseHours, 'startMin' | 'endMin' | 'days'>;
 export const HOLIDAY_KINDS = [
   { value: 'company', label: 'Company day off' },
   { value: 'public', label: 'Public holiday' },
-] as const satisfies readonly { value: (typeof KINDS)[number]; label: string }[];
+] as const satisfies readonly { value: HolidayKind; label: string }[];
 
 export const HOLIDAY_NAME_MAX = 100;
 
@@ -90,7 +89,9 @@ export function holidayYears(holidays: readonly Holiday[], hours: Hours, now: Da
           kind: h.kind,
           kindLabel: kindLabel(h.kind),
           offDay,
-          sub: offDay ? `Weekend — no effect on ${daysWord(hours)} hours` : null,
+          sub: offDay
+            ? `${weekdayOf(h.day) >= 6 ? 'Weekend' : 'Not a response-hours day'} — no effect on ${daysWord(hours)} hours`
+            : null,
         };
       });
     const on = rows.filter((r) => !r.offDay).length;
@@ -113,16 +114,23 @@ export function holidayYears(holidays: readonly Holiday[], hours: Hours, now: Da
  * What removing a day turns it into (the Remove dialog). A day outside the hours changes nothing.
  * New calendars apply from the next engine run, open incidents included (D-069 item 2, as the hours).
  */
-export function removeEffect(h: Pick<Holiday, 'day'>, hours: Hours): { title: string; body: string } {
+export function removeEffect(
+  h: Pick<Holiday, 'day'>,
+  hours: Hours,
+): { title: string; body: string; offDay: boolean; result: string } {
   const date = formatDay(dayDate(h.day), { weekday: true, year: true });
   if (!hours.days.includes(weekdayOf(h.day)))
     return {
       title: `${date} stays a day off.`,
       body: `It isn’t one of the response-hours days (${daysWord(hours)}), so removing it changes no timer.`,
+      offDay: true,
+      result: 'it stays a day off',
     };
   return {
     title: `${date} becomes a working day.`,
-    body: `Tier 2–3 timers run ${minutesToClock(hours.startMin)}–${minutesToClock(hours.endMin)} and Tier 1 DOWN goes to the owner during those hours, the on-call person outside them. This applies within a minute, open incidents included; a PROBLEM already held keeps the time it was held until.`,
+    body: `Tier 2–3 timers run ${minutesToClock(hours.startMin)}–${minutesToClock(hours.endMin)} and Tier 1 DOWN goes to the owner during those hours, the on-call person outside them. Open incidents use the new calendar too; a PROBLEM already held keeps the time it was held until.`,
+    offDay: false,
+    result: 'it’s a working day now',
   };
 }
 
