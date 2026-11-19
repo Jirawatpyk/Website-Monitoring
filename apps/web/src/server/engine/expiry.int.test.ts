@@ -222,6 +222,55 @@ describe('S13 · an SSL incident takes a new cause and goes back, round after ro
     expect(await chatOf(inc.id)).toEqual(['problem', 'problem_again:new_cause']);
   });
 
+  // Spec §40.2, D-068: SSL incident → DOWN (raised) → back up with the certificate still 13 days out.
+  it('an SSL incident raised to DOWN comes back: one RECOVERED "still SSL expiring", silently back to SSL', async () => {
+    const { siteId, monitorId } = await newSite('Back');
+    await round(monitorId, 0, 'ok');
+    await judge(0);
+    let inc = await incidentOf(siteId);
+    expect(inc).toMatchObject({ severity: 'problem', trigger: 'ssl' });
+
+    await round(monitorId, 1, 'down');
+    await judge(1);
+    inc = await incidentOf(siteId);
+    expect(inc).toMatchObject({ severity: 'down', episode_severity: 'down' });
+    const raised = await must(db.from('incidents').select('down_from_expiry').eq('id', inc.id).single());
+    expect(raised.down_from_expiry).toBe(true);
+
+    await round(monitorId, 2, 'ok');
+    await judge(2);
+    inc = await incidentOf(siteId);
+    expect(inc).toMatchObject({
+      severity: 'down',
+      episode_severity: 'problem',
+      state: 'unacked',
+      is_flapping: false,
+    });
+    const after = await must(
+      db.from('incidents').select('cause_trigger, down_from_expiry').eq('id', inc.id).single(),
+    );
+    expect(after).toEqual({ cause_trigger: 'ssl', down_from_expiry: false });
+    const chat = await chatOf(inc.id);
+    expect(chat.filter((t) => t === 'recovered')).toHaveLength(1);
+    expect(chat.filter((t) => t === 'problem_again')).toHaveLength(0);
+    const recovered = await must(
+      db
+        .from('notifications')
+        .select('context')
+        .eq('incident_id', inc.id)
+        .eq('template', 'recovered')
+        .eq('channel', 'google_chat')
+        .single(),
+    );
+    expect((recovered.context as { stillExpiry?: { trigger?: string } }).stillExpiry?.trigger).toBe('ssl');
+
+    // The next OK round keeps it open for SSL: no RECOVERED, no AGAIN (keepsExpiry on its PROBLEM drop).
+    await round(monitorId, 3, 'ok');
+    await judge(3);
+    expect((await chatOf(inc.id)).filter((t) => t === 'recovered' || t === 'problem_again')).toHaveLength(1);
+    expect(await incidentOf(siteId)).toMatchObject({ episode_severity: 'problem', state: 'unacked' });
+  });
+
   it('a DOWN back up on SSL: a keyword a window hid is told on the first round after it, then back to SSL with no RECOVERED', async () => {
     const { siteId, monitorId } = await newSite('Down');
     await round(monitorId, 0, 'down');
