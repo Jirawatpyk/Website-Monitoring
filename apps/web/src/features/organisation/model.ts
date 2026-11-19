@@ -204,7 +204,11 @@ export function gigabytes(bytes: number): string {
   return `${gb < 10 && !Number.isInteger(Math.round(gb * 10) / 10) ? gb.toFixed(1) : Math.round(gb)} GB`;
 }
 
-/** The monthly budget as the PRD records it (§9, §13: cap approved Mon 5 Oct 2026); no live bill exists. */
+/**
+ * The monthly cost, estimated: the cap the PRD records (§13, approved Mon 5 Oct 2026) and each provider's
+ * share. Vercel is not free: the Pro seat plus usage, ~$40–65 a month from its bill of 31 Oct–19 Nov 2026
+ * (D-069, Tao 19 Nov). No live bill is read; each provider's bill has the exact amount.
+ */
 export const BUDGET = {
   cap: '$60',
   approved: 'Mon 5 Oct',
@@ -212,6 +216,8 @@ export const BUDGET = {
     { k: 'Supabase · Micro compute', v: '~$10' },
     { k: 'Thai VPS · probe + verifier', v: '~$10–25' },
     { k: 'Twilio voice · off', v: '$0 (~$23–26 if turned on)' },
-    { k: 'Vercel Pro, Resend, Healthchecks.io', v: 'Already paid / free' },
+    { k: 'Vercel Pro · seat', v: '$20' },
+    { k: 'Vercel usage · builds + functions', v: '~$40–65' },
+    { k: 'Resend, Healthchecks.io', v: 'Free plans' },
   ],
 } as const;

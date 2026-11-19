@@ -483,7 +483,7 @@ function Budget() {
       <div className="flex flex-col gap-3">
         <Facts rows={BUDGET.lines} />
         <span className="text-xs leading-normal text-fg-secondary">
-          Estimates from the approved budget; each provider’s bill has the exact amount.
+          Estimates; each provider’s bill has the exact amount. Vercel’s usage moves with how often we deploy.
         </span>
       </div>
     </Card>
