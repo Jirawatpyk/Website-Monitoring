@@ -25,9 +25,8 @@ import {
 } from '@jirawatpyk/aura-react/icons';
 import { formatTime } from '@dxt/shared';
 import Link from 'next/link';
-import { useEffect, useState, useTransition } from 'react';
-
-const TEST_COOLDOWN_MS = 60_000;
+import { useState, useTransition } from 'react';
+import { useTestCooldown } from '@/components/use-test-cooldown';
 import { SECTION_HEADING, SettingsHeader, ViewOnlyLine } from '@/features/settings';
 import { sendChannelTest } from '../actions';
 import type { TestChannel } from '../mutations';
@@ -258,17 +257,7 @@ function TestButton({
 }) {
   const [pending, start] = useTransition();
   const [done, setDone] = useState<{ ok: boolean; text: string } | null>(null);
-  // The SQL allows one test a minute: the button waits that minute instead of failing (§14.16).
-  const [sentAt, setSentAt] = useState(lastAt);
-  const [cooling, setCooling] = useState(
-    () => !!lastAt && Date.now() - Date.parse(lastAt) < TEST_COOLDOWN_MS,
-  );
-  useEffect(() => {
-    if (!cooling) return;
-    const left = sentAt ? TEST_COOLDOWN_MS - (Date.now() - Date.parse(sentAt)) : 0;
-    const t = setTimeout(() => setCooling(false), Math.max(left, 0));
-    return () => clearTimeout(t);
-  }, [cooling, sentAt]);
+  const { cooling, markSent } = useTestCooldown(lastAt);
   return (
     <>
       <Button
@@ -283,10 +272,7 @@ function TestButton({
           start(async () => {
             const r = await sendChannelTest(channel);
             setDone(r.ok ? { ok: true, text: doneText(r.at) } : { ok: false, text: r.message });
-            if (r.ok) {
-              setSentAt(r.at);
-              setCooling(true);
-            }
+            if (r.ok) markSent(r.at);
           })
         }
       >

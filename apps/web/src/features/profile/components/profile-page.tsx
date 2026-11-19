@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { phoneHeader } from '@/components/phone-header';
+import { useTestCooldown } from '@/components/use-test-cooldown';
 import { MutedOverlay, untilText } from '@/components/site-cells';
 import { SiteStatusBadge } from '@/components/status-badges';
 import { sendChannelTest } from '@/features/channels';
@@ -50,9 +51,6 @@ const FAILED = 'Couldn’t reach Monitor. Check your connection and try again.';
 /** Devices card words (D-062 item 12, D-011): no number of days. */
 const DEVICES_SUB =
   'You stay signed in on this device, so the Ack link opens straight to the incident. Signing out a device takes effect now.';
-
-/** A test alert waits a minute after the last one (`send_oncall_test`), as the On-call page's does. */
-const TEST_COOLDOWN_MS = 60_000;
 
 const TEXT_LINK = 'inline-flex min-h-11 items-center text-sm text-fg-link';
 
@@ -171,11 +169,10 @@ function ChannelBadge({ status }: { status: ChannelRow['status'] }) {
 function Channels({ data }: { data: ProfileData }) {
   const [editing, setEditing] = useState(false);
   const [line, setLine] = useState<string | null>(null);
+  // The SQL refuses a second test within a minute: the button says so and waits (§14.16).
+  const { sentAt: lastSent, cooling, markSent } = useTestCooldown(data.testSentAt);
+  // This visit's send, for the success note (the cooldown also starts from the loaded one).
   const [sent, setSent] = useState<string | null>(null);
-  const [cooling, setCooling] = useState(
-    () => !!data.testSentAt && Date.now() - Date.parse(data.testSentAt) < TEST_COOLDOWN_MS,
-  );
-  const lastSent = sent ?? data.testSentAt;
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const editRef = useRef<HTMLButtonElement>(null);
@@ -186,13 +183,6 @@ function Channels({ data }: { data: ProfileData }) {
     editRef.current?.focus();
     returnFocus.current = false;
   }, [editing]);
-  // The SQL refuses a second test within a minute: the button says so and waits (§14.16).
-  useEffect(() => {
-    if (!cooling) return;
-    const left = lastSent ? TEST_COOLDOWN_MS - (Date.now() - Date.parse(lastSent)) : 0;
-    const t = setTimeout(() => setCooling(false), Math.max(left, 0));
-    return () => clearTimeout(t);
-  }, [cooling, lastSent]);
 
   const oncallTest = canTest(data.me.role);
   const test = () =>
@@ -205,8 +195,9 @@ function Channels({ data }: { data: ProfileData }) {
         message: FAILED,
       }));
       if (!r.ok) return setError(r.message);
-      setSent(r.at ?? new Date().toISOString());
-      setCooling(true);
+      const at = r.at ?? new Date().toISOString();
+      setSent(at);
+      markSent(at);
     });
   const button = (fullWidth?: boolean) => (
     <TestButton
