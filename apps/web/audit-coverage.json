@@ -24,6 +24,15 @@
     "features/organisation/actions.ts#saveResponseHours": {
       "rpc": ["save_response_hours"]
     },
+    "features/organisation/actions.ts#addHoliday": {
+      "rpc": ["add_company_holiday"]
+    },
+    "features/organisation/actions.ts#renameHoliday": {
+      "rpc": ["rename_company_holiday"]
+    },
+    "features/organisation/actions.ts#removeHoliday": {
+      "rpc": ["remove_company_holiday"]
+    },
     "features/settings/actions.ts#inviteUser": {
       "rpc": ["invite_user"]
     },

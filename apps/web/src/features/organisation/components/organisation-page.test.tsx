@@ -19,6 +19,9 @@ const data: OrganisationData = {
   ],
   clients: [{ name: 'MuvMi', internal: false, amName: 'Bua', language: 'th', sites: ['MuvMi'] }],
   storageBytes: 1.4 * 1024 ** 3,
+  holidays: [],
+  hoursNow: { startMin: 540, endMin: 1080, days: [1, 2, 3, 4, 5] },
+  now: '2026-09-25T03:08:00.000Z',
 };
 
 beforeEach(() => {

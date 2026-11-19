@@ -62,6 +62,47 @@ test.describe('organisation (local Supabase)', () => {
     }
   });
 
+  test('an Admin adds, renames and removes a company holiday (PR 3a, §41)', async ({
+    page,
+    context,
+    baseURL,
+  }, info) => {
+    test.skip(info.project.name === 'mobile', 'view only on phones (§22.5)');
+    await ensureUser('tao@example.test');
+    await signIn(context, baseURL!, 'tao@example.test');
+    await page.goto('/settings/organisation#holidays');
+    await expect(page.getByRole('heading', { name: 'Company holidays' })).toBeVisible();
+
+    // A run that stopped half way leaves its "E2E" day: take it out first.
+    const leftover = page.getByRole('button', { name: /^Remove E2E /, exact: false });
+    while ((await leftover.count()) > 0) {
+      await leftover.first().click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Remove holiday' }).click();
+      await expect(page.getByText(/^Removed .* · logged$/)).toBeFocused();
+    }
+
+    // The dialog starts on today; a real holiday today means there's nothing to add.
+    await page.getByRole('button', { name: 'Add holiday' }).click();
+    const add = page.getByRole('dialog', { name: 'Add a holiday' });
+    test.skip(await add.getByText(/ is already /).isVisible(), 'today is already a holiday');
+    await add.getByRole('textbox', { name: /Name/ }).fill('E2E outing');
+    await add.getByRole('button', { name: 'Add holiday' }).click();
+    await expect(page.getByText(/^Added .* · E2E outing · logged$/)).toBeFocused();
+
+    await page.getByRole('button', { name: /^Rename E2E outing, / }).click();
+    const rename = page.getByRole('dialog', { name: 'Rename holiday' });
+    await rename.getByRole('textbox', { name: /Name/ }).fill('E2E outing — Hua Hin');
+    await rename.getByRole('button', { name: 'Save name' }).click();
+    await expect(page.getByText(/^Renamed .* to E2E outing — Hua Hin · logged$/)).toBeFocused();
+
+    await page.getByRole('button', { name: /^Remove E2E outing — Hua Hin, / }).click();
+    const remove = page.getByRole('dialog', { name: 'Remove “E2E outing — Hua Hin”?' });
+    await expect(remove.getByText(/becomes a working day\.|stays a day off\./)).toBeVisible();
+    await remove.getByRole('button', { name: 'Remove holiday' }).click();
+    await expect(page.getByText(/^Removed .* · E2E outing — Hua Hin · logged$/)).toBeFocused();
+    await expect(page.getByRole('button', { name: /^Remove E2E / })).toHaveCount(0);
+  });
+
   test('on a phone it is view only', async ({ page, context, baseURL }, info) => {
     test.skip(info.project.name !== 'mobile', 'phone view');
     await ensureUser('tao@example.test');
@@ -69,6 +110,10 @@ test.describe('organisation (local Supabase)', () => {
     await page.goto('/settings/organisation');
     await expect(page.getByText('View only on phones.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+    // Holidays are listed without their buttons (§41 item 7).
+    await expect(page.getByRole('heading', { name: 'Company holidays' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add holiday' })).toBeHidden();
+    await expect(page.getByText('Holidays change on a larger screen.', { exact: false })).toBeVisible();
     // The Settings pages are a select on a phone (§35.1).
     await page.locator('select.aura-select__native').first().selectOption({ label: 'Users & roles' });
     await expect(page).toHaveURL(/\/settings\/users$/);
