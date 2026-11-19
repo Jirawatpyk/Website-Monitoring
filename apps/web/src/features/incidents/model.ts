@@ -15,6 +15,7 @@ import {
   type MetricIncident,
   type ResolveBlocker,
 } from '@dxt/engine';
+import { expiryNow } from '@dxt/notifier';
 import {
   clockMinutes,
   CLOSED_INCIDENT_STATES,
@@ -540,6 +541,16 @@ export interface EventRow {
 }
 
 const str = (v: unknown) => (typeof v === 'string' ? v : null);
+
+/** An ack stored with an event (D-068: set aside / given back): who and when, or null. */
+function ackOf(v: unknown): { by: string; at: Date } | null {
+  const a = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+  const at = str(a?.at);
+  return a && str(a.by) && at && !Number.isNaN(Date.parse(at)) ? { by: str(a.by)!, at: new Date(at) } : null;
+}
+
+/** An SSL / domain detail's cause, days counted for `asOf` (D-066 item 6). */
+const expiryNowWords = (detail: unknown, asOf: Date) => expiryNow(detail, asOf)?.cause ?? null;
 const num = (v: unknown) => (typeof v === 'number' ? v : null);
 
 /** The gate's view of the incident (the same facts `resolve_incident` reads). */
@@ -870,6 +881,9 @@ export interface TimelineItem {
     | 'problem'
     | 'alert'
     | 'ack'
+    /** §40.5 (D-068): the ack of the expiry set aside (grey minus) / given back (green check). */
+    | 'ack_aside'
+    | 'ack_back'
     | 'evidence'
     | 'recovered'
     | 'ok'
@@ -1137,17 +1151,35 @@ export function timelineOf(
             `${fromExpiry ? 'Now' : 'Back to'} ${label(trig)}`,
             fromExpiry ? `was ${label(was)} · nobody was told` : `${label(was)} cleared · nobody was told`,
           );
+          // Spec §40.5 (D-068): the ack the new cause set aside comes back with the expiry.
+          const back = ackOf(e.payload.ackBack);
+          if (back)
+            item(
+              e,
+              'ack_back',
+              'Acknowledgement given back',
+              `Acknowledged by ${back.by} ${formatShortWhen(back.at, new Date(e.at))} again — it was for ${label(trig)}`,
+            );
           return;
         }
         item(
           e,
           'problem',
           `New cause: ${label(trig)}`,
-          `${str(e.payload.cause) ?? label(trig)} · was ${label(was)}${
-            // D-067 item 2: an ack of the expiry doesn't cover the new cause (given back with the expiry).
-            e.payload.ackCleared === true ? ' · the acknowledgement of the expiry was set aside' : ''
-          }`,
+          `${str(e.payload.cause) ?? label(trig)} · was ${label(was)}`,
         );
+        // D-067 item 2, spec §40.5: an ack of the expiry doesn't cover the new cause — its own row.
+        if (e.payload.ackCleared === true) {
+          const aside = ackOf(e.payload.setAside);
+          item(
+            e,
+            'ack_aside',
+            'Acknowledgement set aside',
+            aside
+              ? `${aside.by}’s acknowledgement of ${label(was)} (${formatShortWhen(aside.at, new Date(e.at))}) doesn’t cover ${label(trig)} — it needs its own`
+              : `The acknowledgement of ${label(was)} doesn’t cover ${label(trig)} — it needs its own`,
+          );
+        }
         return;
       }
       case 'relapsed': {
@@ -1158,6 +1190,29 @@ export function timelineOf(
           return;
         }
         // §37.8: D-023's partial recovery — the DOWN minutes stop here, the same incident carries on.
+        if (!down && str(e.payload.homeBackAt) && e.payload.stillExpiry === true) {
+          // Spec §40.5, D-068: a DOWN that joined the expiry incident is over, the expiry isn't.
+          const trig = str(e.payload.trigger);
+          const label = trig && trig in TRIGGER_LABELS ? TRIGGER_LABELS[trig as Trigger] : 'expiring';
+          // The drop that just ended, as the RECOVERED card says it (code review: not every DOWN drop).
+          const ended = episodesFromTimeline({ started_at: i.startedAt, severity: i.severity }, events)
+            .filter((d) => d.severity === 'down' && d.end && d.end.getTime() <= Date.parse(e.at))
+            .at(-1);
+          const downMin = ended ? outageMinutes([ended], new Date(e.at)) : null;
+          const lastDrop = downMin
+            ? `First OK round after ${formatDuration(downMin)} down`
+            : 'First OK round';
+          item(
+            e,
+            'ok',
+            `Back up · still ${label}`,
+            [lastDrop, expiryNowWords(e.payload.detail, new Date(e.at)), 'the DOWN needs a root cause']
+              .filter(Boolean)
+              .join(' · '),
+            'recover',
+          );
+          return;
+        }
         if (!down && str(e.payload.homeBackAt)) {
           const key =
             e.payload.keyPage && typeof e.payload.keyPage === 'object'

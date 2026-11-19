@@ -52,6 +52,12 @@ export interface OpenIncident {
    * the last PROBLEM AGAIN left one) — only such an incident may go back to it.
    */
   leftExpiry?: boolean;
+  /**
+   * D-068 (spec §40.2): its DOWN drop joined an incident whose cause was (or came from) an SSL / domain
+   * expiry (`incidents.down_from_expiry`) — back up with the expiry still under its line, it stays open
+   * for it, at any hour.
+   */
+  downFromExpiry?: boolean;
 }
 
 /** The site note while a blocked site can't be verified (D-019; trigger label, spec §11). */

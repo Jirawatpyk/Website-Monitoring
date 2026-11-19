@@ -119,7 +119,11 @@ async function clientFor(email: string) {
 
 /** A seeded site's id (layout checks of the pages under /sites). */
 export async function anySiteId(): Promise<string> {
-  const [site] = (await admin('/rest/v1/sites?select=id&order=name&limit=1')) as { id: string }[];
+  // A live seed site: an "E2E …" site another spec makes (and retires) in parallel sorts first by name and
+  // may be gone or hidden from the list by the time the page loads (CI #212: phone-bar timed out on it).
+  const [site] = (await admin(
+    '/rest/v1/sites?select=id&is_active=eq.true&name=not.like.E2E*&order=name&limit=1',
+  )) as { id: string }[];
   return site!.id;
 }
 

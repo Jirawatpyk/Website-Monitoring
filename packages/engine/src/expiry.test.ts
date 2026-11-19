@@ -480,6 +480,130 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
     expect(d).not.toHaveProperty('then');
   });
 
+  // Spec §40.2, D-068 (INC-0136 DxT AI, Wed 23 Sep): a DOWN at 16:10 joined the SSL incident and came
+  // back at 16:18 with the certificate 13 days out — RECOVERED "back up, still SSL expiring", the
+  // incident stays open for SSL expiring, silently (one RECOVERED, no PROBLEM AGAIN post).
+  describe('back up, still SSL expiring (spec §40.2, D-068)', () => {
+    // As engine_escalate_incident leaves it (engine review M3: severity down).
+    const raised: OpenIncident = {
+      ...open,
+      severity: 'down',
+      episodeSeverity: 'down',
+      trigger: 'hard_fail',
+      downFromExpiry: true,
+    };
+    const carry: MonitorCarry = { ...NEW_MONITOR, status: 'down', trigger: 'hard_fail' };
+    const backUp = (
+      expiry: ExpiryFact | undefined,
+      over: Partial<SiteSnapshot> = {},
+      more: SiteMonitor[] = [],
+    ) =>
+      decideSite(site([monitor(clean, { carry, expiry }), ...more], { open: raised, okRounds: 1, ...over }));
+
+    it.each<[string, Partial<SiteSnapshot>]>([
+      ['inside response hours (16:18)', {}],
+      ['at night too: the incident was already open for it (Tao, 19 Nov)', night],
+    ])('%s → recover, then SSL expiring from the same round, marked stillExpiry', (_, over) => {
+      expect(backUp(fact('2026-10-06', null), over)).toMatchObject({
+        kind: 'recover',
+        allOk: false,
+        then: {
+          severity: 'problem',
+          trigger: 'ssl',
+          stillExpiry: true,
+          detail: { kind: 'ssl', daysLeft: 13 },
+        },
+      });
+    });
+
+    it('a domain still under its line reads Domain expiring', () => {
+      expect(backUp(fact('2027-01-01', '2026-10-13'))).toMatchObject({
+        kind: 'recover',
+        then: { trigger: 'domain', stillExpiry: true },
+      });
+    });
+
+    it.each<[string, ExpiryFact | undefined]>([
+      ['renewed meanwhile (SSL 90 days out)', fact('2026-12-22', null)],
+      [
+        'the SSL read failed: no evidence, a clean RECOVERED (D-066 item 3)',
+        fact('2026-10-06', null, { sslFailed: true }),
+      ],
+      [
+        'the last good read is 40 h old',
+        fact('2026-10-06', null, { readAt: new Date(NOW.getTime() - 40 * HOUR) }),
+      ],
+      ['no row', undefined],
+    ])('%s → a clean RECOVERED', (_, expiry) => {
+      const d = backUp(expiry);
+      expect(d).toMatchObject({ kind: 'recover' });
+      expect(d).not.toHaveProperty('then');
+    });
+
+    it('a key page failing outranks it: PROBLEM AGAIN Key page, not still expiring', () => {
+      const key = monitor(
+        LOCATIONS.map((l, i) => ({ ...check(l, 'pass', 1 + i), statusCode: 404 })),
+        { id: 'booking', isPrimary: false, url: 'https://www.dxt-ai.example/booking' },
+      );
+      const d = backUp(fact('2026-10-06', null), {}, [key]);
+      expect(d).toMatchObject({ kind: 'recover', then: { trigger: 'key_page' } });
+      expect(d.kind === 'recover' && d.then?.stillExpiry).toBeFalsy();
+    });
+
+    it('still down: nothing about the expiry (the DOWN holds)', () => {
+      const d = decideSite(
+        site([monitor(failed(), { carry, expiry: fact('2026-10-06', null) })], { open: raised, okRounds: 0 }),
+      );
+      expect(d.kind).not.toBe('recover');
+      expect(d).toMatchObject({ status: 'down' });
+    });
+
+    // Engine review H1 (D-024, §19.4): a site going up and down under its SSL incident flaps.
+    const flips = [new Date(NOW.getTime() - 9 * 60_000), new Date(NOW.getTime() - 5 * 60_000)];
+    it('flapping: one combined RECOVERED per back-up, no held summary (engine re-review H1)', () => {
+      const d = backUp(fact('2026-10-06', null), { flips, flipOk: false }, []);
+      // Not tagged flapping yet: still the back-up.
+      expect(d).toMatchObject({ kind: 'recover', then: { stillExpiry: true } });
+      const flapping = decideSite(
+        site([monitor(clean, { carry, expiry: fact('2026-10-06', null) })], {
+          open: { ...raised, isFlapping: true },
+          okRounds: 1,
+          flips,
+          flipOk: false,
+        }),
+      );
+      // Tagged flapping: still the one combined RECOVERED, never a summary the rejoin would cancel.
+      expect(flapping).toMatchObject({ kind: 'recover', holdSummary: false, then: { stillExpiry: true } });
+    });
+
+    it('the DOWN AGAIN after a back-up counts toward flapping (its OK change was recorded)', () => {
+      const backOnSsl: OpenIncident = {
+        ...raised,
+        episodeSeverity: 'problem',
+        trigger: 'ssl',
+        downFromExpiry: false,
+      };
+      const d = decideSite(
+        site([monitor(failed(), { carry: heldSsl, expiry: fact('2026-10-06', null) })], {
+          open: backOnSsl,
+          flips,
+          flipOk: true,
+        }),
+      );
+      expect(d).toMatchObject({ kind: 'relapse', severity: 'down', flapping: true });
+      // A key page's partial recovery records no OK change: not flapping, as before.
+      expect(
+        decideSite(
+          site([monitor(failed(), { carry: heldSsl, expiry: fact('2026-10-06', null) })], {
+            open: backOnSsl,
+            flips,
+            flipOk: false,
+          }),
+        ),
+      ).toMatchObject({ kind: 'relapse', flapping: false });
+    });
+  });
+
   it('the new cause cleared, the certificate still under the line → back to SSL expiring, silently', () => {
     expect(
       decideSite(

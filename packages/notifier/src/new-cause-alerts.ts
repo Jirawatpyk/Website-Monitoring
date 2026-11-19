@@ -18,6 +18,11 @@ export interface NewCauseAlertInput {
   /** Whoever acts now: the person who acknowledged, else the L0 person. */
   mention: ChatPerson | null;
   ackedBy: string | null;
+  /**
+   * D-068 item 3 (spec §40.3): `ackedBy` acknowledged the expiry and that ack was set aside — the new
+   * cause needs its own ("Tao’s acknowledgement of the expiry is set aside — Keyword needs its own.").
+   */
+  setAside?: boolean;
   /** A DOWN incident back up with the expiry its only problem (Tao, 17 Nov): its trigger is kept. */
   afterDown?: boolean;
   /** When the new cause was seen (the round). */
@@ -54,7 +59,24 @@ export function buildNewCauseAlert(input: NewCauseAlertInput): ChatMessage {
         cardId: `problem-new-cause-${input.incidentId}-${input.at.getTime()}`,
         card: {
           header: { title: `PROBLEM · ${site} · new cause: ${now}` },
-          sections: [{ widgets: [{ textParagraph: { text: escape(body) } }] }],
+          sections: [
+            {
+              widgets: [
+                { textParagraph: { text: escape(body) } },
+                ...(ack && input.setAside
+                  ? [
+                      {
+                        textParagraph: {
+                          text: escape(
+                            `${ack}’s acknowledgement of the expiry is set aside — ${now} needs its own.`,
+                          ),
+                        },
+                      },
+                    ]
+                  : []),
+              ],
+            },
+          ],
         },
       },
     ],

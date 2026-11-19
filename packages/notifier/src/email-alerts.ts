@@ -158,6 +158,8 @@ export interface RecoveredEmailInput extends EmailBaseInput {
   clientUpdate?: string | null;
   /** The AM, for "Still to do · tell the client it's back (Bua)". */
   amName?: string | null;
+  /** D-068 (spec §40.2): back up, the incident still open for this expiry — the Chat card's words. */
+  stillExpiry?: { label: string; cause: string | null } | null;
 }
 
 type Template =
@@ -317,6 +319,8 @@ interface Body {
   label: string;
   /** Rest of the preheader, after "LABEL —". */
   pre: string;
+  /** The preheader's status when it differs from the label (EmailAlert `preStatus`). */
+  preStatus?: string;
   headline: string;
   lede: string;
   facts: [string, string][];
@@ -401,7 +405,7 @@ function sectionsText(sections: EmailSection[] | undefined): string[] {
 
 /** The EmailAlert layout: status bar, label, headline, lede, facts table, buttons, footer. */
 export function emailLayout({ subject, why, footer, headers }: Envelope, b: EmailBody): EmailMessage {
-  const preheader = `${b.label} — ${b.pre}`;
+  const preheader = `${b.preStatus ?? b.label} — ${b.pre}`;
   const facts = b.facts
     .map(
       ([k, v]) =>
@@ -591,6 +595,13 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
   const { duration, range } = downtime(input.startedAt, input.recoveredAt);
   const isOwner = addsRootCause(input.reason);
   const ackFact = ack ? [['Acknowledged', `${ack.by} at ${formatTime(ack.at)}`] as [string, string]] : [];
+  const still = input.stillExpiry;
+  // D-068 (Tao, 19 Nov): back up with the expiry still open — the Chat card's words lead, then this
+  // reader's part as on any DOWN RECOVERED (message-checker M3).
+  const stillLine = still
+    ? `${site} answered again at ${formatTime(input.recoveredAt)} after ${duration} down. ` +
+      `The incident stays open for ${still.label}${still.cause ? ` — ${still.cause}` : ''}.`
+    : null;
   if (problem) {
     return render(input, {
       template: 'recovered',
@@ -627,23 +638,48 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
     color: C.positive,
     bar: C.positive,
     label: 'RECOVERED',
-    pre: `${site} back at ${formatTime(input.recoveredAt)} · down ${duration} · root cause needed`,
-    headline: `${site} is back`,
+    // Still expiring: said, and the owner's root cause kept (message re-check L2).
+    pre: [
+      `${site} back at ${formatTime(input.recoveredAt)}`,
+      `down ${duration}`,
+      ...(still ? [`still ${still.label}`] : []),
+      ...(!still || isOwner ? ['root cause needed'] : []),
+    ].join(' · '),
+    headline: still ? `${site} is back up, still ${still.label}` : `${site} is back`,
     // The owner's root cause comes first, even when the owner is also the AM (message-check L4).
-    lede: isOwner
-      ? 'Needs a root cause before it can be resolved.'
-      : input.amReader
-        ? input.amReader.notNeeded
-          ? `${site} is back after ${duration}. The client update was marked not needed (${input.amReader.notNeeded}) — let the client know it’s back if they need to hear it.`
-          : input.amReader.marked
-            ? `${site} is back after ${duration}. Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
-            : `${site} is back after ${duration}. Let the client know it’s back, and mark the client update on the incident page.`
-        : owner
-          ? `Nothing needed from you. ${owner} adds the root cause.`
-          : 'Nothing needed from you.',
+    lede: [
+      stillLine,
+      isOwner
+        ? still
+          ? 'The DOWN needs a root cause before it can be resolved.'
+          : 'Needs a root cause before it can be resolved.'
+        : input.amReader
+          ? input.amReader.notNeeded
+            ? `${still ? '' : `${site} is back after ${duration}. `}The client update was marked not needed (${input.amReader.notNeeded}) — let the client know it’s back if they need to hear it.`
+            : input.amReader.marked
+              ? `${still ? '' : `${site} is back after ${duration}. `}Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
+              : `${still ? '' : `${site} is back after ${duration}. `}Let the client know it’s back, and mark the client update on the incident page.`
+          : owner
+            ? `Nothing needed from you. ${owner} adds the root cause.`
+            : 'Nothing needed from you.',
+    ]
+      .filter(Boolean)
+      .join(' '),
     facts: [
       ['Down for', `${duration} (${range})`],
-      ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)} → Monitoring`],
+      // Back up, still expiring: the incident stays open, it doesn't go to Monitoring (D-068).
+      [
+        'Confirmed by',
+        `First OK round from ${formatLocations(input.okLocations)}${still ? '' : ' → Monitoring'}`,
+      ],
+      ...(still
+        ? [
+            ['Still open for', still.cause ? `${still.label} — ${still.cause}` : still.label] as [
+              string,
+              string,
+            ],
+          ]
+        : []),
       ...ackFact,
       ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
       ...(() => {
@@ -1042,44 +1078,89 @@ export interface NewCauseEmailInput extends EmailBaseInput {
   /** The new trigger's words ("Keyword") and what the incident was open for ("SSL expiring"). */
   now: string;
   was: string;
+  /** The expiry it was open for, counted for when the email goes: "SSL certificate expires in 13 days (Tue 6 Oct)". */
+  wasCause?: string | null;
   /** The full cause: "Found “บาคาร่า” on / (as Googlebot)". */
   cause: string;
+  /** Its short form for the preheader: "“บาคาร่า” found on / (as Googlebot)". */
+  summary?: string | null;
+  /** When the new cause was seen (the round), and when the incident opened. */
+  at: Date;
+  openedAt: Date;
+  /** An ack of the new cause itself (given during the D-047 grace). */
   acknowledged?: { by: string; at: Date } | null;
+  /**
+   * D-068 item 3 (spec §40.3, EmailAlert "New cause · acknowledged"): the ack of the expiry the new cause
+   * set aside — this reader gave it; the new cause needs its own.
+   */
+  setAside?: { by: string; at: Date } | null;
   /** A DOWN incident back up with the expiry its only problem (Tao, 17 Nov). */
   afterDown?: boolean;
 }
 
+/** "SSL expiring" → "SSL expiry", "Domain expiring" → "domain expiry" (§40.3's sentence). */
+const expiryNoun = (was: string) => was.replace(/ expiring$/, ' expiry').replace(/^Domain/, 'domain');
+
 /**
  * D-067: an incident open for an SSL / domain expiry took a more urgent PROBLEM as its cause. In the
- * incident's thread, to L0 after the D-047 grace (or as the fallback when the Chat reply failed).
- * Nothing recovered, so not an AGAIN: "has a new problem".
+ * incident's thread, to L0 after the D-047 grace (or as the fallback when the Chat reply failed); to the
+ * acker of the expiry when that ack was set aside (D-068). Nothing recovered, so not an AGAIN: "has a new
+ * problem". Words and rows as EmailAlert "New cause · not acknowledged yet / acknowledged" (spec §40.3).
  */
 export function buildNewCauseEmail(input: NewCauseEmailInput): EmailMessage {
   const inc = formatIncidentId(input.incidentNumber);
+  const { now, was, setAside, acknowledged } = input;
   const what = input.afterDown
-    ? `${input.cause}. ${input.site} was back up in ${inc} with ${input.was} still open; this new problem joins it.`
-    : `${input.cause}. ${input.site} was already open as ${inc} for ${input.was}; this new problem joins it.`;
+    ? `${input.cause}. ${input.site} was back up in ${inc} with ${was} still open; this new problem joins it.`
+    : `${input.cause}. ${input.site} was already open as ${inc} for ${was}; this new problem joins it, and the incident now reads ${now}.`;
+  const asks = !acknowledged && (isL0(input.reason) || !!setAside);
+  const since = `${formatDay(input.openedAt, { weekday: true })} ${formatTime(input.openedAt)}`;
   return render(input, {
     template: 'problem_again',
     color: C.warning,
     bar: C.warning,
-    label: 'PROBLEM',
-    pre: `${input.site} · new cause: ${input.now} · was ${input.was} · same incident ${inc}`,
+    label: `PROBLEM — NEW CAUSE: ${now.toUpperCase()}`,
+    preStatus: 'PROBLEM',
+    pre: [`new cause: ${now}`, input.summary, `was ${was}`, `same incident ${inc}`]
+      .filter(Boolean)
+      .join(' · '),
     headline: `${input.site} has a new problem`,
-    lede: !isL0(input.reason)
-      ? `${what} The Google Chat reply couldn’t be delivered, so this email is the alert.`
-      : input.acknowledged
-        ? `${what} ${input.acknowledged.by} acknowledged it at ${formatTime(input.acknowledged.at)}.`
-        : `${what} ${yourPart(input.reason, input.site)} — please acknowledge or hand it over in the Chat thread.`,
+    lede: acknowledged
+      ? `${what} ${acknowledged.by} acknowledged it at ${formatTime(acknowledged.at)}.`
+      : setAside
+        ? `${what} ${setAside.by} acknowledged earlier, so only ${setAside.by} is mentioned. That acknowledgement was for the ${expiryNoun(was)} — please acknowledge the new problem.`
+        : !isL0(input.reason)
+          ? `${what} The Google Chat reply couldn’t be delivered, so this email is the alert.`
+          : what,
     facts: [
-      ['New cause', input.now],
-      ['Was', input.was],
-      ['Same incident', inc],
+      ['New cause', `${now} · found ${formatTime(input.at)}`],
+      ['Cause', input.cause],
+      ['Was', input.wasCause ? `${was} — ${input.wasCause}` : was],
+      [
+        'Incident',
+        input.afterDown
+          ? `${inc}, open since ${since}`
+          : setAside && !acknowledged
+            ? `${inc} · now reads ${now} · not acknowledged for it yet`
+            : `${inc}, open since ${since} · now reads ${now}`,
+      ],
+      acknowledged
+        ? ['Acknowledged', `${acknowledged.by} at ${formatTime(acknowledged.at)}`]
+        : setAside
+          ? [
+              'Acknowledged',
+              `${setAside.by} at ${withDayIfNot(setAside.at, input.at, formatTime)} for ${was} — set aside, ${now} needs its own`,
+            ]
+          : asks
+            ? ['Next step', 'Acknowledge to stop the PROBLEM reminders']
+            : ['Next step', 'Open the incident to see who acknowledges it'],
     ],
-    buttons:
-      isL0(input.reason) && !input.acknowledged
-        ? [{ label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true }]
-        : [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
+    buttons: asks
+      ? [
+          { label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true },
+          { label: 'Open incident', href: input.incidentUrl, primary: false },
+        ]
+      : [{ label: 'Open incident', href: input.incidentUrl, primary: true }],
   });
 }
 

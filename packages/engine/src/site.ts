@@ -278,6 +278,11 @@ export type SiteDecision =
         trigger: Trigger;
         detail: ProblemDetail;
         startedAt: Date;
+        /**
+         * D-068 (spec §40.2): back up with the expiry the DOWN joined still under its line — the
+         * incident goes back to it silently; the RECOVERED says "back up, still SSL expiring".
+         */
+        stillExpiry?: boolean;
       };
     } & Judged)
   /** Second OK round in a row: the site is OK; incident → Needs root cause (or stays in Monitoring). */
@@ -454,7 +459,9 @@ function judgeSiteRound(
         trigger: 'hard_fail',
         startedAt: primaryDown.startedAt,
         detectedAt: primaryDown.confirmedAt,
-        flapping: false,
+        // D-068 (engine review H1): back up on an expiry is an OK change, so a site going up and down
+        // under its SSL incident flaps (D-024). A key page's partial recovery records none: false, as before.
+        flapping: isFlapping(s.flips ?? [], s.flipOk, roundAt),
         down: facts,
         ...judgedDown,
       };
@@ -484,6 +491,11 @@ function judgeSiteRound(
         primaryVerdict.kind === 'ok' || primaryVerdict.kind === 'problem'
           ? (primaryVerdict.reachable ?? [])
           : [];
+      // D-068: back up with the expiry the DOWN joined still due — the site really answered (an OK
+      // change for D-024, so it is tagged flapping on the next DOWN AGAIN). Flapping or not, the one
+      // combined RECOVERED stands in for the summary: a held summary would be cancelled by the expiry
+      // rejoining a round later (engine re-review H1).
+      const still = isExpiryTrigger(problem.v.trigger);
       const d = recoverDecision(s, open, base, reachable, 'problem', false);
       if (d?.kind === 'recover') {
         return {
@@ -494,6 +506,8 @@ function judgeSiteRound(
             trigger: problem.v.trigger,
             detail: problem.v.detail,
             startedAt: problem.v.startedAt,
+            // Only `backUpOnExpiry` lets an expiry through on a DOWN drop (`expiryNow`).
+            ...(still ? { stillExpiry: true } : {}),
           },
         };
       }
@@ -1268,8 +1282,20 @@ function expiryNow(m: SiteMonitor, s: SiteSnapshot): ReturnType<typeof expiryIss
   if (!m.isPrimary) return null;
   const issue = expiryIssue(m.expiry, s.now);
   if (!issue) return null;
-  if (s.open && !RECOVERED_STATES.includes(s.open.state)) return keepsExpiry(m, s) ? issue : null;
+  if (s.open && !RECOVERED_STATES.includes(s.open.state))
+    return keepsExpiry(m, s) || backUpOnExpiry(s) ? issue : null;
   return s.expiryOpens === false ? null : issue;
+}
+
+/**
+ * D-068 (spec §40.2): a DOWN drop that joined an expiry incident. When the home page answers again
+ * with the expiry still under its line (a good, fresh read — a failed or stale one is no evidence,
+ * D-066 item 3: a clean RECOVERED), the incident stays open for it — any hour, since it was already
+ * open for it (D-067 item 1's inside-hours gate is for opening one).
+ */
+function backUpOnExpiry(s: SiteSnapshot): boolean {
+  const o = s.open;
+  return !!o?.downFromExpiry && (o.episodeSeverity ?? o.severity) === 'down';
 }
 
 /**

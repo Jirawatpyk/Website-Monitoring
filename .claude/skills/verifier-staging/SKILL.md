@@ -310,6 +310,8 @@ SSL & domain expiry (S13, D-066, D-067, spec §39), as Tao on https://monitor-st
   - Put it back with Check now, which re-reads the real certificate, and `reset-test-incident.sql`.
   - PR 2's run: INC-0067 and INC-0068, 18 Nov.
 
+- **Back up, still SSL expiring (PR 4, spec §40.2, D-068).** With the SSL fixture's PROBLEM open, flip the target to `error` (DOWN in ~1–2 min: `incidents.down_from_expiry = true`), then back to `ok`. On the first OK round: one RECOVERED in Chat and email with `context.stillExpiry`, a `recovered` + `relapsed` event pair (`stillExpiry`), no `problem_again` row, the incident Unacked on `cause_trigger = 'ssl'` with `down_from_expiry = false`, `site_status.flip_ok = true`. The Incident timeline shows one line, "Back up · still SSL expiring". Finish before :00 — the hourly expiry read re-reads an open expiry site and puts the real certificate back (PR 4's run: INC-0069, 19 Nov 10:26–10:41).
+
 | Width            | Expect                                                                                                                                    |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | 1440 (xl and up) | The table and the full How it alerts note with the organisation's hours. Check now on the right                                           |

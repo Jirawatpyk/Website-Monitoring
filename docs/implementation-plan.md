@@ -681,7 +681,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   1. Schema and collector: `site_expiry`, `@dxt/probe` `expiry.ts`, `/api/cron/expiry`.
   2. Engine and messages.
   3. Page, the Sites list column, the weekly lines and nav. The 18 Nov design refresh (spec §39: MExpiry, Expiry820, the MSites row) is part of it.
-  4. Spec §40's messages (Tao, 18 Nov): RECOVERED "back up, still SSL expiring" for a DOWN that recovers while the expiry is still due, and the acknowledged new-cause email's "That acknowledgement was for the SSL expiry — please acknowledge the new problem." Tao confirmed the three ack rules (set aside, given back, cleared by a DOWN) as D-067 has them.
+  4. Spec §40's messages (Tao, 18 Nov): RECOVERED "back up, still SSL expiring" for a DOWN that recovers while the expiry is still due, and the acknowledged new-cause email's "That acknowledgement was for the SSL expiry — please acknowledge the new problem." Tao confirmed the three ack rules (set aside, given back, cleared by a DOWN) as D-067 has them. Settled on 19 Nov as D-068: the back-up message at any hour, only for a DOWN that came from the expiry (`incidents.down_from_expiry`); the set-aside ack names its acker; the RECOVERED email uses the Chat words; the §40.5 timeline rows.
 - **Depends on:** S04
 - **Done when:**
   1. An expiring-cert target opens PROBLEM "SSL expiring"; a domain 20 days from expiry opens PROBLEM "Domain expiring".
