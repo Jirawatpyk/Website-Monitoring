@@ -25,6 +25,8 @@ export interface OncallEventFacts {
   emailed?: Set<string>;
   /** The test link's token; the URL is built with the app's address at render time. */
   test?: { name: string; token: string | null };
+  /** A channel test (S17): who sent it and which channel. */
+  channelTest?: { name: string; channel: 'chat' | 'email' };
 }
 
 type EventRow = {
@@ -204,6 +206,11 @@ export async function loadOncallFacts(
     }
     if (e.kind === 'test_alert' && e.user_id)
       f.test = { name: nameOf(e.user_id)!, token: tokenOf.get(e.user_id) ?? null };
+    if (e.kind === 'channel_test' && e.user_id)
+      f.channelTest = {
+        name: nameOf(e.user_id)!,
+        channel: e.payload?.channel === 'email' ? 'email' : 'chat',
+      };
     out.set(e.id, f);
   }
   return out;

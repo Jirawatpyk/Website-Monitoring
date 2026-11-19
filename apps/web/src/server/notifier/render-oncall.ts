@@ -29,6 +29,10 @@ export function oncallFactsOf(e: OncallEventFacts, appUrl: string): OncallFacts 
     ...(e.test
       ? { test: { name: e.test.name, url: oncallUrl(appUrl, e.test.token ? `?test=${e.test.token}` : '') } }
       : {}),
+    // A channel test opens the app on My profile, the one page every role has (S17).
+    ...(e.channelTest
+      ? { channelTest: { ...e.channelTest, url: `${appUrl.replace(/\/$/, '')}/profile` } }
+      : {}),
   };
 }
 
@@ -49,7 +53,8 @@ export function renderOncallChat(n: Notification, e: OncallEventFacts, appUrl: s
   if (
     (f.kind === 'handed_over' && !f.handover) ||
     (f.kind === 'shift_reminder' && !f.shift) ||
-    (f.kind === 'test_alert' && !e.test?.token)
+    (f.kind === 'test_alert' && !e.test?.token) ||
+    (f.kind === 'channel_test' && !f.channelTest)
   )
     return null;
   return buildOncallChat(f, mentionedIn(n, e));

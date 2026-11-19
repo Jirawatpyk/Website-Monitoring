@@ -22,7 +22,8 @@ export type OncallKind =
   | 'swap_expired'
   | 'handed_over'
   | 'test_alert'
-  | 'shift_reminder';
+  | 'shift_reminder'
+  | 'channel_test';
 
 /** How the recipient is tied to the event (`notifications.context.role`, SQL `oncall_recipients`). */
 export type OncallRole =
@@ -57,6 +58,8 @@ export interface OncallFacts {
   shiftHolder?: string;
   /** The test alert: the tester and the link that ticks "Test alert received on this phone". */
   test?: { name: string; url: string };
+  /** A channel test (S17, Alert channels / Profile): who sent it, which channel, and the app's link. */
+  channelTest?: { name: string; channel: 'chat' | 'email'; url: string };
 }
 
 const when = (d: Date) => `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
@@ -73,6 +76,7 @@ const STATE: Record<OncallKind, ChatState> = {
   handed_over: 'SHIFT HANDED OVER',
   test_alert: 'TEST — no action',
   shift_reminder: 'ON CALL TOMORROW',
+  channel_test: 'TEST — no action',
 };
 
 /** The words after "STATE · On-call ·" on the Chat line: who and which weeks, never a reason. */
@@ -137,6 +141,7 @@ function chatDetail(f: OncallFacts): string[] {
         'Tier 1 alerts outside response hours come to you',
       ];
     case 'test_alert':
+    case 'channel_test':
       return [];
   }
 }
@@ -144,6 +149,43 @@ function chatDetail(f: OncallFacts): string[] {
 /** The Chat line, and for a test alert its card with the link (ChatAlert "Test alert · own thread"). */
 export function buildOncallChat(f: OncallFacts, mention: readonly ChatPerson[]): ChatMessage {
   const ids = [...new Set(mention.flatMap((p) => (p.chatUserId ? [p.chatUserId] : [])))];
+  if (f.kind === 'channel_test') {
+    const name = plainName(f.channelTest!.name);
+    return {
+      // Spec §10: its own "TEST — no action" thread, @mentioning only the tester.
+      text: buildChatTextLine({
+        state: 'TEST — no action',
+        site: `Google Chat test for ${name}`,
+        mention: ids,
+      }),
+      cardsV2: [
+        {
+          cardId: 'channel-test',
+          card: {
+            header: { title: 'TEST — no action', subtitle: `Google Chat test for ${name}` },
+            sections: [
+              {
+                widgets: [
+                  {
+                    textParagraph: {
+                      text: 'Nothing to do. This shows DxT Monitor alerts reach you in the Alerts Space and that the @mention notifies you. Real alerts post the same way, one thread per incident.',
+                    },
+                  },
+                  {
+                    buttonList: {
+                      buttons: [
+                        { text: 'Open DxT Monitor', onClick: { openLink: { url: f.channelTest!.url } } },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    };
+  }
   if (f.kind === 'test_alert') {
     const name = plainName(f.test!.name);
     return {
@@ -207,6 +249,7 @@ export function buildOncallChat(f: OncallFacts, mention: readonly ChatPerson[]):
 
 /** One subject per mail thread, so every message of a swap / hand-over / shift stays in one thread. */
 function subjectOf(f: OncallFacts): string {
+  if (f.channelTest) return `DxT Monitor · TEST — no action · ${plainName(f.channelTest.name)}`;
   if (f.swap)
     return `DxT Monitor · On-call · Swap · ${plainName(f.swap.requester)} ↔ ${plainName(f.swap.asked)} · ${formatWeek(f.swap.requesterWeek)}`;
   if (f.handover)
@@ -240,6 +283,27 @@ export function buildOncallEmail(input: OncallEmailInput): EmailMessage | null {
   if (f.kind === 'rotation_changed' || f.kind === 'test_alert') return null;
   const s = f.swap;
   const threadId = oncallThreadId(input.threadKey, input.from);
+  if (f.kind === 'channel_test') {
+    if (!f.channelTest) return null;
+    return emailLayout(
+      {
+        subject: subjectOf(f),
+        why: 'You got this because you sent yourself a test from DxT Monitor.',
+        footer: ONCALL_EMAIL_FOOTER,
+        headers: { References: threadId },
+      },
+      {
+        color: C.primary,
+        bar: C.primary,
+        label: 'TEST — no action',
+        pre: 'Test email — nothing to do',
+        headline: 'Test email — nothing to do',
+        lede: 'This shows DxT Monitor alert emails reach you. Real alerts come from this address, one email thread per incident, with the status first.',
+        facts: [['Sent', when(f.at)]],
+        buttons: [{ label: 'Open DxT Monitor', href: f.channelTest.url, primary: true }],
+      },
+    );
+  }
   const open = {
     label: f.kind === 'swap_requested' && role === 'asked' ? 'Accept or decline' : 'Open On-call',
     href: f.pageUrl,
