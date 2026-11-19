@@ -165,6 +165,21 @@ export interface RecoveredAlertInput {
   problem?: ProblemFacts | null;
   /** S11, ChatAlert RECOVERED: "Client update marked by Bua 10:12." */
   clientUpdate?: string | null;
+  /** D-068 (spec §40.2): back up, the incident still open for this expiry. */
+  stillExpiry?: StillExpiry | null;
+}
+
+/**
+ * D-068 (spec §40.2, ChatAlert "Back up, still SSL expiring"): a DOWN that joined an expiry incident is
+ * over, the expiry isn't — `label` "SSL expiring", `cause` "SSL certificate expires in 13 days (Tue 6
+ * Oct)", @mentioning whoever acts now (the DOWN's acker, else L0).
+ */
+export interface StillExpiry {
+  label: string;
+  cause: string;
+  incidentNumber: number;
+  tier: number;
+  mention: ChatPerson | null;
 }
 
 /**
@@ -343,6 +358,41 @@ export function buildAcknowledgedAlert(input: AcknowledgedAlertInput): ChatMessa
 export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
   const site = plainName(input.site);
   const { duration, range } = downtime(input.startedAt, input.recoveredAt);
+  const still = input.stillExpiry;
+  if (still) {
+    const inc = formatIncidentId(still.incidentNumber);
+    return {
+      text: buildChatTextLine({
+        state: 'RECOVERED',
+        site: `${site} (${formatTier(still.tier)})`,
+        mention: mentionOf(still.mention),
+        detail: [`back after ${duration} down`, `still ${still.label}`, `same incident ${inc}`],
+      }),
+      cardsV2: [
+        {
+          cardId: `recovered-${input.incidentId}`,
+          card: {
+            header: { title: `RECOVERED · ${site} · back up, still ${still.label}` },
+            sections: [
+              {
+                widgets: [
+                  {
+                    textParagraph: {
+                      text:
+                        `${site} answered again at ${formatTime(input.recoveredAt)} after ${duration} down. ` +
+                        `The incident stays open for ${still.label} — ${still.cause}. ` +
+                        'The DOWN needs a root cause before it can be resolved.' +
+                        (input.clientUpdate ? ` ${plainName(input.clientUpdate)}.` : ''),
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    };
+  }
   const problem = input.problem;
   const slow = problem?.trigger === 'slow';
   const title = !problem

@@ -36,6 +36,7 @@ import {
   type EmailReason,
   type KeyPageFacts,
   type ProblemFacts,
+  type StillExpiry,
   type VerifierDownReason,
   expiryNow,
 } from '@dxt/notifier';
@@ -222,6 +223,7 @@ function againAlert(n: Notification, i: IncidentFacts, now: Date = new Date(n.cr
 function newCauseAlert(n: Notification, i: IncidentFacts): ChatMessage {
   const ctx = contextOf(n.context);
   const acked = !!i.acked_at && !!i.acker;
+  const aside = setAsideOf(ctx);
   return buildNewCauseAlert({
     incidentId: i.id,
     incidentNumber: i.number,
@@ -234,10 +236,60 @@ function newCauseAlert(n: Notification, i: IncidentFacts): ChatMessage {
     mention: acked
       ? { name: i.acker!.display_name, chatUserId: i.acker!.google_chat_user_id ?? null }
       : (nightMention(ctx) ?? person(l0Of(i))),
-    ackedBy: acked ? i.acker!.display_name : null,
+    ackedBy: acked ? i.acker!.display_name : (aside?.by ?? null),
+    setAside: !acked && !!aside,
     afterDown: ctx.afterDown === true,
     at: new Date(n.created_at),
   });
+}
+
+/**
+ * D-068 item 3 (spec §40.3): the ack of the expiry the new cause set aside — its acker is the person the
+ * reply names (`mention.acked`, stored by `engine_new_cause_incident`).
+ */
+function setAsideOf(ctx: Record<string, unknown>): { by: string; at: Date } | null {
+  const m = ctx.mention as { name?: unknown; acked?: unknown; ackedAt?: unknown } | undefined;
+  const at = dateOf(m?.ackedAt);
+  return m?.acked === true && typeof m.name === 'string' && at ? { by: m.name, at } : null;
+}
+
+/**
+ * The expiry the incident was open for before this message's new cause, counted for `asOf` (D-068:
+ * the email's "Was" row) — the newest event before it that carried an SSL / domain detail.
+ */
+function expiryBefore(i: IncidentFacts, before: Date, asOf: Date): string | null {
+  const events = [...(i.incident_events ?? [])]
+    .filter((e) => (e.at ?? '') < before.toISOString())
+    .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''));
+  for (const e of events.reverse()) {
+    const hit = expiryNow(contextOf(e.payload).detail, asOf);
+    if (hit) return hit.cause;
+  }
+  return null;
+}
+
+/** The RECOVERED card's "still SSL expiring" (D-068): whoever acts now — the acker, else L0. */
+function stillOf(i: IncidentFacts, ctx: Record<string, unknown>, asOf: Date): StillExpiry | null {
+  const still = stillExpiryOf(ctx, asOf);
+  return still
+    ? {
+        ...still,
+        incidentNumber: i.number,
+        tier: i.sites.tier,
+        mention:
+          i.acked_at && i.acker
+            ? { name: i.acker.display_name, chatUserId: i.acker.google_chat_user_id ?? null }
+            : person(l0Of(i)),
+      }
+    : null;
+}
+
+/** D-068 (spec §40.2): back up, the incident still open for the expiry its DOWN joined. */
+function stillExpiryOf(ctx: Record<string, unknown>, asOf: Date): { label: string; cause: string } | null {
+  const still = ctx.stillExpiry as { trigger?: unknown; detail?: unknown } | undefined;
+  const hit = still ? expiryNow(still.detail, asOf) : null;
+  const t = still?.trigger;
+  return hit && (t === 'ssl' || t === 'domain') ? { label: TRIGGER_LABELS[t], cause: hit.cause } : null;
 }
 
 /** D-067 (Tao, 17 Nov): the person on call a Tier 1 new cause at night names, stored with the row. */
@@ -506,6 +558,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         owner: person(l0Of(i)),
         problem: dropProblem(i, drop, ctx),
         clientUpdate: clientUpdateMarked(i),
+        stillExpiry: stillOf(i, ctx, now),
       });
     }
     case 'down_again':
@@ -544,7 +597,8 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
   if (n.template === 'step_fired') return contextOf(n.context).fallback === true ? 'fallback' : 'step';
   // A Tier 1 new cause at night: the person on call it named (D-067).
   const mention = contextOf(n.context).mention as { id?: unknown } | undefined;
-  if (n.user_id && n.template === 'problem_again' && mention?.id === n.user_id) return 'oncall';
+  if (n.user_id && n.template === 'problem_again' && mention?.id === n.user_id)
+    return setAsideOf(contextOf(n.context)) ? 'acked' : 'oncall';
   if (l0Of(i)?.id === n.user_id) return l0IsOnCall(i) ? 'oncall' : 'owner';
   // …and their later emails (RECOVERED, RESOLVED): emailed about it, nothing asked of them — the owner
   // adds the root cause (message-checker). The new cause's event says whom it told.
@@ -729,6 +783,7 @@ export function renderEmail(
         clientUpdate: clientUpdateFact(i),
         amReader,
         amName: i.sites.client?.am?.display_name ?? null,
+        stillExpiry: stillExpiryOf(ctx, sentAt),
       });
     }
     case 'resolved':
@@ -758,7 +813,11 @@ export function renderEmail(
             'Problem',
           was: TRIGGER_LABELS[str(ctx.was, 'ssl') as Trigger] ?? 'SSL expiring',
           cause: str(ctx.cause, 'Problem'),
+          wasCause: expiryBefore(i, new Date(n.created_at), sentAt),
+          at: new Date(n.created_at),
+          openedAt: new Date(i.detected_at),
           acknowledged,
+          setAside: acknowledged ? null : setAsideOf(ctx),
           afterDown: ctx.afterDown === true,
         });
       }

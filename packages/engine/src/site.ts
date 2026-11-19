@@ -278,6 +278,11 @@ export type SiteDecision =
         trigger: Trigger;
         detail: ProblemDetail;
         startedAt: Date;
+        /**
+         * D-068 (spec §40.2): back up with the expiry the DOWN joined still under its line — the
+         * incident goes back to it silently; the RECOVERED says "back up, still SSL expiring".
+         */
+        stillExpiry?: boolean;
       };
     } & Judged)
   /** Second OK round in a row: the site is OK; incident → Needs root cause (or stays in Monitoring). */
@@ -494,6 +499,8 @@ function judgeSiteRound(
             trigger: problem.v.trigger,
             detail: problem.v.detail,
             startedAt: problem.v.startedAt,
+            // Only `backUpOnExpiry` lets an expiry through on a DOWN drop (`expiryNow`).
+            ...(isExpiryTrigger(problem.v.trigger) ? { stillExpiry: true } : {}),
           },
         };
       }
@@ -1268,8 +1275,20 @@ function expiryNow(m: SiteMonitor, s: SiteSnapshot): ReturnType<typeof expiryIss
   if (!m.isPrimary) return null;
   const issue = expiryIssue(m.expiry, s.now);
   if (!issue) return null;
-  if (s.open && !RECOVERED_STATES.includes(s.open.state)) return keepsExpiry(m, s) ? issue : null;
+  if (s.open && !RECOVERED_STATES.includes(s.open.state))
+    return keepsExpiry(m, s) || backUpOnExpiry(s) ? issue : null;
   return s.expiryOpens === false ? null : issue;
+}
+
+/**
+ * D-068 (spec §40.2): a DOWN drop that joined an expiry incident. When the home page answers again
+ * with the expiry still under its line (a good, fresh read — a failed or stale one is no evidence,
+ * D-066 item 3: a clean RECOVERED), the incident stays open for it — any hour, since it was already
+ * open for it (D-067 item 1's inside-hours gate is for opening one).
+ */
+function backUpOnExpiry(s: SiteSnapshot): boolean {
+  const o = s.open;
+  return !!o?.downFromExpiry && (o.episodeSeverity ?? o.severity) === 'down';
 }
 
 /**

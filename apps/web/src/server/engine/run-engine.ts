@@ -504,6 +504,7 @@ export async function runEngine(
             isFlapping: open.is_flapping,
             trigger: open.cause_trigger ?? open.trigger,
             leftExpiry: open.expiry_left,
+            downFromExpiry: open.down_from_expiry,
           } satisfies OpenIncident)
         : null,
       // OK ↔ not-OK changes at incident steps (D-024): the 3rd in 30 min tags flapping.
@@ -1438,6 +1439,11 @@ async function apply(
           // The reply renders from its own facts: a relapse may clear the incident's before it goes.
           recoveredAt: d.recoveredAt.toISOString(),
           ...(d.autoResolve ? { autoResolved: true } : {}),
+          // D-068 (spec §40.2): "back up, still SSL expiring" — the expiry the incident stays open for,
+          // its days counted again when the message goes.
+          ...(d.then?.stillExpiry
+            ? { stillExpiry: { trigger: d.then.trigger, detail: d.then.detail as unknown as Json } }
+            : {}),
         },
         // A mute stops new alerts only (§15.1, D-036): RECOVERED still closes a thread that alerted.
         p_notify: alertQueued,
@@ -1470,11 +1476,13 @@ async function apply(
             startedAt: d.then.startedAt.toISOString(),
             trigger: d.then.trigger,
             homeBackAt: d.recoveredAt.toISOString(),
+            ...(d.then.stillExpiry ? { stillExpiry: true } : {}),
           },
           p_flapping: false,
           ...holdFor(site.tier, d.recoveredAt, hours),
           // With its RECOVERED or not at all: a muted alert gets no reply out of context (engine review L3).
-          p_notify: !site.muted && alertQueued,
+          // D-068: back to the expiry it was open for is silent — the RECOVERED says it.
+          p_notify: !site.muted && alertQueued && !d.then.stillExpiry,
           ...judged,
         });
         if (again.error) throw new Error(`engine_relapse_incident: ${again.error.message}`);
@@ -1580,11 +1588,20 @@ async function loadOpenIncidents(
       .not('state', 'in', CLOSED_INCIDENT_STATES_IN);
     return { data: r.data as unknown as OpenIncidentRow[] | null, error: r.error };
   };
-  const full = await read(`${INCIDENT_COLUMNS}, cause_trigger, expiry_left`);
+  const full = await read(`${INCIDENT_COLUMNS}, cause_trigger, expiry_left, down_from_expiry`);
   if (full.error?.code !== '42703') return full;
   console.error(JSON.stringify({ event: 'engine_incident_columns_lag', error: full.error.message }));
+  // S13 PR 4 (D-068) ahead of its migration: the PR 2 columns are there, `down_from_expiry` isn't.
+  const pr2 = await read(`${INCIDENT_COLUMNS}, cause_trigger, expiry_left`);
+  if (pr2.error?.code !== '42703')
+    return { ...pr2, data: pr2.data?.map((i) => ({ ...i, down_from_expiry: false })) ?? null };
   const lag = await read(INCIDENT_COLUMNS);
-  return { ...lag, data: lag.data?.map((i) => ({ ...i, cause_trigger: null, expiry_left: false })) ?? null };
+  return {
+    ...lag,
+    data:
+      lag.data?.map((i) => ({ ...i, cause_trigger: null, expiry_left: false, down_from_expiry: false })) ??
+      null,
+  };
 }
 
 type OpenIncidentRow = Pick<
@@ -1607,6 +1624,7 @@ type OpenIncidentRow = Pick<
   | 'root_cause_category'
   | 'cause_trigger'
   | 'expiry_left'
+  | 'down_from_expiry'
 > & { notifications: { template: string }[] };
 
 /**
