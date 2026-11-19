@@ -745,7 +745,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - **Decisions (D-069, Tao 19 Nov):** one response-hours setting, shared by the Tier 2–3 timers and Tier 1's owner / on-call hand-over; new hours apply to open incidents from the next engine run; "Who gets what" and flapping are read-only; the holiday editor and the editable forbidden-word list wait for a board.
 - **Boards:** AlertChannels, Organisation ; OrganisationLists, OrganisationListsDark, MOrganisationLists, MOrganisationListsDark (spec §41, drawn 19 Nov from the brief `docs/design/briefs/Organisation-holidays-forbidden.md`)
 - **PRs:**
-  1. Organisation: `save_response_hours` (+ `organisation_storage`), `/settings/organisation`, the Settings select on phones, the hours copy on Sites / Site detail, "Edit in Organisation" on Escalation and Profile.
+  1. Organisation: `save_response_hours` (+ `organisation_storage`), `/settings/organisation`, the Settings select on phones, the hours copy on Sites / Site detail, "Edit in Organisation" on Escalation and Profile. Merged #214 (19 Nov, `/verify` PASS on staging: INC-0071 held until the new opening).
   2. Alert channels: read-only routing, the test alert (`send_channel_test`; also Profile's test for Stakeholders and Viewers, D-062 item 12), the delivery log.
   3. Holidays and the editable shared forbidden-word list, after their board (probes, crawler and the VPS agent read it; deploy `dxt-agent`).
 - **Moved out (D-069):** a per-site uptime target (D-059) and the editable tracking allowlist (D-046) — backlog, no slice yet.

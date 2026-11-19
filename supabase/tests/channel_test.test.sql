@@ -5,6 +5,11 @@ begin;
 \ir _helpers.psql
 select plan(14);
 
+-- Earlier runs (the int test) leave tests and their messages: messages first (on delete restrict).
+delete from public.notification_attempts where notification_id in (
+  select n.id from public.notifications n join public.oncall_events e on e.id = n.oncall_event_id
+  where e.kind = 'channel_test');
+delete from public.notifications where oncall_event_id in (select id from public.oncall_events where kind = 'channel_test');
 delete from public.oncall_events where kind = 'channel_test';
 create temp table ids (name text primary key, id uuid) on commit drop;
 grant select on ids to authenticated;
