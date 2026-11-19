@@ -1,8 +1,10 @@
 import 'server-only';
+import { loadResponseHours } from '@/server/escalation/response-hours';
 import {
   CLOSED_INCIDENT_STATES_IN,
   defaultSlowMs,
   expiryCounts,
+  formatResponseHours,
   toMonitorHeaders,
   type ExpiryCount,
   type ExpiryDates,
@@ -187,12 +189,13 @@ async function existingUrls(supabase: Client): Promise<ExistingUrl[]> {
 /** What Add site / Edit site choose from. */
 export async function getRegistrationOptions(): Promise<RegistrationOptions> {
   const supabase = await createClient();
-  const [clients, people, urls] = await Promise.all([
+  const [clients, people, urls, hours] = await Promise.all([
     clientOptions(supabase),
     peopleOptions(supabase),
     existingUrls(supabase),
+    loadResponseHours(supabase, new Date()),
   ]);
-  return { clients, people, existingUrls: urls };
+  return { hoursText: formatResponseHours(hours), clients, people, existingUrls: urls };
 }
 
 /** One site with its monitors (not the removed ones), primary first. Null when unknown. */

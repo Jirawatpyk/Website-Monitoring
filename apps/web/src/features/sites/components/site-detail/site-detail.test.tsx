@@ -15,6 +15,7 @@ const detail = (over: Partial<SiteDetail> = {}): SiteDetail => ({
   id: 's1',
   name: 'Bangkok Airways – Taiwan',
   tier: 1,
+  hoursText: 'Mon–Fri 09:00–18:00',
   live: true,
   status: 'ok',
   statusSince: '2026-09-14T14:18:00Z',

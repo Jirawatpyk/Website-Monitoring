@@ -38,7 +38,7 @@
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Done |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Done |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Done |
-| S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Todo |
+| S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | In progress |
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Todo |
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | Todo |
 | G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov) | Todo |
@@ -742,12 +742,20 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S17 · Alert channels & organisation settings
 
 - **Scope:** Alert channels & routing ("who gets what" with DOWN / PROBLEM rows read-only, delivery log, test alert in its own thread). Organisation: tiers, clients & AMs, response hours for Tier 2–3 (confirm with before / after, "Affects N sites"), company holidays, data retention, cost. The shared forbidden-word list becomes Admin-editable here; S09c ships it as a reviewed list in code (D-025, D-041).
-- **Boards:** AlertChannels, Organisation
+- **Decisions (D-069, Tao 19 Nov):** one response-hours setting, shared by the Tier 2–3 timers and Tier 1's owner / on-call hand-over; new hours apply to open incidents from the next engine run; "Who gets what" and flapping are read-only; the holiday editor and the editable forbidden-word list wait for a board.
+- **Boards:** AlertChannels, Organisation (+ a board for holidays and the forbidden-word list: brief `docs/design/briefs/Organisation-holidays-forbidden.md`)
+- **PRs:**
+  1. Organisation: `save_response_hours` (+ `organisation_storage`), `/settings/organisation`, the Settings select on phones, the hours copy on Sites / Site detail, "Edit in Organisation" on Escalation and Profile.
+  2. Alert channels: read-only routing, the test alert (`send_channel_test`; also Profile's test for Stakeholders and Viewers, D-062 item 12), the delivery log.
+  3. Holidays and the editable shared forbidden-word list, after their board (probes, crawler and the VPS agent read it; deploy `dxt-agent`).
+- **Moved out (D-069):** a per-site uptime target (D-059) and the editable tracking allowlist (D-046) — backlog, no slice yet.
 - **Depends on:** S10, S11
 - **Done when:**
   1. Changing Tier 2–3 response hours needs a note, shows "Affects N sites", and the engine uses the new hours on the next sweep (test).
   2. A test alert posts in a "TEST — no action" thread mentioning only the tester.
   3. spec-checker passes both boards.
+  4. (D-069, proposed) Adding a company holiday is audited, and the next engine run treats that day as outside response hours (test).
+  5. (D-069, proposed) A forbidden phrase an Admin saves is used by the probes, the crawler and the VPS agent on their next run; a single word, or a phrase found on a live site's last clean fetch, is refused (test).
 - **Review:** spec-checker, message-checker, security-reviewer.
 
 ### S18 · User guide

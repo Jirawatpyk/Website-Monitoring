@@ -88,9 +88,9 @@ export function chartLines(
   return out;
 }
 
-/** "24/7 response" for Tier 1; Tier 2–3 respond Mon–Fri 09:00–18:00 (spec §7). */
-export function responseHoursLabel(tier: Tier): string {
-  return TIER_CONFIG[tier].alwaysOn ? '24/7 response' : 'Mon–Fri 09:00–18:00';
+/** "24/7 response" for Tier 1; Tier 2–3 respond in the organisation's response hours (spec §7, S17). */
+export function responseHoursLabel(tier: Tier, hoursText: string): string {
+  return TIER_CONFIG[tier].alwaysOn ? '24/7 response' : hoursText;
 }
 
 export function intervalLabel(tier: Tier): string {

@@ -20,6 +20,7 @@ const ARM = '00000000-0000-4000-8000-000000000003';
 const INTERNAL = '00000000-0000-4000-8000-0000000000c1';
 
 const options: RegistrationOptions = {
+  hoursText: 'Mon–Fri 09:00–18:00',
   clients: [{ id: INTERNAL, name: 'Internal', internal: true, amName: null }],
   people: [
     { id: NOK, name: 'Nok', linked: true },

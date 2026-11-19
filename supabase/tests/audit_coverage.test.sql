@@ -31,6 +31,7 @@ insert into audit_classes (fn, kind, note) values
   ('send_client_update_reminder', 'audited', 'hand_check.test.sql'),
   ('report_down_by_hand', 'audited', 'hand_relapse.test.sql'),
   ('save_escalation_policies', 'audited', 'escalation.test.sql'),
+  ('save_response_hours', 'audited', 'organisation_hours.test.sql'),
   ('create_maintenance', 'audited', 'maintenance.test.sql'),
   ('mute_site', 'audited', 'maintenance.test.sql'),
   ('approve_maintenance', 'audited', 'maintenance.test.sql'),

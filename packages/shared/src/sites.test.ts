@@ -173,6 +173,7 @@ describe('registrationChecklist (AddSite)', () => {
     keyPages: ['/contact'],
     keyword: 'EQHO Academy',
     tier: 2,
+    hoursText: 'Mon–Fri 09:00–18:00',
     primary: { id: ID.nok, name: 'Nok', linked: true },
     backup: { id: ID.ploy, name: 'Ploy', linked: true },
     client: { name: 'Internal (DxT group)', internal: true, amName: null },

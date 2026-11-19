@@ -21,6 +21,9 @@
     "features/escalation/actions.ts#saveEscalation": {
       "rpc": ["save_escalation_policies"]
     },
+    "features/organisation/actions.ts#saveResponseHours": {
+      "rpc": ["save_response_hours"]
+    },
     "features/settings/actions.ts#inviteUser": {
       "rpc": ["invite_user"]
     },

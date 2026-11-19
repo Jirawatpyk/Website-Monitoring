@@ -120,7 +120,7 @@ export function EscalationView({
       >
         {policy.steps.map((s, i) => {
           const names = site ? stepNames(policy.steps, i, site, data.admins) : targetLabels(s, data.admins);
-          const note = stepNote(policy, s, true);
+          const note = stepNote(policy, s, true, data.admins, hoursLabel(data.hours));
           return (
             <li key={s.level} className="group relative flex gap-3">
               <div className="flex w-9 shrink-0 flex-col items-center" aria-hidden>

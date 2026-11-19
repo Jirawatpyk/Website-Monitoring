@@ -180,6 +180,8 @@ describe('getRegistrationOptions', () => {
     });
     m.db = fake.db;
     expect(await getRegistrationOptions()).toEqual({
+      // No settings row in the fake: the seeded hours (S17 reads them from Organisation).
+      hoursText: 'Mon–Fri 09:00–18:00',
       clients: [{ id: 'c1', name: 'Cando Asia', internal: false, amName: 'Bua' }],
       people: [
         { id: 'u1', name: 'Nok', linked: true },

@@ -405,7 +405,7 @@ export function EditRotationDialog({ data, now, open, onClose }: Base & { data: 
             options={[{ value: 'mon9', label: 'Monday 09:00' }]}
             value="mon9"
             disabled
-            hint="Matches Tier 1 owner hours"
+            hint="Fixed in v1"
           />
         </div>
         <div className="flex flex-col gap-1 rounded-aura-md bg-bg-canvas px-3.5 py-2.5 text-sm">

@@ -572,10 +572,21 @@ function Devices({ data, now }: { data: ProfileData; now: Date }) {
   );
 }
 
-/** "Same for everyone": no personal do-not-disturb. Organisation editing comes with S17. */
+/** "Same for everyone": no personal do-not-disturb. An Admin edits them in Organisation (S17). */
 function Same({ data }: { data: ProfileData }) {
   return (
-    <Card title="Same for everyone" headingLevel={2}>
+    <Card
+      title="Same for everyone"
+      headingLevel={2}
+      actions={
+        data.me.role === 'admin' ? (
+          // An inline text link (WCAG 2.5.8): the span keeps the card header from blockifying it.
+          <span className="text-sm">
+            <Link href="/settings/organisation">Edit in Organisation</Link>
+          </span>
+        ) : undefined
+      }
+    >
       <div className="flex flex-col gap-3">
         <dl className="m-0 flex flex-col">
           {sameForEveryone(data).map((r) => (
