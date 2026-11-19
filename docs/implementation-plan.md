@@ -34,7 +34,7 @@
 | S11 | Client-update track | 2 · P1 | M | FR-20 | S08 | 4 | Done |
 | S12a | Monitor fault: heartbeats, alerts, VPS watchdog, Probes page | 2 · P1 | L | FR-21 | S06b, S10, S11 | 4 | Done |
 | S12b | Monitor fault: hand check, manual incident, Escalate now | 2 · P1 | M | — (FR-21 hand check) | S12a + MainFault / Escalate-now boards | 4 | Done |
-| S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | In progress |
+| S13 | SSL & domain expiry | 2 · P1 | S | FR-11 | S04a | 4 | Done |
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Done |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Done |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Done |
@@ -688,6 +688,14 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   2. Days-left on the page match a fixed "today" (spec §15.8 figures in a test).
   3. spec-checker passes Expiry; nav "SSL & domains" live.
 - **Review:** engine-reviewer, spec-checker, db-reviewer and security-reviewer (`site_expiry`, the reader), message-checker (the cause and the weekly lines).
+- **Evidence (Done 19 Nov 2026; PRs #209, #210, #211, #212 and this close-out):**
+  1. **Done-when 1:** PR #210, on staging 18 Nov: INC-0067 `ssl` "SSL certificate expires in 10 days" and INC-0068 `domain` "Domain expires in 20 days". Again on 19 Nov (INC-0069, INC-0070). Engine `expiry.test.ts`, pgTAP `new_cause.test.sql`, `expiry.int.test.ts`. Production: the hourly read and its 06:00 full run read every host since 18 Nov (34 of 34 on 19 Nov). No expiry has been under its line yet (nearest SSL 29 days).
+  2. **Done-when 2:** `features/expiry/model.test.ts` "expiryView — the §15.8 figures on Fri 25 Sep 2026" (Cando 55 / 41, WeCare 68 / 50, BA-TW 73 / 211, DxT AI 87 / 220). The same figures are in `expiryCounts`, `expiryOf`, `expiringOf` and `expiryLine`.
+  3. **Done-when 3:**
+     - spec-checker Expiry, Expiry820, MExpiry, MExpiryDark and MSites: no open High (#211).
+     - Nav "SSL & domains" live; production `/expiry` since 19 Nov. Check now pressed on production: the last check moved to 08:25, 200.
+     - `/verify` PASS on staging for #211 and for #212 (spec §40: back up, still SSL expiring, INC-0070).
+     - Close-out: spec-checker on the §40.5 timeline rows. The icons were fixed in #212. Here, "Raised to DOWN … · DOWN ladder from L0" and the board's "Back to / Now … · <days> · no message sent" (D-068 addendum).
 
 ### S14 · Digest, weekly summary & recurring maintenance
 

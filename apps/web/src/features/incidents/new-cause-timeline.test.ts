@@ -31,6 +31,7 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
       trigger: 'ssl',
       was: 'keyword',
       back: true,
+      detail: { kind: 'ssl', expiresAt: '2026-10-06T13:00:00Z', daysLeft: 13 },
     }),
   ];
 
@@ -74,6 +75,7 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
           was: 'ssl',
           back: true,
           cause: 'Domain expires in 18 days',
+          detail: { kind: 'domain', expiresAt: '2026-10-11T13:00:00Z', daysLeft: 18 },
         }),
       ],
       nameOf,
@@ -81,7 +83,8 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
     );
     expect(t.map((x) => [x.title, x.detail])).toContainEqual([
       'Now Domain expiring',
-      'was SSL expiring · nobody was told',
+      // Spec §40.5 board (D-068 addendum): what renewed, the days left, no message.
+      'SSL renewed · domain expires in 18 days (Sun 11 Oct) · no message sent',
     ]);
   });
 
@@ -90,7 +93,10 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
     expect(t.map((x) => [x.title, x.detail])).toEqual(
       expect.arrayContaining([
         ['New cause: Keyword', 'Found “บาคาร่า” on / (as Googlebot) · was SSL expiring'],
-        ['Back to SSL expiring', 'Keyword cleared · nobody was told'],
+        [
+          'Back to SSL expiring',
+          'Keyword cleared · SSL certificate expires in 13 days (Tue 6 Oct) · no message sent',
+        ],
       ]),
     );
   });
@@ -177,5 +183,24 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
     expect(
       t.filter((x) => x.title === 'Back up · still SSL expiring').map((x) => x.detail?.split(' · ')[0]),
     ).toEqual(['First OK round after 10 min down', 'First OK round after 8 min down']);
+  });
+
+  // Spec §40.5 board: "Raised to DOWN — Hard fail … · the acknowledgement of the expiry was cleared · DOWN
+  // ladder from L0"; an ack of the outage itself holds the ladder (D-021, D-067 item 6).
+  it('Raised to DOWN: from L0 when the expiry ack was cleared or nobody acked; not with an ack standing', () => {
+    const raise = (extra: Record<string, unknown>) =>
+      ev('escalated_to_down', '16:10:00', { cause: 'Timeout', ...extra });
+    const detail = (evs: ReturnType<typeof ev>[]) =>
+      timelineOf({ ...i, severity: 'down' }, [events[0]!, ...evs], nameOf, new Date(at('16:20:00'))).find(
+        (x) => x.title === 'Raised to DOWN',
+      )?.detail;
+    expect(detail([raise({ ackCleared: true })])).toBe(
+      'Timeout · the acknowledgement of the expiry was cleared · DOWN ladder from L0',
+    );
+    expect(detail([raise({})])).toBe('Timeout · DOWN ladder from L0');
+    expect(detail([ev('acknowledged', '15:00:00', {}), raise({})])).toBe('Timeout');
+    expect(detail([ev('acknowledged', '15:00:00', {}), ev('ack_undone', '15:00:05', {}), raise({})])).toBe(
+      'Timeout · DOWN ladder from L0',
+    );
   });
 });
