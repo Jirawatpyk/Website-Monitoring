@@ -64,6 +64,10 @@ The index `/implement-screen` reads. One row per canvas board (62). The board fi
 | Security | Settings — sessions & security (no 2-step lock, D-007) | `/settings/security` | P1 | S16 | §15.2, §16.7 | §3, §9 |
 | AlertChannels | Settings — alert channels & routing | `/settings/alert-channels` | P1 | S17 | §14.8, §15.5, §15.8 | §7 |
 | Organisation | Settings — organisation: tiers, clients, data, cost | `/settings/organisation` | P1 | S17 | §7, §14.14 | §4, §10 |
+| OrganisationLists | Settings — organisation: company holidays + shared forbidden words | `/settings/organisation` (same page, scrolled) | P1 | S17 | §41 | D-041, D-069 |
+| OrganisationListsDark | Same · dark | same, dark theme | P1 | S17 | §41 | D-041, D-069 |
+| MOrganisationLists | Mobile — Settings: Organisation lists, view only | `/settings/organisation` (390) | P1 | S17 | §22.5, §41 | D-069 |
+| MOrganisationListsDark | Mobile — Settings: Organisation lists · dark | same (390), dark theme | P1 | S17 | §41 | D-069 |
 | Profile | My profile & notifications | `/profile` | P1 | S16 | §10 (on-call checklist) | §3 |
 | MProfile | Mobile — My profile | `/profile` (390) | P1 | S16 | §22.6 | §3 |
 | Guide | User guide | `/guide` | P1 | S18 | §18 | FR-22 |

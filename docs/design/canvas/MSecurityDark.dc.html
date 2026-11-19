@@ -50,7 +50,7 @@ a{color:var(--aura-fg-accent)}
 <div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{viewOpts}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import></div>
 </div>
 
-<nav aria-label="Settings pages" class="st-tabs"><a href="MUsersDark.dc.html" >Users &amp; roles</a><a href="MSecurityDark.dc.html" aria-current="page">Sign-in &amp; security</a></nav>
+<x-import component-from-global-scope="Aura.Select" label="Settings page" options="{{pages}}" value="{{pageV}}" on-change="{{goPage}}"></x-import>
 
 <sc-if value="{{noAccess}}" hint-placeholder-val="{{false}}">
 <div style="padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); line-height: 1.45">
@@ -135,7 +135,7 @@ class Component extends DCLogic {
     var VAR = { Admin: 'solid', Responder: 'soft', Stakeholder: 'outline', Viewer: 'soft' };
     var COMMON = {
       yes: true, no: false, me: NOACC ? 'Arm' : 'Tao', noAccess: NOACC, hasAccess: !NOACC,
-      tabs: ['Users & roles', 'Sign-in & security'], tab: 'Sign-in & security',
+      tabs: ['Users & roles', 'Sign-in & security'], tab: 'Sign-in & security', pages: [{ value: 'users', label: 'Users & roles' }, { value: 'channels', label: 'Alert channels' }, { value: 'sso', label: 'Sign-in & security' }, { value: 'org', label: 'Organisation' }], pageV: 'sso', goPage: function (e) { var v = e && e.target ? e.target.value : e; var H = { users: 'MUsersDark.dc.html', sso: 'MSecurityDark.dc.html', org: 'MOrganisationListsDark.dc.html', channels: 'AlertChannels.dc.html' }; if (v !== 'sso' && H[v] && typeof location !== 'undefined') location.href = H[v]; }, 
       goTab: function (v) { if (v !== 'Sign-in & security' && typeof location !== 'undefined') location.href = v === 'Users & roles' ? 'MUsersDark.dc.html' : 'MSecurityDark.dc.html'; },
       close: function () { self.setState({ open: '', view: /sheet|Devices/.test(self.state.view) ? 'Default' : self.state.view }); },
       bottom: [

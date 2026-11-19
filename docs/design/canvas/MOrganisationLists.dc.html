@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Settings · Organisation: holidays and forbidden words</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:var(--aura-fg-accent)}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.aura-dialog__close.aura-icon-btn{width:44px;height:44px;margin:-12px -14px 0 0}
+.aura-input,.aura-input__control,.aura-select__trigger{min-height:44px;box-sizing:border-box}
+.aura-btn{min-height:44px;box-sizing:border-box}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.st-card{width:100%;min-height:64px;box-sizing:border-box;padding:10px 8px 10px 14px;display:flex;align-items:center;gap:10px;border:0;border-bottom:1px solid var(--aura-border-subtle);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.st-card:last-child{border-bottom:0}
+.st-card:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:-2px}
+.st-sec{background:var(--aura-bg-surface);border:1px solid var(--aura-border-default);border-radius:var(--aura-radius-lg);overflow:hidden}
+.st-h{font-family:var(--font-mono);font-size:11px;color:var(--aura-fg-tertiary);padding-left:2px}
+.st-kv{display:flex;flex-direction:column;gap:2px;font-size:13px;line-height:1.45}
+.st-kv>span:first-child{font-size:12px;color:var(--aura-fg-secondary)}
+.st-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:9999px;background:var(--aura-bg-surface-hover)}
+.st-tabs a{min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:9999px;font-size:13px;color:var(--aura-fg-secondary);text-decoration:none}
+.st-tabs a[aria-current="page"]{background:var(--aura-bg-surface);color:var(--aura-fg-primary);font-weight:600;box-shadow:0 0 0 1px var(--aura-border-default)}
+.st-tabs a:focus-visible{outline:var(--aura-focus-ring-width) solid var(--aura-focus-ring);outline-offset:2px}
+.st-clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ol-ph{display:inline-flex;align-items:center;padding:4px 10px;border:1px solid var(--aura-border-default);border-radius:9999px;background:var(--aura-bg-surface);font-size:13px;line-height:1.4}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<a href="MOverview4.dc.html" aria-label="Back to Overview" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<span style="flex-grow: 1; font-size: 17px; font-weight: 600">Settings</span>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="sm"></x-import></a>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{viewOpts}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import></div>
+</div>
+
+<x-import component-from-global-scope="Aura.Select" label="Settings page" options="{{pages}}" value="{{pageV}}" on-change="{{goPage}}"></x-import>
+
+<sc-if value="{{noAccess}}" hint-placeholder-val="{{false}}">
+<div style="padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-surface-hover); color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="lock" size="md"></x-import></span>
+<span style="font-size: 15px; font-weight: 600">Only Admins can see Settings</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">You’re signed in as Arm (Responder). Ask Tao if something here needs to change.</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="arrow-left" full-width="{{yes}}" href="MOverview4.dc.html">Back to Overview</x-import>
+</div>
+</sc-if>
+
+<sc-if value="{{hasAccess}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45">
+<span style="display: flex; padding-top: 1px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="eye" size="sm"></x-import></span>
+<span><b style="font-weight: 600">View only on phones.</b> <span style="color: var(--aura-fg-secondary)">Admins change policies on a larger screen.</span></span>
+</div>
+<span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Tiers and Clients sit above, Data kept and Monthly cost below — same page.</span>
+
+<span class="st-h">COMPANY HOLIDAYS</span>
+<span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary); margin-top: -6px">Tier 2–3 timers wait and Tier 1 is with the person on call all day.</span>
+<sc-for list="{{years}}" as="y" hint-placeholder-count="2">
+<div class="st-sec">
+<div style="padding: 8px 14px; font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); background: var(--aura-bg-canvas)">{{y.head}}</div>
+<sc-for list="{{y.rows}}" as="h" hint-placeholder-count="7">
+<div style="display: flex; align-items: flex-start; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--aura-border-subtle); font-size: 13px; line-height: 1.4">
+<span style="width: 84px; flex-shrink: 0; font-weight: 600; font-variant-numeric: tabular-nums">{{h.date}}</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span>{{h.name}}</span><sc-if value="{{h.co}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">Company day off</span></sc-if><sc-if value="{{h.hasSub}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{h.sub}}</span></sc-if></span>
+</div>
+</sc-for>
+<sc-if value="{{y.missing}}" hint-placeholder-val="{{false}}"><div style="padding: 9px 14px; border-top: 1px solid var(--aura-border-subtle); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">{{y.missingText}}</div></sc-if>
+</div>
+</sc-for>
+
+<span class="st-h" style="margin-top: 4px">SHARED FORBIDDEN WORDS · {{total}}</span>
+<span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary); margin-top: -6px">Checked on every site on top of its own list. Groups stay closed until you open one.</span>
+<div class="st-sec">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div style="border-bottom: 1px solid var(--aura-border-subtle)">
+<button type="button" class="st-card" style="min-height: 52px; border-bottom: 0" aria-expanded="{{g.open}}" aria-label="{{g.aria}}" onClick="{{g.toggle}}">
+<span style="flex-grow: 1; font-size: 14px; font-weight: 600">{{g.name}}</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary)">{{g.count}}</span>
+<span style="min-width: 44px; text-align: right; font-size: 13px; font-weight: 500; color: var(--aura-fg-accent)">{{g.btn}}</span>
+</button>
+<sc-if value="{{g.open}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px"><sc-for list="{{g.phrases}}" as="p" hint-placeholder-count="12"><span class="ol-ph" lang="{{p.lang}}">{{p.p}}</span></sc-for></div></sc-if>
+</div>
+</sc-for>
+</div>
+<span style="display: flex; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="eye" size="sm"></x-import></span>Holidays and phrases change on a larger screen.</span>
+</sc-if>
+
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Settings › Organisation at 390, holidays and forbidden words (§41, D-069). View only (§22.5): no add, rename, remove, Show-to-edit or Save. With four Settings pages the tabs become a “Settings page” select (§35.1). Holidays as a list per year (date · name · Company day off / weekend line); forbidden words collapsed per group with a count, a tap opens one group read-only. STATE: Default · Group shown · No access. Mock data — compute it.</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="" label="Sections"></x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { view: 'Default', openG: '' }; }
+  renderVals() {
+    var self = this, st = this.state, NOACC = st.view === 'No access';
+
+    // Board clock: Fri 25 Sep 2026 10:08. Holidays from today on; Thai public holidays seeded Oct 2026 – 2027 (made-up sample list).
+    var HOL = [
+      ['2026-10-13', 'Tue 13 Oct', 'King Bhumibol Memorial Day', 'pub'],
+      ['2026-10-23', 'Fri 23 Oct', 'Chulalongkorn Day', 'pub'],
+      ['2026-12-05', 'Sat 5 Dec', 'Father’s Day', 'pub'],
+      ['2026-12-07', 'Mon 7 Dec', 'Father’s Day (substitute)', 'pub'],
+      ['2026-12-10', 'Thu 10 Dec', 'Constitution Day', 'pub'],
+      ['2026-12-30', 'Wed 30 Dec', 'Company day off — year-end', 'co'],
+      ['2026-12-31', 'Thu 31 Dec', 'New Year’s Eve', 'pub'],
+      ['2027-01-01', 'Fri 1 Jan', 'New Year’s Day', 'pub'],
+      ['2027-04-06', 'Tue 6 Apr', 'Chakri Day', 'pub'],
+      ['2027-04-13', 'Tue 13 Apr', 'Songkran', 'pub'],
+      ['2027-04-14', 'Wed 14 Apr', 'Songkran', 'pub'],
+      ['2027-04-15', 'Thu 15 Apr', 'Songkran', 'pub'],
+      ['2027-05-01', 'Sat 1 May', 'Labour Day', 'pub'],
+      ['2027-05-04', 'Tue 4 May', 'Coronation Day', 'pub'],
+      ['2027-06-03', 'Thu 3 Jun', 'Queen Suthida’s Birthday', 'pub'],
+      ['2027-07-28', 'Wed 28 Jul', 'King’s Birthday', 'pub'],
+      ['2027-08-12', 'Thu 12 Aug', 'Mother’s Day', 'pub'],
+      ['2027-10-13', 'Wed 13 Oct', 'King Bhumibol Memorial Day', 'pub'],
+      ['2027-10-23', 'Sat 23 Oct', 'Chulalongkorn Day', 'pub'],
+      ['2027-10-25', 'Mon 25 Oct', 'Chulalongkorn Day (substitute)', 'pub'],
+      ['2027-12-05', 'Sun 5 Dec', 'Father’s Day', 'pub'],
+      ['2027-12-06', 'Mon 6 Dec', 'Father’s Day (substitute)', 'pub'],
+      ['2027-12-10', 'Fri 10 Dec', 'Constitution Day', 'pub'],
+      ['2027-12-31', 'Fri 31 Dec', 'New Year’s Eve', 'pub']
+    ];
+    if (st.added) HOL.push(['2026-11-20', 'Fri 20 Nov', st.added, 'co']);
+    if (st.renamed) HOL = HOL.map(function (h) { return h[0] === '2026-12-30' ? [h[0], h[1], st.renamed, h[3]] : h; });
+    if (st.removedHol) HOL = HOL.filter(function (h) { return h[0] !== '2026-12-30'; });
+    HOL.sort(function (a, b) { return a[0] < b[0] ? -1 : 1; });
+    function weekend(lbl) { return /^(Sat|Sun)/.test(lbl); }
+    var years = ['2026', '2027'].map(function (y) {
+      var rows = HOL.filter(function (h) { return h[0].slice(0, 4) === y; }).map(function (h) {
+        var we = weekend(h[1]);
+        return { iso: h[0], date: h[1], name: h[2], co: h[3] === 'co', pub: h[3] !== 'co', kind: h[3] === 'co' ? 'Company day off' : 'Public holiday',
+          kindVariant: h[3] === 'co' ? 'soft' : 'outline', we: we, sub: we ? 'Weekend — no effect on Mon–Fri hours' : '', hasSub: we,
+          aria: h[1] + ', ' + h[2], renameLabel: 'Rename ' + h[2] + ', ' + h[1], removeLabel: 'Remove ' + h[2] + ', ' + h[1],
+          rename: function () { self.setState({ dlg: 'rename', hName: h[2] }); }, remove: function () { self.setState({ dlg: 'removeHol' }); } };
+      });
+      var wd = rows.filter(function (r) { return !r.we; }).length;
+      return { y: y, rows: rows, head: y === '2026' ? y + ' · ' + rows.length + ' left this year · ' + wd + ' on weekdays' : y + ' · ' + rows.length + ' days · ' + wd + ' on weekdays',
+        missing: y === '2027', missingText: 'Makha Bucha, Visakha Bucha and Asanha Bucha 2027 follow the lunar calendar and aren’t announced yet — add them when the dates are announced.' };
+    });
+    // Shared forbidden words (made-up sample list, about 60 phrases)
+    var G = [
+      ['Gambling · Thai', ['บาคาร่า', 'สล็อตออนไลน์', 'แทงบอลออนไลน์', 'เว็บพนันออนไลน์', 'คาสิโนออนไลน์', 'เครดิตฟรี กดรับเอง', 'ฝากถอนไม่มีขั้นต่ำ', 'สล็อตแตกง่าย', 'หวยออนไลน์', 'แทงหวยออนไลน์', 'เว็บตรงไม่ผ่านเอเย่นต์', 'ทดลองเล่นสล็อต', 'โปรสมาชิกใหม่ 100%']],
+      ['Gambling · English', ['online casino', 'slot online', 'free credit bonus', 'sports betting', 'live baccarat', 'no deposit bonus', 'slot gacor', 'judi online', 'auto deposit withdraw', 'betting odds today', 'jackpot slot', 'bet online now']],
+      ['Brands', ['ufabet', 'pg slot', 'joker gaming', 'sbobet', 'sa gaming', 'betflik', 'lsm99 เว็บตรง', 'gclub casino', '168 slot', 'superslot', 'pgslot เว็บตรง']],
+      ['Adult', ['หนังโป๊', 'คลิปหลุด', 'เว็บผู้ใหญ่', 'สาวไซด์ไลน์', 'หาคู่คืนนี้', 'xxx video', 'adult chat', 'porn videos', 'hot cams', 'live cam girls', 'escort service', '18+ only']],
+      ['Pharma', ['viagra online', 'cialis online', 'buy tramadol', 'ยาเพิ่มขนาด', 'ยาปลุกอารมณ์', 'ยาลดความอ้วนแรง', 'ยาทำแท้ง', 'weight loss pills', 'cheap viagra', 'kamagra jelly', 'buy xanax', 'diet pills fast']]
+    ];
+    if (st.addedPh) G[0][1] = G[0][1].concat([st.addedPh]);
+    if (st.removedPh) G[0][1] = G[0][1].filter(function (p) { return p !== 'แทงหวยออนไลน์'; });
+    var total = 0;
+    var groups = G.map(function (g) {
+      total += g[1].length;
+      var open = st.openG === g[0];
+      return { name: g[0], n: g[1].length, count: g[1].length + ' phrases', open: open, closed: !open, btn: open ? 'Hide' : 'Show', btnIcon: open ? 'eye-off' : 'eye',
+        aria: (open ? 'Hide ' : 'Show ') + g[1].length + ' phrases in ' + g[0],
+        toggle: function () { self.setState({ openG: open ? '' : g[0] }); },
+        phrases: g[1].map(function (p) { return { p: p, lang: /[\u0E00-\u0E7F]/.test(p) ? 'th' : 'en', rmLabel: 'Remove ' + p + ' from ' + g[0], rm: function () { self.setState({ dlg: 'removePh', rmPh: p }); } }; }) };
+    });
+
+    groups.forEach(function (g) { g.aria = (g.open ? 'Hide ' : 'Show ') + g.n + ' phrases in ' + g.name; });
+    return {
+      yes: true, me: NOACC ? 'Arm' : 'Tao', noAccess: NOACC, hasAccess: !NOACC,
+      viewOpts: ['Default', 'Group shown', 'No access'].map(function (v) { return { value: v, label: v }; }), view: st.view,
+      setView: function (e) { var v = e && e.target ? e.target.value : e; self.setState({ view: v, openG: v === 'Group shown' ? 'Brands' : '' });
+        if (v === 'Group shown') setTimeout(function () { var el = document.querySelector('.r3-scroll'); if (el) el.scrollTop = 1500; }, 80); },
+      pages: [{ value: 'users', label: 'Users & roles' }, { value: 'channels', label: 'Alert channels' }, { value: 'sso', label: 'Sign-in & security' }, { value: 'org', label: 'Organisation' }], pageV: 'org', goPage: function (e) { var v = e && e.target ? e.target.value : e; var H = { users: 'MUsers.dc.html', sso: 'MSecurity.dc.html', org: 'MOrganisationLists.dc.html', channels: 'AlertChannels.dc.html' }; if (v !== 'org' && H[v] && typeof location !== 'undefined') location.href = H[v]; },
+      years: years, groups: groups, total: total,
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

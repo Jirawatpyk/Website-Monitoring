@@ -51,10 +51,11 @@ main > *{flex-shrink:0}
 </div>
 
 <x-import component-from-global-scope="Aura.Tabs" label="Settings sections" tabs="{{tabs}}" value="org"></x-import>
+<nav aria-label="On this page" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--aura-fg-secondary)"><span>On this page:</span><a href="#org-tiers">Tiers</a><span>·</span><a href="#org-clients">Clients</a><span>·</span><a href="OrganisationLists.dc.html">Company holidays</a><span>·</span><a href="OrganisationLists.dc.html">Shared forbidden words</a><span>·</span><a href="#org-data">Data kept</a><span>·</span><a href="#org-data">Monthly cost</a></nav>
 
 <section style="display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
-<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Tiers</h2>
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600" id="org-tiers">Tiers</h2>
 <span style="font-size: 13px; color: var(--aura-fg-secondary)">Response hours are set here only — alert channels, escalation and profiles read them. Changes are logged.</span>
 </div>
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
@@ -123,7 +124,7 @@ main > *{flex-shrink:0}
 <section style="display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
 <div style="display: flex; align-items: baseline; gap: 12px">
-<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">Clients</h2>
+<h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600" id="org-clients">Clients</h2>
 <span style="font-size: 13px; color: var(--aura-fg-secondary)">Who gets a report and a status page. Client logins arrive in Phase 3.</span>
 </div>
 <div style="display: flex; align-items: center; gap: 10px"><span style="font-size: 12px; color: var(--aura-fg-secondary)">New clients are created with their first site</span><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="plus" href="AddSite.dc.html">Add client</x-import></div>
@@ -157,7 +158,7 @@ main > *{flex-shrink:0}
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
 
 <div class="aura-card" style="gap: 12px">
-<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600">Data kept</h3><span style="font-size: 12px; color: var(--aura-fg-secondary)">Database 1.4 GB of 8 GB</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between"><h3 style="margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600" id="org-data">Data kept</h3><span style="font-size: 12px; color: var(--aura-fg-secondary)">Database 1.4 GB of 8 GB</span></div>
 <x-import component-from-global-scope="Aura.Progress" value="{{dbUsed}}" max="{{dbMax}}" aria-label="Database storage used" size="sm"></x-import>
 <div style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.5">
 <sc-for list="{{retention}}" as="r" hint-placeholder-count="4">

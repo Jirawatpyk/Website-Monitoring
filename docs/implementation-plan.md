@@ -743,7 +743,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
 - **Scope:** Alert channels & routing ("who gets what" with DOWN / PROBLEM rows read-only, delivery log, test alert in its own thread). Organisation: tiers, clients & AMs, response hours for Tier 2–3 (confirm with before / after, "Affects N sites"), company holidays, data retention, cost. The shared forbidden-word list becomes Admin-editable here; S09c ships it as a reviewed list in code (D-025, D-041).
 - **Decisions (D-069, Tao 19 Nov):** one response-hours setting, shared by the Tier 2–3 timers and Tier 1's owner / on-call hand-over; new hours apply to open incidents from the next engine run; "Who gets what" and flapping are read-only; the holiday editor and the editable forbidden-word list wait for a board.
-- **Boards:** AlertChannels, Organisation (+ a board for holidays and the forbidden-word list: brief `docs/design/briefs/Organisation-holidays-forbidden.md`)
+- **Boards:** AlertChannels, Organisation ; OrganisationLists, OrganisationListsDark, MOrganisationLists, MOrganisationListsDark (spec §41, drawn 19 Nov from the brief `docs/design/briefs/Organisation-holidays-forbidden.md`)
 - **PRs:**
   1. Organisation: `save_response_hours` (+ `organisation_storage`), `/settings/organisation`, the Settings select on phones, the hours copy on Sites / Site detail, "Edit in Organisation" on Escalation and Profile.
   2. Alert channels: read-only routing, the test alert (`send_channel_test`; also Profile's test for Stakeholders and Viewers, D-062 item 12), the delivery log.
@@ -968,6 +968,10 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | MSecurityDark | S16 |
 | AlertChannels | S17 |
 | Organisation | S17 |
+| OrganisationLists | S17 |
+| OrganisationListsDark | S17 |
+| MOrganisationLists | S17 |
+| MOrganisationListsDark | S17 |
 | Guide | S18 |
 | MGuide | S18 |
 | Reports | S20 |
