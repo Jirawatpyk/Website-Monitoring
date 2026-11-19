@@ -170,7 +170,9 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
             hint={
               toError
                 ? 'Fix the hours first — “To” must be after “From”'
-                : 'Response hours apply within a minute of saving · the next step shows who is affected'
+                : data.storedOther
+                  ? 'The stored hours aren’t one of these choices — only saving replaces them'
+                  : 'Response hours apply within a minute of saving · the next step shows who is affected'
             }
             onDiscard={() => setHours(data.hours)}
             saveDisabled={!!toError}
