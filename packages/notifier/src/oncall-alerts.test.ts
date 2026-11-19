@@ -164,6 +164,40 @@ describe('on-call messages (S10, D-048 item 11)', () => {
     expect(buildOncallEmail({ facts: base('test_alert'), role: 'self', to: 'Nok', ...thread })).toBeNull();
   });
 
+  it('a channel test (S17): its own TEST — no action card @mentioning only the tester, or one email', () => {
+    const channelTest = {
+      name: 'Mint',
+      channel: 'chat' as const,
+      url: 'https://monitor.example.test/profile',
+    };
+    const m = buildOncallChat(base('channel_test', { swap: undefined, channelTest }), [
+      { name: 'Mint', chatUserId: 'MINT' },
+    ]);
+    expect(m.text).toBe('<users/MINT> TEST — no action · Google Chat test for Mint');
+    expect(JSON.stringify(m.cardsV2)).toContain('"url":"https://monitor.example.test/profile"');
+    expect(JSON.stringify(m.cardsV2)).toContain('Nothing to do.');
+
+    const e = buildOncallEmail({
+      facts: base('channel_test', { swap: undefined, channelTest: { ...channelTest, channel: 'email' } }),
+      role: 'self',
+      to: 'Mint',
+      ...thread,
+      threadKey: 'test-e1',
+    })!;
+    expect(e.subject).toBe('DxT Monitor · TEST — no action · Mint');
+    expect(e.text).toContain('Test email — nothing to do');
+    expect(e.text).toContain('You got this because you sent yourself a test from DxT Monitor.');
+    expect(e.headers?.['In-Reply-To']).toBeUndefined();
+    expect(
+      buildOncallEmail({
+        facts: base('channel_test', { swap: undefined }),
+        role: 'self',
+        to: 'Mint',
+        ...thread,
+      }),
+    ).toBeNull();
+  });
+
   it('a later email replies in the same thread', () => {
     const e = buildOncallEmail({
       facts: base('swap_declined'),

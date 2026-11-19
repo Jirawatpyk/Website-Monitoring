@@ -1428,6 +1428,9 @@ isOneToOne: false
 "save_root_cause":
 { Args: { "p_category": string,"p_fix": string,"p_incident_id": string,"p_what": string }; Returns: undefined
                            },
+"send_channel_test":
+{ Args: { "p_channel": string }; Returns: string
+                           },
 "send_client_update_reminder":
 { Args: { "p_incident_id": string }; Returns: boolean
                            },

@@ -25,6 +25,7 @@ describe('Settings pages on a phone (§35.1, S17)', () => {
     expect(router.push).not.toHaveBeenCalled();
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
       'Users & roles',
+      'Alert channels',
       'Sign-in & security',
       'Organisation',
     ]);

@@ -90,6 +90,7 @@ insert into audit_classes (fn, kind, note) values
   ('post_series_action_now', 'exempt', 'Sends early the messages an audited series action already queued.'),
   ('set_oncall_checklist', 'exempt', 'A person ticks their own phone-readiness checklist (MOnCall).'),
   ('send_oncall_test', 'exempt', 'Queues a test alert to the person themselves.'),
+  ('send_channel_test', 'exempt', 'Queues a Chat or email test to the person themselves (S17).'),
   ('confirm_oncall_test', 'exempt', 'Records that the person got their own test alert.'),
   ('claim_notifications', 'exempt', 'The notifier claims queued messages to deliver them.'),
   ('queue_fallback_emails', 'exempt', 'Queues the fallback emails for a Chat post that failed (D-016).'),

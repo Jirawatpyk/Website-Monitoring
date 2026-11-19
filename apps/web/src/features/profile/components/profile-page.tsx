@@ -18,8 +18,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { phoneHeader } from '@/components/phone-header';
+import { useTestCooldown } from '@/components/use-test-cooldown';
 import { MutedOverlay, untilText } from '@/components/site-cells';
 import { SiteStatusBadge } from '@/components/status-badges';
+import { sendChannelTest } from '@/features/channels';
 import { sendTest } from '@/features/oncall';
 import {
   ChatIdDialog,
@@ -49,9 +51,6 @@ const FAILED = 'Couldn’t reach Monitor. Check your connection and try again.';
 /** Devices card words (D-062 item 12, D-011): no number of days. */
 const DEVICES_SUB =
   'You stay signed in on this device, so the Ack link opens straight to the incident. Signing out a device takes effect now.';
-
-/** A test alert waits a minute after the last one (`send_oncall_test`), as the On-call page's does. */
-const TEST_COOLDOWN_MS = 60_000;
 
 const TEXT_LINK = 'inline-flex min-h-11 items-center text-sm text-fg-link';
 
@@ -170,11 +169,10 @@ function ChannelBadge({ status }: { status: ChannelRow['status'] }) {
 function Channels({ data }: { data: ProfileData }) {
   const [editing, setEditing] = useState(false);
   const [line, setLine] = useState<string | null>(null);
+  // The SQL refuses a second test within a minute: the button says so and waits (§14.16).
+  const { sentAt: lastSent, cooling, markSent } = useTestCooldown(data.testSentAt);
+  // This visit's send, for the success note (the cooldown also starts from the loaded one).
   const [sent, setSent] = useState<string | null>(null);
-  const [cooling, setCooling] = useState(
-    () => !!data.testSentAt && Date.now() - Date.parse(data.testSentAt) < TEST_COOLDOWN_MS,
-  );
-  const lastSent = sent ?? data.testSentAt;
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const editRef = useRef<HTMLButtonElement>(null);
@@ -185,23 +183,22 @@ function Channels({ data }: { data: ProfileData }) {
     editRef.current?.focus();
     returnFocus.current = false;
   }, [editing]);
-  // The SQL refuses a second test within a minute: the button says so and waits (§14.16).
-  useEffect(() => {
-    if (!cooling) return;
-    const left = lastSent ? TEST_COOLDOWN_MS - (Date.now() - Date.parse(lastSent)) : 0;
-    const t = setTimeout(() => setCooling(false), Math.max(left, 0));
-    return () => clearTimeout(t);
-  }, [cooling, lastSent]);
 
+  const oncallTest = canTest(data.me.role);
   const test = () =>
     start(async () => {
       setError(null);
-      const r = await sendTest().catch(() => ({ ok: false as const, message: FAILED }));
+      // Admins and Responders get the on-call phone test (D-062 item 12); everyone else a plain Chat
+      // test in its own thread (S17), so every role can check alerts reach them.
+      const r = await (oncallTest ? sendTest() : sendChannelTest('chat')).catch(() => ({
+        ok: false as const,
+        message: FAILED,
+      }));
       if (!r.ok) return setError(r.message);
-      setSent(r.at ?? new Date().toISOString());
-      setCooling(true);
+      const at = r.at ?? new Date().toISOString();
+      setSent(at);
+      markSent(at);
     });
-  const testable = canTest(data.me.role);
   const button = (fullWidth?: boolean) => (
     <TestButton
       linked={data.me.chatLinked}
@@ -217,7 +214,7 @@ function Channels({ data }: { data: ProfileData }) {
       title="How alerts reach me"
       headingLevel={2}
       description="Owners and backups need a Chat id, so alerts can @mention them."
-      actions={testable ? <span className="hidden md:inline-flex">{button()}</span> : undefined}
+      actions={<span className="hidden md:inline-flex">{button()}</span>}
     >
       <div className="flex flex-col gap-3">
         <ul className="m-0 flex list-none flex-col p-0">
@@ -256,12 +253,13 @@ function Channels({ data }: { data: ProfileData }) {
             </li>
           ))}
         </ul>
-        {testable && <span className="md:hidden">{button(true)}</span>}
+        <span className="md:hidden">{button(true)}</span>
         {sent && (
           <Alert tone="success" role="status" title={`Test sent at ${formatTime(new Date(sent))}`}>
-            Posted in its own “TEST — no action” thread in the Alerts Space, mentioning only you. Open its
-            link on your phone to tick “Test alert received on this phone”. If your phone didn’t buzz, allow
-            the Alerts Space through Do Not Disturb.
+            Posted in its own “TEST — no action” thread in the Alerts Space, mentioning only you.
+            {oncallTest
+              ? ' Open its link on your phone to tick “Test alert received on this phone”. If your phone didn’t buzz, allow the Alerts Space through Do Not Disturb.'
+              : ' If your phone didn’t buzz, allow the Alerts Space through Do Not Disturb.'}
           </Alert>
         )}
         {error && (
@@ -580,10 +578,10 @@ function Same({ data }: { data: ProfileData }) {
       headingLevel={2}
       actions={
         data.me.role === 'admin' ? (
-          // An inline text link (WCAG 2.5.8): the span keeps the card header from blockifying it.
-          <span className="text-sm">
-            <Link href="/settings/organisation">Edit in Organisation</Link>
-          </span>
+          // On its own in the header, so a ghost button with a 44 px target (§14.17).
+          <Button variant="ghost" size="sm" touchHeight href="/settings/organisation">
+            Edit in Organisation
+          </Button>
         ) : undefined
       }
     >

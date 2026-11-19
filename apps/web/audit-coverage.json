@@ -156,6 +156,9 @@
     "features/oncall/actions.ts#setChecklist": {
       "exempt": "Ticks the person's own phone-readiness checklist (MOnCall); not config or incident state."
     },
+    "features/channels/actions.ts#sendChannelTest": {
+      "exempt": "Sends the person a Chat or email test; changes no config or incident (S17)."
+    },
     "features/oncall/actions.ts#sendTest": {
       "exempt": "Sends the person a test alert; changes no config or incident."
     },

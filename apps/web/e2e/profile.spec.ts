@@ -63,12 +63,13 @@ test.describe('my profile (local Supabase)', () => {
     await expect(page.getByText('No Chat id').first()).toBeVisible();
   });
 
-  test('a Viewer sees no test button and no on-call card', async ({ page, context, baseURL }) => {
+  test('a Viewer gets a Chat test (S17) and no on-call card', async ({ page, context, baseURL }) => {
     await ensureUser('mint@example.test');
     await signIn(context, baseURL!, 'mint@example.test');
     await page.goto('/profile');
     await expect(page.getByRole('heading', { name: 'How alerts reach me' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /test alert/i })).toHaveCount(0);
+    // Every role can check alerts reach them (D-062 item 12, S17); without a Chat id it says why.
+    await expect(page.getByRole('button', { name: /test alert/i }).first()).toBeAttached();
     await expect(page.getByText('MY NEXT ON-CALL SHIFT')).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath('profile-viewer.png'), fullPage: true });
   });
