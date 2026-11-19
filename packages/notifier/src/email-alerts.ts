@@ -159,7 +159,7 @@ export interface RecoveredEmailInput extends EmailBaseInput {
   /** The AM, for "Still to do · tell the client it's back (Bua)". */
   amName?: string | null;
   /** D-068 (spec §40.2): back up, the incident still open for this expiry — the Chat card's words. */
-  stillExpiry?: { label: string; cause: string } | null;
+  stillExpiry?: { label: string; cause: string | null } | null;
 }
 
 type Template =
@@ -605,12 +605,12 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
       headline: `${site} is back up, still ${still.label}`,
       lede:
         `${site} answered again at ${formatTime(input.recoveredAt)} after ${duration} down. ` +
-        `The incident stays open for ${still.label} — ${still.cause}. ` +
+        `The incident stays open for ${still.label}${still.cause ? ` — ${still.cause}` : ''}. ` +
         'The DOWN needs a root cause before it can be resolved.',
       facts: [
         ['Down for', `${duration} (${range})`],
         ['Confirmed by', `First OK round from ${formatLocations(input.okLocations)}`],
-        ['Still open for', `${still.label} — ${still.cause}`],
+        ['Still open for', still.cause ? `${still.label} — ${still.cause}` : still.label],
         ...ackFact,
         ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
       ],

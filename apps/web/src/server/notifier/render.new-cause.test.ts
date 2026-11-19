@@ -343,4 +343,37 @@ describe('render — a new cause (D-067)', () => {
       expect(m.text).not.toContain('still SSL expiring');
     });
   });
+
+  it('back up with an unreadable expiry detail still says it stays open (code review)', () => {
+    const facts: IncidentFacts = {
+      ...incident,
+      severity: 'down',
+      trigger: 'ssl',
+      incident_events: [
+        incident.incident_events![0]!,
+        {
+          type: 'escalated_to_down',
+          at: '2026-09-23T09:10:00Z',
+          payload: { startedAt: '2026-09-23T09:10:00Z' },
+        },
+        { type: 'recovered', at: '2026-09-23T09:18:00Z', payload: {} },
+      ],
+    };
+    const ctx = {
+      okLocations: 3,
+      recoveredAt: '2026-09-23T09:18:00Z',
+      stillExpiry: { trigger: 'ssl', detail: {} },
+    };
+    const m = renderChat(row({ template: 'recovered', context: ctx }), facts, appUrl, now)!;
+    expect(m.cardsV2[0]!.card.header.title).toBe('RECOVERED · DxT AI · back up, still SSL expiring');
+    expect(JSON.stringify(m.cardsV2)).toContain('The incident stays open for SSL expiring. The DOWN');
+    const email = renderEmail(
+      row({ template: 'recovered', channel: 'email', user_id: 'u-tao', context: ctx }),
+      facts,
+      tao,
+      appUrl,
+      thread,
+    )!;
+    expect(email.text).toContain('Still open for: SSL expiring');
+  });
 });

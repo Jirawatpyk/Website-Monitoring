@@ -1191,12 +1191,11 @@ export function timelineOf(
           // Spec §40.5, D-068: a DOWN that joined the expiry incident is over, the expiry isn't.
           const trig = str(e.payload.trigger);
           const label = trig && trig in TRIGGER_LABELS ? TRIGGER_LABELS[trig as Trigger] : 'the expiry';
-          const downMin = outageMinutes(
-            episodesFromTimeline({ started_at: i.startedAt, severity: i.severity }, events).filter(
-              (d) => d.severity === 'down' && d.end && d.end.getTime() <= Date.parse(e.at),
-            ),
-            new Date(e.at),
-          );
+          // The drop that just ended, as the RECOVERED card says it (code review: not every DOWN drop).
+          const ended = episodesFromTimeline({ started_at: i.startedAt, severity: i.severity }, events)
+            .filter((d) => d.severity === 'down' && d.end && d.end.getTime() <= Date.parse(e.at))
+            .at(-1);
+          const downMin = ended ? outageMinutes([ended], new Date(e.at)) : null;
           const lastDrop = downMin
             ? `First OK round after ${formatDuration(downMin)} down`
             : 'First OK round';

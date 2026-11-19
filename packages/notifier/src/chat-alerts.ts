@@ -176,7 +176,8 @@ export interface RecoveredAlertInput {
  */
 export interface StillExpiry {
   label: string;
-  cause: string;
+  /** Null when the stored detail can't be read: the card then names the label only. */
+  cause: string | null;
   incidentNumber: number;
   tier: number;
   mention: ChatPerson | null;
@@ -380,7 +381,7 @@ export function buildRecoveredAlert(input: RecoveredAlertInput): ChatMessage {
                     textParagraph: {
                       text:
                         `${site} answered again at ${formatTime(input.recoveredAt)} after ${duration} down. ` +
-                        `The incident stays open for ${still.label} — ${still.cause}. ` +
+                        `The incident stays open for ${still.label}${still.cause ? ` — ${still.cause}` : ''}. ` +
                         'The DOWN needs a root cause before it can be resolved.' +
                         (input.clientUpdate ? ` ${plainName(input.clientUpdate)}.` : ''),
                     },

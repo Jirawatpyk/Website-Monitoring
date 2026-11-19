@@ -146,4 +146,33 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
     // One line for the round, not RECOVERED + PROBLEM AGAIN.
     expect(t.filter((x) => x.time.startsWith('16:18'))).toHaveLength(1);
   });
+
+  it('a second back-up counts only the drop that just ended (code review)', () => {
+    const detail = { kind: 'ssl', expiresAt: '2026-10-06T13:00:00Z', daysLeft: 13 };
+    const backUp = (t: string) =>
+      ev('relapsed', t, {
+        severity: 'problem',
+        trigger: 'ssl',
+        homeBackAt: at(t),
+        stillExpiry: true,
+        detail,
+      });
+    const t = timelineOf(
+      { ...i, severity: 'down' },
+      [
+        events[0]!,
+        ev('escalated_to_down', '14:00:00', { cause: 'Timeout', startedAt: at('14:00:00') }),
+        ev('recovered', '14:10:00', { okLocations: 3 }),
+        backUp('14:10:00'),
+        ev('relapsed', '16:10:00', { severity: 'down', summary: 'Timeout', startedAt: at('16:10:00') }),
+        ev('recovered', '16:18:00', { okLocations: 3 }),
+        backUp('16:18:00'),
+      ],
+      nameOf,
+      new Date(at('16:20:00')),
+    );
+    expect(
+      t.filter((x) => x.title === 'Back up · still SSL expiring').map((x) => x.detail?.split(' · ')[0]),
+    ).toEqual(['First OK round after 10 min down', 'First OK round after 8 min down']);
+  });
 });

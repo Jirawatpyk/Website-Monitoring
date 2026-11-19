@@ -258,9 +258,11 @@ function setAsideOf(ctx: Record<string, unknown>): { by: string; at: Date } | nu
  * the email's "Was" row) — the newest event before it that carried an SSL / domain detail.
  */
 function expiryBefore(i: IncidentFacts, before: Date, asOf: Date): string | null {
+  // As times, not strings: Postgres writes "+00:00", a JS date "Z" (code review).
+  const t = (at: string | null | undefined) => (at ? Date.parse(at) : Number.NaN);
   const events = [...(i.incident_events ?? [])]
-    .filter((e) => (e.at ?? '') < before.toISOString())
-    .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''));
+    .filter((e) => t(e.at) < before.getTime())
+    .sort((a, b) => t(a.at) - t(b.at));
   for (const e of events.reverse()) {
     const hit = expiryNow(contextOf(e.payload).detail, asOf);
     if (hit) return hit.cause;
@@ -285,11 +287,16 @@ function stillOf(i: IncidentFacts, ctx: Record<string, unknown>, asOf: Date): St
 }
 
 /** D-068 (spec §40.2): back up, the incident still open for the expiry its DOWN joined. */
-function stillExpiryOf(ctx: Record<string, unknown>, asOf: Date): { label: string; cause: string } | null {
+function stillExpiryOf(
+  ctx: Record<string, unknown>,
+  asOf: Date,
+): { label: string; cause: string | null } | null {
   const still = ctx.stillExpiry as { trigger?: unknown; detail?: unknown } | undefined;
-  const hit = still ? expiryNow(still.detail, asOf) : null;
   const t = still?.trigger;
-  return hit && (t === 'ssl' || t === 'domain') ? { label: TRIGGER_LABELS[t], cause: hit.cause } : null;
+  // An unreadable detail still says what it stays open for (code review: never a plain "is back").
+  return t === 'ssl' || t === 'domain'
+    ? { label: TRIGGER_LABELS[t], cause: expiryNow(still?.detail, asOf)?.cause ?? null }
+    : null;
 }
 
 /** D-067 (Tao, 17 Nov): the person on call a Tier 1 new cause at night names, stored with the row. */
