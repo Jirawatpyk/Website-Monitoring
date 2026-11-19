@@ -1,5 +1,12 @@
 import { bangkokDayOf, isoWeekdayOf } from '@dxt/engine';
-import { formatDay, formatResponseHours, type ResponseHours } from '@dxt/shared';
+import {
+  formatDay,
+  formatResponseDays,
+  HOLIDAY_KINDS as KINDS,
+  minutesToClock,
+  type HolidayKind,
+  type ResponseHours,
+} from '@dxt/shared';
 
 /** A company holiday as stored (`company_holidays`): a Bangkok day, its name and its kind. */
 export interface Holiday {
@@ -7,15 +14,16 @@ export interface Holiday {
   /** `YYYY-MM-DD`, a Bangkok date. */
   day: string;
   name: string;
-  kind: 'public' | 'company';
+  kind: HolidayKind;
 }
 
 export type Hours = Pick<ResponseHours, 'startMin' | 'endMin' | 'days'>;
 
+/** The Add dialog's choices, company first (the usual add); values mirror `company_holidays.kind`. */
 export const HOLIDAY_KINDS = [
   { value: 'company', label: 'Company day off' },
   { value: 'public', label: 'Public holiday' },
-] as const;
+] as const satisfies readonly { value: (typeof KINDS)[number]; label: string }[];
 
 export const HOLIDAY_NAME_MAX = 100;
 
@@ -29,10 +37,8 @@ export const bangkokToday = bangkokDayOf;
 export const lastHolidayDay = (now: Date) => `${Number(bangkokToday(now).slice(0, 4)) + 1}-12-31`;
 
 const weekdayOf = isoWeekdayOf;
-
-const hhmm = (m: number) =>
-  `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-const daysWord = (h: Hours) => formatResponseHours(h).split(' ')[0]!;
+const daysWord = (h: Hours) => formatResponseDays(h.days);
+const kindLabel = (k: Holiday['kind']) => HOLIDAY_KINDS.find((x) => x.value === k)!.label;
 
 export interface HolidayRow {
   id: string;
@@ -67,7 +73,10 @@ export function holidayYears(holidays: readonly Holiday[], hours: Hours, now: Da
   const nextYear = String(Number(thisYear) + 1);
   const working = (h: Hours) =>
     h.days.length === 5 && h.days.every((d, i) => d === i + 1) ? 'weekdays' : 'working days';
-  return [thisYear, nextYear].map((year) => {
+  // This year and next always; any later year a row was written for (by SQL) too, so it can be removed.
+  const later = holidays.map((h) => h.day.slice(0, 4)).filter((y) => y > nextYear);
+  const years = [...new Set([thisYear, nextYear, ...later])].sort();
+  return years.map((year) => {
     const rows = holidays
       .filter((h) => h.day.slice(0, 4) === year && h.day >= today)
       .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
@@ -79,7 +88,7 @@ export function holidayYears(holidays: readonly Holiday[], hours: Hours, now: Da
           date: formatDay(dayDate(h.day), { weekday: true }),
           name: h.name,
           kind: h.kind,
-          kindLabel: h.kind === 'company' ? 'Company day off' : 'Public holiday',
+          kindLabel: kindLabel(h.kind),
           offDay,
           sub: offDay ? `Weekend — no effect on ${daysWord(hours)} hours` : null,
         };
@@ -90,7 +99,7 @@ export function holidayYears(holidays: readonly Holiday[], hours: Hours, now: Da
       head:
         year === thisYear
           ? `${year} · ${rows.length} left this year · ${on} on ${working(hours)}`
-          : `${year} · ${rows.length} days · ${on} on ${working(hours)}`,
+          : `${year} · ${rows.length} ${rows.length === 1 ? 'day' : 'days'} · ${on} on ${working(hours)}`,
       rows,
       note:
         year === nextYear
@@ -113,7 +122,7 @@ export function removeEffect(h: Pick<Holiday, 'day'>, hours: Hours): { title: st
     };
   return {
     title: `${date} becomes a working day.`,
-    body: `Tier 2–3 timers run ${hhmm(hours.startMin)}–${hhmm(hours.endMin)} and Tier 1 DOWN goes to the owner during those hours, the on-call person outside them. This applies within a minute, open incidents included; a PROBLEM already held keeps the time it was held until.`,
+    body: `Tier 2–3 timers run ${minutesToClock(hours.startMin)}–${minutesToClock(hours.endMin)} and Tier 1 DOWN goes to the owner during those hours, the on-call person outside them. This applies within a minute, open incidents included; a PROBLEM already held keeps the time it was held until.`,
   };
 }
 

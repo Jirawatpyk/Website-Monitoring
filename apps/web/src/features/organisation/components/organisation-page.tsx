@@ -449,7 +449,7 @@ const ON_THIS_PAGE = [
   { href: '#clients', label: 'Clients' },
   { href: '#holidays', label: 'Company holidays' },
   { href: '#data-kept', label: 'Data kept' },
-  { href: '#data-kept', label: 'Monthly cost' },
+  { href: '#monthly-cost', label: 'Monthly cost' },
 ] as const;
 
 function OnThisPage() {
@@ -504,6 +504,8 @@ function DataKept({ bytes }: { bytes: number | null }) {
 function Budget() {
   return (
     <Card
+      id="monthly-cost"
+      className="scroll-mt-4"
       title="Monthly cost"
       headingLevel={2}
       actions={

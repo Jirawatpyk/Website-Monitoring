@@ -45,6 +45,12 @@ describe('holiday list', () => {
     expect(y27!.note).toMatch(/^Makha Bucha, Visakha Bucha and Asanha Bucha 2027 follow the lunar calendar/);
   });
 
+  it('a day SQL wrote after next year gets its own year, so it can be removed', () => {
+    const years = holidayYears([...LIST, h('2028-01-03', 'Far day')], MON_FRI, NOW);
+    expect(years.map((y) => y.year)).toEqual(['2026', '2027', '2028']);
+    expect(years[2]!.head).toBe('2028 · 1 day · 1 on weekdays');
+  });
+
   it('follows the hours setting: with Mon–Sat a Saturday counts', () => {
     const [y26] = holidayYears(LIST, MON_SAT, NOW);
     expect(y26!.head).toBe('2026 · 4 left this year · 4 on working days');

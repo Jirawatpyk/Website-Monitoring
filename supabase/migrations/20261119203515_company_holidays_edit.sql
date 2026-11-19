@@ -12,7 +12,8 @@
 set local lock_timeout = '5s';
 
 alter table public.company_holidays
-  add column kind text not null default 'public' check (kind in ('public', 'company'));
+  add column kind text not null default 'public'
+    constraint company_holidays_kind_check check (kind in ('public', 'company'));
 
 create function private.holiday_window_check(p_day date)
 returns void
@@ -69,16 +70,13 @@ begin
   if p_kind is null or p_kind not in ('public', 'company') then
     raise exception 'Pick Public holiday or Company day off' using errcode = '22023', hint = 'kind_invalid';
   end if;
-  select h.name into v_taken from public.company_holidays h where h.day = p_day;
-  if found then
-    raise exception 'That day is already a holiday' using errcode = '23505', hint = 'holiday_taken', detail = v_taken;
-  end if;
+  -- One per day: a taken day (or one a concurrent add just took) is refused with its name.
   insert into public.company_holidays (day, name, kind) values (p_day, v_name, p_kind)
     on conflict (day) do nothing
     returning id into v_id;
   if v_id is null then
-    raise exception 'That day is already a holiday' using errcode = '23505', hint = 'holiday_taken',
-      detail = (select h.name from public.company_holidays h where h.day = p_day);
+    select h.name into v_taken from public.company_holidays h where h.day = p_day;
+    raise exception 'That day is already a holiday' using errcode = '23505', hint = 'holiday_taken', detail = v_taken;
   end if;
   return v_id;
 end;
@@ -103,8 +101,8 @@ begin
   if v_day < (now() at time zone 'Asia/Bangkok')::date then
     raise exception 'Past days can’t be changed' using errcode = '22023', hint = 'holiday_past';
   end if;
-  -- The audit trigger skips a no-op update, so the same name again writes nothing.
-  update public.company_holidays set name = v_name where id = p_id;
+  -- The same name again changes nothing: no audit row, no new updated_at.
+  update public.company_holidays set name = v_name where id = p_id and name is distinct from v_name;
 end;
 $$;
 

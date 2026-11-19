@@ -1,5 +1,5 @@
 import 'server-only';
-import { formatResponseHours, timeToMinutes, type Tier } from '@dxt/shared';
+import { formatResponseHours, minutesToClock, timeToMinutes, type Tier } from '@dxt/shared';
 import type { ServerClient } from '@/lib/supabase/server';
 import { bangkokToday, type Holiday, type Hours as HolidayHours } from './holidays';
 import { daySetOf, TIME_OPTIONS, type Hours, type OrgClient, type OrgSite } from './model';
@@ -32,15 +32,15 @@ async function loadHolidays(db: ServerClient, now: Date): Promise<Holiday[]> {
   const from = bangkokToday(now);
   const full = await db.from('company_holidays').select('id, day, name, kind').gte('day', from).order('day');
   if (!full.error) return full.data.map((h) => ({ ...h, kind: h.kind === 'company' ? 'company' : 'public' }));
+  // Only the missing column falls back; any other failure is a real one.
+  if (full.error.code !== '42703') throw new Error(`company_holidays: ${full.error.message}`);
+  console.error(JSON.stringify({ event: 'company_holidays_kind_missing' }));
   const bare = await db.from('company_holidays').select('id, day, name').gte('day', from).order('day');
   if (bare.error) throw new Error(`company_holidays: ${bare.error.message}`);
   return bare.data.map((h) => ({ ...h, kind: 'public' }));
 }
 
-const hhmm = (t: string) => {
-  const m = timeToMinutes(t);
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-};
+const hhmm = (t: string) => minutesToClock(timeToMinutes(t));
 
 /** The Organisation page for an Admin (RLS as the user: staff read; the storage RPC is Admin-only). */
 export async function loadOrganisation(db: ServerClient, now = new Date()): Promise<OrganisationData> {

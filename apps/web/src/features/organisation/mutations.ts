@@ -59,6 +59,9 @@ function holidayRefusal(error: RpcError, day?: string): SaveHoursResult {
   if (error.hint === 'holiday_taken' && day)
     return { ok: false, message: `${takenLine(day, error.details ?? 'a holiday')}.` };
   if (error.hint && HOLIDAY_WORDS.has(error.hint)) return { ok: false, message: `${error.message}.` };
+  // The deploy runs before `migrate-production`: for those minutes the functions don't exist yet.
+  if (error.code === 'PGRST202')
+    return { ok: false, message: 'Holidays can’t be changed for a minute — try again shortly.' };
   return { ok: false, message: 'Couldn’t save. Check your connection and try again.' };
 }
 

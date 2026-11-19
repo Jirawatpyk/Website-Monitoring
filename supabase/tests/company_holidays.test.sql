@@ -3,7 +3,16 @@
 -- audit row naming the Admin (the row trigger, inside a security definer function).
 begin;
 \ir _helpers.psql
-select plan(20);
+select plan(25);
+
+-- ── Who may call them (security review: a later `create or replace` mustn't widen them) ────────────
+select ok(not has_function_privilege('anon', 'public.add_company_holiday(date,text,text)', 'execute'), 'anon can’t add');
+select ok(not has_function_privilege('anon', 'public.rename_company_holiday(uuid,text)', 'execute'), 'anon can’t rename');
+select ok(not has_function_privilege('anon', 'public.remove_company_holiday(uuid)', 'execute'), 'anon can’t remove');
+select ok(not has_function_privilege('authenticated', 'private.holiday_window_check(date)', 'execute'),
+          'the date helper is private');
+select ok(not has_function_privilege('authenticated', 'private.holiday_name(text)', 'execute'),
+          'the name helper is private');
 
 update public.profiles set is_active = false where true;
 create temp table ids (name text primary key, id uuid) on commit drop;

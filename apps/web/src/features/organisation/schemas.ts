@@ -1,3 +1,4 @@
+import { HOLIDAY_KINDS } from '@dxt/shared';
 import { z } from 'zod';
 import { HOLIDAY_NAME_MAX } from './holidays';
 import { DAY_SET_LABELS, TIME_OPTIONS, type DaySet } from './model';
@@ -29,7 +30,7 @@ const holidayName = z
 export const addHolidaySchema = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a day.'),
   name: holidayName,
-  kind: z.enum(['company', 'public']),
+  kind: z.enum(HOLIDAY_KINDS),
 });
 export type AddHolidayInput = z.input<typeof addHolidaySchema>;
 
