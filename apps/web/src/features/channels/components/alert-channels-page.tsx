@@ -21,6 +21,7 @@ import {
   IconMinus,
   IconMonitor,
   IconTriangleAlert,
+  IconUsers,
 } from '@jirawatpyk/aura-react/icons';
 import { formatTime } from '@dxt/shared';
 import Link from 'next/link';
@@ -70,8 +71,8 @@ export function AlertChannelsPageView({ data, now: nowIso }: { data: ChannelsDat
         <ChatCard data={data} now={now} />
         <EmailCard data={data} />
         <Card
-          title="Voice call · Twilio"
-          headingLevel={2}
+          header={<ChannelHead icon={<IconTriangleAlert />} name="Voice call · Twilio" id="ch-voice" />}
+          titleId="ch-voice"
           actions={<StatusPill tone="neutral">Off</StatusPill>}
         >
           <ChannelBody
@@ -92,8 +93,8 @@ export function AlertChannelsPageView({ data, now: nowIso }: { data: ChannelsDat
           </ChannelBody>
         </Card>
         <Card
-          title="Google Chat app"
-          headingLevel={2}
+          header={<ChannelHead icon={<IconUsers />} name="Google Chat app" id="ch-app" />}
+          titleId="ch-app"
           actions={
             <Badge tone="neutral" variant="outline">
               Phase 3
@@ -164,6 +165,23 @@ export function AlertChannelsPageView({ data, now: nowIso }: { data: ChannelsDat
       </div>
 
       <DeliveryLog rows={log} />
+    </div>
+  );
+}
+
+/** A channel card's head (board): the 36 px icon tile, then the name as the card's h2. */
+function ChannelHead({ icon, name, id }: { icon: React.ReactElement; name: string; id: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        aria-hidden
+        className="flex size-9 shrink-0 items-center justify-center rounded-aura-md border border-border-default bg-bg-canvas text-fg-secondary"
+      >
+        {icon}
+      </span>
+      <h2 id={id} className="m-0 text-base font-semibold">
+        {name}
+      </h2>
     </div>
   );
 }
@@ -285,8 +303,8 @@ function ChatCard({ data, now }: { data: ChannelsData; now: Date }) {
   const f = data.facts;
   return (
     <Card
-      title="Google Chat"
-      headingLevel={2}
+      header={<ChannelHead icon={<IconBell />} name="Google Chat" id="ch-chat" />}
+      titleId="ch-chat"
       actions={
         <StatusPill tone={f.chatConnected ? 'ready' : 'blocked'}>
           {f.chatConnected ? 'Connected' : 'Not set up'}
@@ -324,8 +342,8 @@ function EmailCard({ data }: { data: ChannelsData }) {
   const f = data.facts;
   return (
     <Card
-      title="Email · Resend"
-      headingLevel={2}
+      header={<ChannelHead icon={<IconMail />} name="Email · Resend" id="ch-email" />}
+      titleId="ch-email"
       actions={
         <StatusPill tone={f.emailConnected ? 'ready' : 'blocked'}>
           {f.emailConnected ? 'Connected' : 'Not set up'}

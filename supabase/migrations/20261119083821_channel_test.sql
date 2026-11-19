@@ -18,6 +18,11 @@ alter table public.oncall_events add constraint oncall_events_kind_check check (
 create index oncall_events_channel_test_idx on public.oncall_events (user_id, at desc)
   where kind = 'channel_test';
 
+-- Alert channels reads today's messages by creation time, and counts the failed emails of the last
+-- 24 h: `notifications` keeps every row (no retention job), so both get an index.
+create index notifications_created_at_idx on public.notifications (created_at desc);
+create index notifications_failed_idx on public.notifications (updated_at) where status = 'failed';
+
 -- Who an event tells: as before, plus the tester of a channel test, whatever their role.
 create or replace function private.oncall_recipients(p_event_id uuid)
 returns table (user_id uuid, role text)

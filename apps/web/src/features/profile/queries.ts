@@ -36,6 +36,7 @@ export async function loadProfileData(
     open,
     admins,
     checklist,
+    channelTest,
   ] = await Promise.all([
     db.from('profiles').select('id, display_name, email, role, google_chat_user_id').eq('id', meId).single(),
     db.rpc('list_sessions', { p_user_id: meId }),
@@ -72,6 +73,15 @@ export async function loadProfileData(
       .eq('is_active', true)
       .order('display_name'),
     db.from('oncall_checklist').select('test_sent_at').eq('user_id', meId).maybeSingle(),
+    // A Stakeholder's or Viewer's test is a channel test (S17): its newest one starts the button's minute.
+    db
+      .from('oncall_events')
+      .select('at')
+      .eq('kind', 'channel_test')
+      .eq('user_id', meId)
+      .order('at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const p = check('profiles', me);
@@ -165,6 +175,9 @@ export async function loadProfileData(
       : { start: '09:00', end: '18:00', days: [1, 2, 3, 4, 5] },
     emailOn,
     admins: (check('admins', admins) ?? []).map((a) => a.display_name),
-    testSentAt: check('oncall_checklist', checklist)?.test_sent_at ?? null,
+    testSentAt:
+      p.role === 'admin' || p.role === 'responder'
+        ? (check('oncall_checklist', checklist)?.test_sent_at ?? null)
+        : (check('oncall_events', channelTest)?.at ?? null),
   };
 }

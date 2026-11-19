@@ -39,6 +39,15 @@ export function ladderLine(steps: readonly EscalationStep[]): string {
   return [head, ...sorted.filter((s) => s.level > 0).map((s) => `L${s.level} +${s.delayMin}`)].join(' · ');
 }
 
+/** "Tier 1: L2 page · L3 FYI" — the Tier 1 DOWN steps that name the CEO, from the policy (Escalation). */
+export function ceoLine(t1Down: readonly EscalationStep[]): string {
+  const steps = [...t1Down]
+    .filter((s) => s.targets.includes('ceo'))
+    .sort((a, b) => a.level - b.level)
+    .map((s) => `L${s.level} ${s.fyi ? 'FYI' : 'page'}`);
+  return steps.length ? `Tier 1: ${steps.join(' · ')}` : 'Not paged — the daily digest';
+}
+
 export interface RoutingRow {
   id: 'down' | 'problem' | 'expiry' | 'recovery' | 'fault';
   event: string;
@@ -81,7 +90,7 @@ export function routingRows(l: Ladders, admins: readonly string[]): RoutingRow[]
         ladderLine(l.t2Down) === ladderLine(l.t3Down)
           ? `Tier 1: ${ladderLine(l.t1Down)} · Tier 2–3: ${ladderLine(l.t2Down)}`
           : `Tier 1: ${ladderLine(l.t1Down)} · Tier 2: ${ladderLine(l.t2Down)} · Tier 3: ${ladderLine(l.t3Down)}`,
-      ceo: 'Tier 1: L2 page · L3 FYI',
+      ceo: ceoLine(l.t1Down),
     },
     {
       id: 'problem',

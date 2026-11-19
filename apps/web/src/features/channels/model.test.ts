@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EscalationStep } from '@dxt/shared';
 import {
+  ceoLine,
   FLAPPING,
   ladderLine,
   lastSentLine,
@@ -73,6 +74,13 @@ describe('who gets what (read-only, D-069 item 3)', () => {
     expect(routingRows({ t1Down: T1, t2Down: T23, t3Down: t3, problem: PROBLEM }, [])[0]!.how).toBe(
       'Tier 1: L0 Chat + Space + email · L1 +15 · L2 +30 · L3 +60 · Tier 2: L0 Chat + Space + email · L1 +15 · L2 +30 · Tier 3: L0 Chat + Space + email · L1 +30',
     );
+  });
+
+  it('the CEO cell reads the Tier 1 policy', () => {
+    const ceo = (level: number, fyi: boolean) =>
+      ({ level, delayMin: level * 30, targets: ['ceo'], channels: ['chat'], fyi }) as EscalationStep;
+    expect(ceoLine([step(0, 0), ceo(2, false), ceo(3, true)])).toBe('Tier 1: L2 page · L3 FYI');
+    expect(ceoLine([step(0, 0), step(1, 15)])).toBe('Not paged — the daily digest');
   });
 
   it('flapping shows the engine’s numbers', () => {
