@@ -881,6 +881,9 @@ export interface TimelineItem {
     | 'problem'
     | 'alert'
     | 'ack'
+    /** §40.5 (D-068): the ack of the expiry set aside (grey minus) / given back (green check). */
+    | 'ack_aside'
+    | 'ack_back'
     | 'evidence'
     | 'recovered'
     | 'ok'
@@ -1153,7 +1156,7 @@ export function timelineOf(
           if (back)
             item(
               e,
-              'ack',
+              'ack_back',
               'Acknowledgement given back',
               `Acknowledged by ${back.by} ${formatShortWhen(back.at, new Date(e.at))} again — it was for ${label(trig)}`,
             );
@@ -1170,7 +1173,7 @@ export function timelineOf(
           const aside = ackOf(e.payload.setAside);
           item(
             e,
-            'ack',
+            'ack_aside',
             'Acknowledgement set aside',
             aside
               ? `${aside.by}’s acknowledgement of ${label(was)} (${formatShortWhen(aside.at, new Date(e.at))}) doesn’t cover ${label(trig)} — it needs its own`
@@ -1190,7 +1193,7 @@ export function timelineOf(
         if (!down && str(e.payload.homeBackAt) && e.payload.stillExpiry === true) {
           // Spec §40.5, D-068: a DOWN that joined the expiry incident is over, the expiry isn't.
           const trig = str(e.payload.trigger);
-          const label = trig && trig in TRIGGER_LABELS ? TRIGGER_LABELS[trig as Trigger] : 'the expiry';
+          const label = trig && trig in TRIGGER_LABELS ? TRIGGER_LABELS[trig as Trigger] : 'expiring';
           // The drop that just ended, as the RECOVERED card says it (code review: not every DOWN drop).
           const ended = episodesFromTimeline({ started_at: i.startedAt, severity: i.severity }, events)
             .filter((d) => d.severity === 'down' && d.end && d.end.getTime() <= Date.parse(e.at))
@@ -1201,7 +1204,7 @@ export function timelineOf(
             : 'First OK round';
           item(
             e,
-            'recovered',
+            'ok',
             `Back up · still ${label}`,
             [lastDrop, expiryNowWords(e.payload.detail, new Date(e.at)), 'the DOWN needs a root cause']
               .filter(Boolean)

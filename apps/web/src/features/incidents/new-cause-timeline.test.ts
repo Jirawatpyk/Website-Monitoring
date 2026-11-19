@@ -54,7 +54,10 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
     const details = t.map((x) => x.detail ?? '');
     // Spec §40.5: its own row (no name stored by an older row: the generic words).
     expect(t.filter((x) => x.title === 'Acknowledgement set aside')).toMatchObject([
-      { kind: 'ack', detail: 'The acknowledgement of SSL expiring doesn’t cover Keyword — it needs its own' },
+      {
+        kind: 'ack_aside',
+        detail: 'The acknowledgement of SSL expiring doesn’t cover Keyword — it needs its own',
+      },
     ]);
     expect(details.filter((d) => d.includes('the acknowledgement of the expiry was cleared'))).toHaveLength(
       2,
@@ -131,15 +134,15 @@ describe('timelineOf — a new cause and back to the expiry (D-067 items 2, 4)',
     );
     const row = (title: string) => t.find((x) => x.title === title);
     expect(row('Acknowledgement set aside')).toMatchObject({
-      kind: 'ack',
+      kind: 'ack_aside',
       detail: 'Tao’s acknowledgement of SSL expiring (09:20) doesn’t cover Keyword — it needs its own',
     });
     expect(row('Acknowledgement given back')).toMatchObject({
-      kind: 'ack',
+      kind: 'ack_back',
       detail: 'Acknowledged by Tao 09:20 again — it was for SSL expiring',
     });
     expect(row('Back up · still SSL expiring')).toMatchObject({
-      kind: 'recovered',
+      kind: 'ok',
       detail:
         'First OK round after 8 min down · SSL certificate expires in 13 days (Tue 6 Oct) · the DOWN needs a root cause',
     });
