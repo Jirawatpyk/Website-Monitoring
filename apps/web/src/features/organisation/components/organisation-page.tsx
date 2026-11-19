@@ -89,7 +89,11 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
       <ViewOnlyLine />
       <OnThisPage />
 
-      <section id="tiers" className="flex scroll-mt-4 flex-col gap-3" aria-labelledby="tiers-h">
+      <section
+        id="tiers"
+        className="flex scroll-mt-18 lg:scroll-mt-4 flex-col gap-3"
+        aria-labelledby="tiers-h"
+      >
         <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
           <h2 id="tiers-h" className={HEADING}>
             <span className="md:hidden">TIERS</span>
@@ -162,7 +166,7 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
 
       <HolidaysSection holidays={data.holidays} hours={data.hoursNow} now={new Date(data.now)} />
 
-      <div id="data-kept" className="grid scroll-mt-4 gap-4 md:grid-cols-2">
+      <div id="data-kept" className="grid scroll-mt-18 lg:scroll-mt-4 gap-4 md:grid-cols-2">
         <DataKept bytes={data.storageBytes} />
         <Budget />
       </div>
@@ -399,7 +403,11 @@ function ClientsSection({ rows }: { rows: ClientRow[] }) {
     },
   ];
   return (
-    <section id="clients" className="flex scroll-mt-4 flex-col gap-3" aria-labelledby="clients-h">
+    <section
+      id="clients"
+      className="flex scroll-mt-18 lg:scroll-mt-4 flex-col gap-3"
+      aria-labelledby="clients-h"
+    >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:gap-3">
           <h2 id="clients-h" className={HEADING}>
@@ -505,7 +513,7 @@ function Budget() {
   return (
     <Card
       id="monthly-cost"
-      className="scroll-mt-4"
+      className="scroll-mt-18 lg:scroll-mt-4"
       title="Monthly cost"
       headingLevel={2}
       actions={

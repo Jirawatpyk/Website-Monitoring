@@ -28,7 +28,7 @@ export interface OrganisationData {
  * The holidays from today on. Until `migrate-production` adds `kind` (the deploy runs first), the read
  * without it still lists them, as public holidays.
  */
-async function loadHolidays(db: ServerClient, now: Date): Promise<Holiday[]> {
+export async function loadHolidays(db: Pick<ServerClient, 'from'>, now: Date): Promise<Holiday[]> {
   const from = bangkokToday(now);
   const full = await db.from('company_holidays').select('id, day, name, kind').gte('day', from).order('day');
   if (!full.error) return full.data.map((h) => ({ ...h, kind: h.kind === 'company' ? 'company' : 'public' }));

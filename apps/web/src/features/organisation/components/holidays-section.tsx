@@ -68,7 +68,11 @@ export function HolidaysSection({ holidays, hours, now }: { holidays: Holiday[];
   };
 
   return (
-    <section id="holidays" className="flex scroll-mt-4 flex-col gap-3" aria-labelledby="holidays-h">
+    <section
+      id="holidays"
+      className="flex scroll-mt-18 lg:scroll-mt-4 flex-col gap-3"
+      aria-labelledby="holidays-h"
+    >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <div className="flex flex-col gap-1">
           <h2 id="holidays-h" className={SECTION_HEADING}>
