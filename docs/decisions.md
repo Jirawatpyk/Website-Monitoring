@@ -96,6 +96,14 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - **Phone tabs:** three Settings pages no longer fit the segmented control at 390, so below md the tabs are a select (§35.1's "then a select"). It opens the page on change: AURA's Select changes value only on a committed choice (an arrow key on the closed field opens the list; a tap on a choice commits it), so there is no arrow-key navigation (WCAG 3.2.2, spec-check 19 Nov).
 - **The hours in words** on Add site, Edit site, Site detail and the Escalation and Profile links now come from the setting.
 
+**PR 2 (Alert channels), settled the same way (19 Nov):**
+
+- **The test alert** rides the on-call event path as kind `channel_test` (`send_channel_test`): any active person; Chat needs a Chat id; one a minute per person and channel; Chat = one card in its own thread `test-<event>` @mentioning only the tester, email = one email to them; the on-call checklist is untouched; no audit row (as `send_oncall_test`). Profile's "Send me a test alert" is the on-call phone test for Admins and Responders and this Chat test for everyone else (D-062 item 12).
+- **Channel cards** say only what is known: Chat "Connected" / "Not set up" from the webhook env (never its value), the newest Chat post; email's From address and the last 24 h as sent · failed (nothing records bounces or SPF / DKIM); voice "Off" with "Off until approved"; the Chat app "Phase 3".
+- **"Who gets what"** columns: Event, Who and how (read-only, the policy ladder in words), CEO. SSL / domain's CEO cell reads "Weekly summary" (its COMING UP lines, S13).
+- **Delivery log:** today's (Bangkok) incident messages, reports, tests and retried sends, newest 50; Tries = attempts; Latency from when it was due (its hold, or its queueing), as the notifier counts; Delivered / Late (over 30 s) / Late · retried / Failed / Held until HH:MM / Queued; set-aside (cancelled) rows left out unless retried.
+- Below lg both tables are row cards (their fixed columns scroll sideways at 820).
+
 **Impact.** S17 PR 1: migration `organisation_hours` (`save_response_hours`, `organisation_storage`), `features/organisation`, `/settings/organisation`, the Settings select, the hours copy on Sites, "Edit in Organisation" on Escalation and Profile, the audit words. PR 2: Alert channels (read-only routing, the test alert, the delivery log). PR 3 after the board: holidays and the forbidden-word list. Plan: S17 Done-when 4–5 proposed; backlog lines for D-059 and D-046.
 
 ## D-068 — S13 PR 4: back up but still expiring, and who the set-aside ack names

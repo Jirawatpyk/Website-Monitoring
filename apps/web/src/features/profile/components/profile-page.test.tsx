@@ -127,7 +127,7 @@ describe('ProfilePageView (Profile, MProfile)', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('a Viewer: no test button, no on-call card', () => {
+  it('a Viewer: a Chat test (S17), no on-call card', () => {
     render(
       <ProfilePageView
         data={{ ...data, me: { ...data.me, role: 'viewer' }, shifts: [], inRotation: false, sites: [] }}
@@ -135,7 +135,8 @@ describe('ProfilePageView (Profile, MProfile)', () => {
         signOutAction={signOutAction}
       />,
     );
-    expect(screen.queryByRole('button', { name: /test alert/i })).toBeNull();
+    // Every role can check alerts reach them (D-062 item 12): a Viewer's test is a plain Chat test.
+    expect(screen.getAllByRole('button', { name: /test alert/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText('MY NEXT ON-CALL SHIFT')).toBeNull();
     // §22.6: a Viewer sees channels, devices and the shared values only.
     expect(screen.queryByRole('heading', { name: /Sites I’m responsible for/ })).toBeNull();

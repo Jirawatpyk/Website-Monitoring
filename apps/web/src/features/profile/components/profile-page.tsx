@@ -20,6 +20,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { phoneHeader } from '@/components/phone-header';
 import { MutedOverlay, untilText } from '@/components/site-cells';
 import { SiteStatusBadge } from '@/components/status-badges';
+import { sendChannelTest } from '@/features/channels';
 import { sendTest } from '@/features/oncall';
 import {
   ChatIdDialog,
@@ -193,15 +194,20 @@ function Channels({ data }: { data: ProfileData }) {
     return () => clearTimeout(t);
   }, [cooling, lastSent]);
 
+  const oncallTest = canTest(data.me.role);
   const test = () =>
     start(async () => {
       setError(null);
-      const r = await sendTest().catch(() => ({ ok: false as const, message: FAILED }));
+      // Admins and Responders get the on-call phone test (D-062 item 12); everyone else a plain Chat
+      // test in its own thread (S17), so every role can check alerts reach them.
+      const r = await (oncallTest ? sendTest() : sendChannelTest('chat')).catch(() => ({
+        ok: false as const,
+        message: FAILED,
+      }));
       if (!r.ok) return setError(r.message);
       setSent(r.at ?? new Date().toISOString());
       setCooling(true);
     });
-  const testable = canTest(data.me.role);
   const button = (fullWidth?: boolean) => (
     <TestButton
       linked={data.me.chatLinked}
@@ -217,7 +223,7 @@ function Channels({ data }: { data: ProfileData }) {
       title="How alerts reach me"
       headingLevel={2}
       description="Owners and backups need a Chat id, so alerts can @mention them."
-      actions={testable ? <span className="hidden md:inline-flex">{button()}</span> : undefined}
+      actions={<span className="hidden md:inline-flex">{button()}</span>}
     >
       <div className="flex flex-col gap-3">
         <ul className="m-0 flex list-none flex-col p-0">
@@ -256,12 +262,13 @@ function Channels({ data }: { data: ProfileData }) {
             </li>
           ))}
         </ul>
-        {testable && <span className="md:hidden">{button(true)}</span>}
+        <span className="md:hidden">{button(true)}</span>
         {sent && (
           <Alert tone="success" role="status" title={`Test sent at ${formatTime(new Date(sent))}`}>
-            Posted in its own “TEST — no action” thread in the Alerts Space, mentioning only you. Open its
-            link on your phone to tick “Test alert received on this phone”. If your phone didn’t buzz, allow
-            the Alerts Space through Do Not Disturb.
+            Posted in its own “TEST — no action” thread in the Alerts Space, mentioning only you.
+            {oncallTest
+              ? ' Open its link on your phone to tick “Test alert received on this phone”. If your phone didn’t buzz, allow the Alerts Space through Do Not Disturb.'
+              : ' If your phone didn’t buzz, allow the Alerts Space through Do Not Disturb.'}
           </Alert>
         )}
         {error && (
