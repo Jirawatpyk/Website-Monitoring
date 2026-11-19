@@ -560,7 +560,7 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
 
     // Engine review H1 (D-024, §19.4): a site going up and down under its SSL incident flaps.
     const flips = [new Date(NOW.getTime() - 9 * 60_000), new Date(NOW.getTime() - 5 * 60_000)];
-    it('flapping: one held summary instead (a plain recovery, no still-expiring)', () => {
+    it('flapping: one combined RECOVERED per back-up, no held summary (engine re-review H1)', () => {
       const d = backUp(fact('2026-10-06', null), { flips, flipOk: false }, []);
       // Not tagged flapping yet: still the back-up.
       expect(d).toMatchObject({ kind: 'recover', then: { stillExpiry: true } });
@@ -572,8 +572,8 @@ describe('decideSite — expiry outside response hours, and back to it (D-067 it
           flipOk: false,
         }),
       );
-      expect(flapping).toMatchObject({ kind: 'recover', allOk: true, holdSummary: true });
-      expect(flapping).not.toHaveProperty('then');
+      // Tagged flapping: still the one combined RECOVERED, never a summary the rejoin would cancel.
+      expect(flapping).toMatchObject({ kind: 'recover', holdSummary: false, then: { stillExpiry: true } });
     });
 
     it('the DOWN AGAIN after a back-up counts toward flapping (its OK change was recorded)', () => {

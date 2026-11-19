@@ -492,13 +492,10 @@ function judgeSiteRound(
           ? (primaryVerdict.reachable ?? [])
           : [];
       // D-068: back up with the expiry the DOWN joined still due — the site really answered (an OK
-      // change for D-024). A flapping incident keeps its one summary instead (§19.4, engine review H1):
-      // a plain recovery, held; the expiry rejoins by the usual rule after it.
+      // change for D-024, so it is tagged flapping on the next DOWN AGAIN). Flapping or not, the one
+      // combined RECOVERED stands in for the summary: a held summary would be cancelled by the expiry
+      // rejoining a round later (engine re-review H1).
       const still = isExpiryTrigger(problem.v.trigger);
-      if (still && open.isFlapping && stillFlapping(s.flips ?? [], earliest(reachable))) {
-        const plain = recoverDecision(s, open, base, reachable, 'problem', true);
-        if (plain) return plain;
-      }
       const d = recoverDecision(s, open, base, reachable, 'problem', false);
       if (d?.kind === 'recover') {
         return {

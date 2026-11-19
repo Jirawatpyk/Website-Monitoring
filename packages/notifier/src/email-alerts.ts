@@ -638,7 +638,13 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
     color: C.positive,
     bar: C.positive,
     label: 'RECOVERED',
-    pre: `${site} back at ${formatTime(input.recoveredAt)} · down ${duration} · ${still ? `still ${still.label}` : 'root cause needed'}`,
+    // Still expiring: said, and the owner's root cause kept (message re-check L2).
+    pre: [
+      `${site} back at ${formatTime(input.recoveredAt)}`,
+      `down ${duration}`,
+      ...(still ? [`still ${still.label}`] : []),
+      ...(!still || isOwner ? ['root cause needed'] : []),
+    ].join(' · '),
     headline: still ? `${site} is back up, still ${still.label}` : `${site} is back`,
     // The owner's root cause comes first, even when the owner is also the AM (message-check L4).
     lede: [
@@ -649,10 +655,10 @@ export function buildRecoveredEmail(input: RecoveredEmailInput): EmailMessage {
           : 'Needs a root cause before it can be resolved.'
         : input.amReader
           ? input.amReader.notNeeded
-            ? `${site} is back after ${duration}. The client update was marked not needed (${input.amReader.notNeeded}) — let the client know it’s back if they need to hear it.`
+            ? `${still ? '' : `${site} is back after ${duration}. `}The client update was marked not needed (${input.amReader.notNeeded}) — let the client know it’s back if they need to hear it.`
             : input.amReader.marked
-              ? `${site} is back after ${duration}. Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
-              : `${site} is back after ${duration}. Let the client know it’s back, and mark the client update on the incident page.`
+              ? `${still ? '' : `${site} is back after ${duration}. `}Let the client know it’s back — no need to mark it again; your ${input.amReader.marked} update is already on record.`
+              : `${still ? '' : `${site} is back after ${duration}. `}Let the client know it’s back, and mark the client update on the incident page.`
           : owner
             ? `Nothing needed from you. ${owner} adds the root cause.`
             : 'Nothing needed from you.',
@@ -1147,7 +1153,7 @@ export function buildNewCauseEmail(input: NewCauseEmailInput): EmailMessage {
             ]
           : asks
             ? ['Next step', 'Acknowledge to stop the PROBLEM reminders']
-            : ['Next step', 'Open the incident — the person it was sent to acknowledges it'],
+            : ['Next step', 'Open the incident to see who acknowledges it'],
     ],
     buttons: asks
       ? [

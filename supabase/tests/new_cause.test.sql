@@ -646,7 +646,8 @@ select ok(
   'on the expiry again: down_from_expiry cleared'
 );
 select ok(
-  (select flip_ok is distinct from false from public.site_status where site_id = '00000000-0000-0000-0000-0000000000b1'),
+  (select coalesce(flip_ok, false) and not (select down_from_expiry from public.incidents where id = '00000000-0000-0000-0000-0000000000b9')
+     from public.site_status where site_id = '00000000-0000-0000-0000-0000000000b1'),
   'the silent way back records no not-OK change (engine review H1)'
 );
 -- DOWN AGAIN on the SSL drop (D-023 path: open, Unacked): it came from it. Then a clean recovery and another
