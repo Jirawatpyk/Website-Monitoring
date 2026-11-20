@@ -160,10 +160,17 @@ export function checkWords(check: PhraseCheck, phrase: string): CheckWords {
     kind: check.checked === check.sites ? 'clear' : 'partial',
     title,
     lines: [
-      ...(check.unchecked.length ? [`Not checked (no clean fetch yet): ${check.unchecked.join(', ')}.`] : []),
+      ...(check.unchecked.length ? [`Not checked (no clean fetch yet): ${namesOf(check.unchecked)}.`] : []),
       next,
     ],
   };
+}
+
+const NAMES_SHOWN = 10;
+/** At most 10 names, then "and N more" — the list grows with the sites (spec-checker). */
+function namesOf(names: readonly string[]): string {
+  if (names.length <= NAMES_SHOWN) return names.join(', ');
+  return `${names.slice(0, NAMES_SHOWN).join(', ')} and ${names.length - NAMES_SHOWN} more`;
 }
 
 /** The Remove dialog (spec §41 item 6; D-069: an open incident recovers, a short unacked one resolves). */

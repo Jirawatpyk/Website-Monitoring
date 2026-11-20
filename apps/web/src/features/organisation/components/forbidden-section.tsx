@@ -261,9 +261,11 @@ function CheckBox({ words, phrase }: { words: CheckWords; phrase: string }) {
       </span>
       {words.kind === 'found' ? (
         <>
-          <span className="font-mono text-xs break-words text-fg-secondary" lang={phraseLang(phrase)}>
+          <span className="font-mono text-xs break-words text-fg-secondary">
             {words.snippet.before}
-            <mark className="bg-alert-warning-bg text-fg-primary">{words.snippet.match}</mark>
+            <mark className="bg-alert-warning-bg text-fg-primary" lang={phraseLang(phrase)}>
+              {words.snippet.match}
+            </mark>
             {words.snippet.after}
           </span>
           <span className="text-fg-secondary">{words.line}</span>

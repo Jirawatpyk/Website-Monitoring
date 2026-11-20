@@ -80,6 +80,14 @@ describe('the check’s words (D-069: it counts what was checked)', () => {
     });
   });
 
+  it('names at most ten sites it couldn’t check, then how many more', () => {
+    const names = Array.from({ length: 13 }, (_, i) => `Site ${i + 1}`);
+    const words = checkWords(check({ checked: 4, unchecked: names }), 'x y');
+    expect((words as { lines: string[] }).lines[0]).toBe(
+      'Not checked (no clean fetch yet): Site 1, Site 2, Site 3, Site 4, Site 5, Site 6, Site 7, Site 8, Site 9, Site 10 and 3 more.',
+    );
+  });
+
   it('nothing to check yet says so', () => {
     expect(checkWords(check({ checked: 0 }), 'x y').kind).toBe('partial');
     expect((checkWords(check({ checked: 0 }), 'x y') as { title: string }).title).toBe(
