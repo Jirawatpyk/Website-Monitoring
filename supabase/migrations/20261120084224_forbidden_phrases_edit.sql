@@ -78,7 +78,8 @@ as $$
     select p.site_id, p.name, p.monitor_id, p.view, p.checked_at, x.pos
     from pages p
     join public.crawler_clean_pages c on c.monitor_id = p.monitor_id and c.view = p.view
-    cross join lateral (select position(p_needle in c.body) as pos) x
+    -- offset 0 keeps the lateral its own step: inlined, position() ran twice per matching page (db-reviewer)
+    cross join lateral (select position(p_needle in c.body) as pos offset 0) x
     where p_needle <> '' and x.pos > 0
   ),
   hits as (
