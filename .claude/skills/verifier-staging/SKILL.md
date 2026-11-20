@@ -49,6 +49,14 @@ Start clean (`reset-test-incident.sql`): an incident left open by an earlier run
 
 The defacement modes (S09c, D-042) open a PROBLEM only with `DEFACEMENT_ALERTS=on` on `dxt-monitor-staging` (a redeploy after setting it); off, the engine summary logs `defacementHeld` instead. The crawler runs at :00 and :30; to skip the wait, press **Run** next to `/api/cron/crawler` on Vercel → `dxt-monitor-staging` → Settings → Cron Jobs (no secret needed; S09c run), or call it as Vercel Cron does — `curl -s -H "Authorization: Bearer $CRON_SECRET" https://monitor-staging.dxtspace.com/api/cron/crawler` (the staging secret, from Tao) — and read `select view, usable, status_code, forbidden, final_url, checked_at from crawler_checks order by checked_at desc limit 4`. Recovery on `ok` needs the next crawler run (a clean usable row replaces the bad one); `waf-partial` gives `usable = false` rows (no data) and no PROBLEM.
 
+**The shared list is the table (S17 PR 3b, D-069).** The seed equals the code list, so a green run alone doesn't prove the table is read. To prove it:
+
+- With `DEFACEMENT_ALERTS=on`, swap one of the two phrases `defaced` serves for text that can't match: `update forbidden_phrases set phrase = 'zz staging list check zz' where phrase = 'บาคาร่า' returning id`. An update keeps `id` and `created_at`, so the order holds.
+- Set the mode to `defaced`. Expect `check_results.keyword_forbidden = {สล็อตออนไลน์}` from BKK, SIN and TYO, and the cause "Found “สล็อตออนไลน์” on / (BKK, SIN, TYO)" (INC-0073, 20 Nov).
+- Put the phrase back by its `id`, confirm 36 rows in order, set `ok`, and run the reset.
+- **Clean pages:** read `select view, url, length(body), checked_at, updated_at from crawler_clean_pages`. The crawler summary in the Vercel log counts `cleanPages: { written, moved, late }`: the first run after the db push writes, an unchanged page then only moves.
+- **Order of a 3b-style deploy:** web first, where the log shows `forbidden_phrases_read_failed` with PGRST205 and the rounds still come from all three locations. Then the db push, a BKK round on the old agent, then `release.sh staging`.
+
 Bangkok time: `node -e "console.log(new Date().toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', weekday: 'short', hour: '2-digit', minute: '2-digit' }))"`. In Git Bash on Windows `TZ=Asia/Bangkok date` prints UTC (S17 `/verify`, 19 Nov) — never plan a response-hours run from it.
 
 Response hours (S17, D-069): change them on `/settings/organisation` with a note and put them back the same way afterwards (each save is an `organisation.response_hours` audit row). To see the engine follow them, set the Test target to Tier 2 (`update sites set tier = 2 where name = 'Test target'`), save hours that leave "now" outside, switch to `keyword-missing`: the PROBLEM's `problem` card and email are queued with `hold_until` = the new opening. Then mode `ok`, the reset script, tier 1, hours back.
