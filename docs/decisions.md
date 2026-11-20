@@ -188,7 +188,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
     - A group's last phrase shows no ×.
     - At 300 phrases "Add phrase" is off with "The list holds 300 phrases — remove one first."
     - A refusal at save sends the dialog back to "Check phrase".
-  - **Focus and announcement.** The check's result is in one live region that is always mounted, and it takes focus: the pressed button may now be off.
+  - **Focus and announcement.** The check's result takes focus, because the pressed button may now be off, and focus reads it out. It is not a live region as well, which would read it twice (`/verify`). Only the checking line is a `status`.
   - **Language marks.** Only the phrase carries `lang`, never the × button's English name. That covers the snippet and the Remove title.
   - **Dialogs.**
     - Both phrase dialogs ignore a click on the scrim, so a typed note isn't lost.
