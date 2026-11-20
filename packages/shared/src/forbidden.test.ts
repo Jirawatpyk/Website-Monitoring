@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   FORBIDDEN_BRANDS,
+  FORBIDDEN_GROUP_IDS,
+  FORBIDDEN_GROUPS,
   FORBIDDEN_PHRASES,
+  MAX_PHRASE_LENGTH,
   findForbiddenPhrases,
-  isForbiddenPhrase,
+  findInNormalized,
+  longestPhrase,
   normalizeForMatch,
 } from './forbidden';
 
@@ -67,8 +71,24 @@ describe('the list itself', () => {
     for (const p of FORBIDDEN_PHRASES) expect(normalizeForMatch(p)).toBe(p);
   });
 
-  it('tells a list entry from a site’s own word', () => {
-    expect(isForbiddenPhrase('บาคาร่า')).toBe(true);
-    expect(isForbiddenPhrase('Database error')).toBe(false);
+  it('is the groups in order, each entry within the stored length', () => {
+    expect(FORBIDDEN_PHRASES).toEqual(FORBIDDEN_GROUP_IDS.flatMap((g) => FORBIDDEN_GROUPS[g]));
+    expect(longestPhrase(FORBIDDEN_PHRASES)).toBeLessThanOrEqual(MAX_PHRASE_LENGTH);
+  });
+});
+
+describe('a list from the database (D-069)', () => {
+  it('the longest entry sets the stream overlap; an empty list has none', () => {
+    expect(longestPhrase(['ab', 'abcd'])).toBe(4);
+    expect(longestPhrase([])).toBe(0);
+  });
+
+  it('an entry that normalises to nothing never matches', () => {
+    expect(findForbiddenPhrases('anything at all', ['', '   ', 'at all'])).toEqual(['at all']);
+  });
+
+  it('a stored page is matched as stored', () => {
+    const page = normalizeForMatch('<p>Best SLOT&nbsp;Online</p>');
+    expect(findInNormalized(page, ['slot online', 'judi online'])).toEqual(['slot online']);
   });
 });

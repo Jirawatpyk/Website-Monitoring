@@ -11,7 +11,9 @@ import {
 } from '@dxt/shared';
 import { isAllowedHost } from '@dxt/engine';
 import type { CronJobResult } from '../cron-job';
+import { loadForbiddenList } from '../forbidden-list';
 import { inBatches } from '../in-batches';
+import { loadCleanHashes, pruneCleanPages, storeCleanPage } from './clean-pages';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 
 /** The crawler runs from Singapore only (vercel.json `functions`); it is a view, not a location (D-041). */
@@ -120,7 +122,12 @@ export async function runCrawler({
     return { ok: false, skipped: 'wrong_region', expected: CRAWLER_REGION };
   }
   const started = clock();
-  const monitors = await loadCrawlerMonitors(db);
+  const [monitors, sharedForbidden, hashes] = await Promise.all([
+    loadCrawlerMonitors(db),
+    loadForbiddenList(db),
+    // Without the store (a deploy ahead of its migration) the run still checks every site.
+    loadCleanHashes(db).catch((err: unknown) => String(err)),
+  ]);
   const views = [...CRAWLER_VIEWS, FINGERPRINT_VIEW] as const;
   const all = monitors.flatMap((m) => views.map((view) => ({ m, view })));
   // Start each run further down the list, so a run cut by its budget never skips the same sites twice.
@@ -141,6 +148,8 @@ export async function runCrawler({
         : { client: CRAWLER_CLIENTS[view], mustNotContain: m.mustNotContain }),
       scanWholeBody: true,
       allowPrivateTargets,
+      sharedForbidden,
+      keepText: typeof hashes !== 'string',
     });
     const usable = plain
       ? isUsablePlain(result, m.url, m.allowedRedirectDomains)
@@ -171,7 +180,52 @@ export async function runCrawler({
       baseline = set.error?.message ?? null;
       baselineSet = set.data === true;
     }
-    return { m, view, checkedAt, result, usable, stored: error?.message ?? null, baseline, baselineSet };
+    // D-069: the site's own page, read whole, with nothing forbidden on it — the shared list or its own
+    // words (the plain view doesn't look for those) — is its newest clean page. Stored after the row
+    // the engine reads, so a large upload never holds monitoring back.
+    const text = result.text;
+    const clean =
+      usable &&
+      text !== undefined &&
+      (result.keywordForbidden?.length ?? 0) === 0 &&
+      !m.mustNotContain.some((k) => text.includes(k)) &&
+      !endedOffSite(result, m.url, m.allowedRedirectDomains);
+    // Past the fetch budget the run keeps its margin for the log and the pings (engine-reviewer).
+    const inBudget = clock() - started <= CRAWLER_BUDGET_MS;
+    const stored =
+      clean && typeof hashes !== 'string' && inBudget
+        ? await storeCleanPage(db, hashes, {
+            monitorId: m.id,
+            view,
+            url: m.url,
+            checkedAt: checkedAt.toISOString(),
+            text,
+          })
+        : null;
+    const cleanError = stored?.error ?? null;
+    // The page text isn't kept past its store: a run holds no 3 MB strings until it ends (db-reviewer).
+    delete result.text;
+    return {
+      m,
+      view,
+      checkedAt,
+      result,
+      usable,
+      stored: error?.message ?? null,
+      baseline,
+      baselineSet,
+      // What the store did, so the rewrite rate can be read off the log (D-069).
+      cleanStore: !stored
+        ? clean && typeof hashes !== 'string'
+          ? ('late' as const)
+          : null
+        : stored.error
+          ? null
+          : stored.written
+            ? ('written' as const)
+            : ('moved' as const),
+      cleanError,
+    };
   });
   const done = ran.filter((r) => r !== null);
   const writeErrors = [...new Set(done.map((r) => r.stored).filter((e) => e !== null))];
@@ -187,10 +241,27 @@ export async function runCrawler({
     )
     .map(({ m, view, result }) => ({ site: m.siteName, view, forbidden: result.keywordForbidden }));
   const baselinesSet = done.filter((r) => r.baselineSet).map((r) => r.m.siteName);
+  // The clean-page store is for 3c's check, not for monitoring: a failure is logged, never fatal.
+  // Pages the crawler no longer reads (a stopped site, a removed monitor, an old URL) go.
+  const pruned =
+    typeof hashes === 'string' || clock() - started > CRAWLER_BUDGET_MS ? null : await pruneCleanPages(db);
+  const cleanErrors = [
+    ...new Set([
+      ...(typeof hashes === 'string' ? [hashes] : []),
+      ...done.map((r) => r.cleanError).filter((e) => e !== null),
+      ...(pruned ? [pruned] : []),
+    ]),
+  ];
   return {
     ok: true,
     fetched: done.length,
     unusable: done.filter((r) => !r.usable).length,
+    cleanPages: {
+      written: done.filter((r) => r.cleanStore === 'written').length,
+      moved: done.filter((r) => r.cleanStore === 'moved').length,
+      late: done.filter((r) => r.cleanStore === 'late').length,
+    },
+    ...(cleanErrors.length ? { cleanPagesFailed: cleanErrors } : {}),
     ...(baselinesSet.length ? { baselinesSet } : {}),
     ...(ran.length > done.length ? { skipped: ran.length - done.length } : {}),
     ...(hits.length ? { hits } : {}),

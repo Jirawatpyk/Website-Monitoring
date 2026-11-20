@@ -36,11 +36,11 @@ const monitors = [
     headers: [{ name: 'Accept-Language', value: 'th' }],
   },
 ];
-const fakeApi = (due: DueMonitor[] = monitors) => {
+const fakeApi = (due: DueMonitor[] = monitors, forbidden?: readonly string[]) => {
   const posted: unknown[][] = [];
   const controls: unknown[] = [];
   const api: Api = {
-    dueMonitors: vi.fn(async () => due),
+    dueMonitors: vi.fn(async () => (forbidden ? { monitors: due, forbidden } : { monitors: due })),
     postResults: vi.fn(async (r, control) => {
       posted.push(r);
       controls.push(control);
@@ -207,6 +207,22 @@ describe('runProbeRound (Bangkok)', () => {
     expect(check).toHaveBeenLastCalledWith(
       expect.objectContaining({ url: 'https://down.example.test', timeoutMs: 18_000 }),
     );
+  });
+
+  it('checks with the web’s shared list (D-069), on the recheck too; none sent → the bundled list', async () => {
+    let now = START;
+    const { api } = fakeApi(monitors, ['slot online']);
+    const check = vi.fn(async ({ url }: { url: string }) =>
+      url.includes('down') ? result('fail', 503) : result('pass'),
+    );
+    await runProbeRound({ api, check, clock: () => now, sleep: async (ms) => void (now += ms) });
+    expect(check).toHaveBeenCalledTimes(3);
+    for (const [req] of check.mock.calls) expect(req).toMatchObject({ sharedForbidden: ['slot online'] });
+
+    const older = fakeApi();
+    const plain = vi.fn(async (_req: { url: string }) => result('pass'));
+    await runProbeRound({ api: older.api, check: plain, clock: () => START, sleep: async () => {} });
+    expect(plain.mock.calls[0]![0]).not.toHaveProperty('sharedForbidden');
   });
 
   it('sends a D-051 confirm check back flagged, its recheck too; ordinary checks carry no flag', async () => {

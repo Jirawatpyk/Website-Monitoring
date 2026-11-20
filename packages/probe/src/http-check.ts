@@ -1,7 +1,7 @@
 import {
   findForbiddenPhrases,
   FORBIDDEN_PHRASES,
-  MAX_FORBIDDEN_PHRASE_LENGTH,
+  longestPhrase,
   PROBE_USER_AGENT,
   type CheckOutcome,
   type PageFingerprint,
@@ -49,6 +49,13 @@ export interface HttpCheckRequest {
   scanWholeBody?: boolean;
   /** The crawler's plain view (S09d, D-046): build the page's fingerprint from what it reads. */
   fingerprint?: boolean;
+  /**
+   * The shared forbidden list in use (D-069): the `forbidden_phrases` table as the caller read it.
+   * Absent: the bundled list (an older web for the Bangkok agent, or a failed read).
+   */
+  sharedForbidden?: readonly string[];
+  /** The crawler (D-069): hand back the whole decoded text read, for the clean-page store. */
+  keepText?: boolean;
 }
 
 export interface HttpCheckResult {
@@ -72,6 +79,8 @@ export interface HttpCheckResult {
   scanComplete?: boolean;
   /** With `fingerprint`, on a passing GET read to its end (or the 3 MB cap): the page's fingerprint. */
   fingerprint?: PageFingerprint;
+  /** With `keepText`, on a passing GET read to its end (or the 3 MB cap): everything decoded. */
+  text?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -101,6 +110,7 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
   const started = performance.now();
   const mustContain = req.mustContain ?? [];
   const mustNotContain = req.mustNotContain ?? [];
+  const sharedList = req.sharedForbidden ?? FORBIDDEN_PHRASES;
   // Every GET is keyword-checked: the shared forbidden list applies to every monitor (D-041).
   const keywords = (req.method ?? 'GET') === 'GET';
   const { agent, owned } = dispatcherFor(req);
@@ -108,12 +118,19 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
     const { res, url } = await fetchFollowing(req, agent);
     const ttfbMs = Math.round(performance.now() - started);
     const builder = req.fingerprint && keywords ? fingerprintBuilder(url.href) : null;
+    const kept: string[] | null = req.keepText && keywords ? [] : null;
     const { bodySample, missing, sampleAt, forbidden, complete } = await readBody(
       res,
       KEYWORD_BODY_BYTES,
       keywords ? mustContain : [],
       keywords && (req.scanWholeBody || builder) ? mustNotContain : null,
-      builder ? (text) => builder.write(text) : undefined,
+      sharedList,
+      builder || kept
+        ? (text) => {
+            builder?.write(text);
+            kept?.push(text);
+          }
+        : undefined,
     );
     const snapshot = { status: res.status, headers: res.headers, bodySample };
     const outcome = classifyResponse(snapshot);
@@ -130,10 +147,13 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       bodySample,
       finalUrl: url.href.slice(0, MAX_FINAL_URL),
       keywordMissing: checked && missing ? capped(missing) : null,
-      keywordForbidden: checked ? capped(forbidden ?? forbiddenIn(bodySample, mustNotContain)) : null,
+      keywordForbidden: checked
+        ? capped(forbidden ?? forbiddenIn(bodySample, mustNotContain, sharedList))
+        : null,
       waf: outcome === 'blocked' ? wafSignature(snapshot) : null,
       ...(req.scanWholeBody || builder ? { scanComplete: complete } : {}),
       ...(fingerprint ? { fingerprint } : {}),
+      ...(kept && checked && complete ? { text: kept.join('') } : {}),
     };
   } catch (err) {
     // DNS, TLS, refused connection and timeout all land here: a hard fail.
@@ -211,6 +231,15 @@ async function fetchFollowing(
 }
 
 /** The monitor's own origin, or its http → https upgrade on the default ports; never a downgrade. */
+/**
+ * The end of the text read so far that the next chunk's scan must see. No overlap (an empty list and no
+ * own words) keeps nothing: `slice(-0)` would keep the whole text and every chunk would re-scan it all
+ * (engine-reviewer, D-069).
+ */
+export function tailOf(text: string, overlap: number): string {
+  return overlap > 0 ? text.slice(-overlap) : '';
+}
+
 export function sameSite(url: URL, first: URL): boolean {
   if (url.origin === first.origin) return true;
   return (
@@ -223,8 +252,10 @@ export function sameSite(url: URL, first: URL): boolean {
 }
 
 /** A site's own words (case-sensitive, D-022) then the shared list's entries (D-041), once each. */
-function forbiddenIn(text: string, mustNotContain: readonly string[]): string[] {
-  return [...new Set([...mustNotContain.filter((k) => text.includes(k)), ...findForbiddenPhrases(text)])];
+function forbiddenIn(text: string, mustNotContain: readonly string[], shared: readonly string[]): string[] {
+  return [
+    ...new Set([...mustNotContain.filter((k) => text.includes(k)), ...findForbiddenPhrases(text, shared)]),
+  ];
 }
 
 /** The page's declared charset (a TIS-620 / windows-874 Thai page), else UTF-8. */
@@ -251,7 +282,9 @@ async function readBody(
   sampleLimit: number,
   mustContain: readonly string[],
   scanForbidden: readonly string[] | null,
-  /** Gets every decoded piece of text, in order (the fingerprint builder). */
+  /** The shared list in use (D-069). */
+  shared: readonly string[],
+  /** Gets every decoded piece of text, in order (the fingerprint builder, the kept text). */
   onText?: (text: string) => void,
 ): Promise<{
   bodySample: string;
@@ -276,7 +309,7 @@ async function readBody(
   const overlap = Math.max(0, ...pending.map((k) => k.length)) - 1;
   // The forbidden scan's own window: twice the longest word, as a run of spaces may stand for one.
   const scanOverlap = scanForbidden
-    ? 2 * Math.max(MAX_FORBIDDEN_PHRASE_LENGTH, ...scanForbidden.map((k) => k.length))
+    ? 2 * Math.max(longestPhrase(shared), ...scanForbidden.map((k) => k.length))
     : 0;
   const found = new Set<string>();
   let sample = '';
@@ -294,8 +327,8 @@ async function readBody(
     }
     if (scanForbidden) {
       const window = scanTail + text;
-      for (const k of forbiddenIn(window, scanForbidden)) found.add(k);
-      scanTail = window.slice(-scanOverlap);
+      for (const k of forbiddenIn(window, scanForbidden, shared)) found.add(k);
+      scanTail = tailOf(window, scanOverlap);
     }
   };
   // The sample: a read error here is the page failing to load, as before.
@@ -333,7 +366,7 @@ async function readBody(
   const forbidden = scanForbidden
     ? [
         ...scanForbidden.filter((k) => found.has(k)),
-        ...FORBIDDEN_PHRASES.filter((k) => found.has(k) && !scanForbidden.includes(k)),
+        ...shared.filter((k) => found.has(k) && !scanForbidden.includes(k)),
       ]
     : null;
   // Complete = read to the end or to the 3 MB cap (the scan's scope), not broken off by a stalled or

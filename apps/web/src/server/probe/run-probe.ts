@@ -5,6 +5,7 @@ import { isHardFailCheck, probeRequestHeaders, type ProbeLocation } from '@dxt/s
 import type { CronJobResult } from '../cron-job';
 import { loadDueMonitors, type DueMonitor } from './due-monitors';
 import { insertCheckResults } from '../check-results';
+import { loadForbiddenList } from '../forbidden-list';
 
 export { isDue } from './due-monitors';
 
@@ -56,7 +57,10 @@ export async function runProbe({
   }
 
   const started = clock();
-  const monitors = await loadDueMonitors(db, new Date(started), { location });
+  const [monitors, sharedForbidden] = await Promise.all([
+    loadDueMonitors(db, new Date(started), { location }),
+    loadForbiddenList(db),
+  ]);
 
   // Scheduled checks carry the run's start time, so a run that starts at :59.9 still lands in the
   // round it was due for; rechecks carry their own start time.
@@ -70,6 +74,7 @@ export async function runProbe({
       allowPrivateTargets,
       mustContain: m.mustContain,
       mustNotContain: m.mustNotContain,
+      sharedForbidden,
     }).then((result) => ({
       m,
       checkedAt,

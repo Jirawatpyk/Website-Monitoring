@@ -4,7 +4,7 @@ import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CRAWLER_CLIENTS, PROBE_USER_AGENT } from '@dxt/shared';
-import { runHttpCheck, sameSite } from './http-check';
+import { runHttpCheck, sameSite, tailOf } from './http-check';
 
 // A local server that answers per path, so every outcome is tested over real HTTP.
 let server: Server;
@@ -36,6 +36,18 @@ beforeAll(async () => {
       case '/too-deep':
         res.writeHead(200).end(`${'x'.repeat(4_000_000)}<title>VOCA</title>`);
         break;
+      case '/small-chunks': {
+        // 1 MB in 4 KB writes with a pause between: the reader gets many small chunks.
+        res.writeHead(200);
+        let left = 256;
+        const next = () => {
+          if (left-- === 0) return void res.end('</html>');
+          res.write('y'.repeat(4096));
+          setImmediate(next);
+        };
+        next();
+        break;
+      }
       case '/stall-tail':
         // The sample arrives, then the rest never does (the brand isn't in it).
         res.writeHead(200);
@@ -374,6 +386,70 @@ describe('runHttpCheck', () => {
       const unknown = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/bad-charset` });
       expect(unknown.keywordForbidden).toEqual(['slot online']);
     });
+
+    it('uses the list it is given (D-069): an entry removed is not looked for, one added is', async () => {
+      const removed = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/spam`,
+        sharedForbidden: ['slot online'],
+      });
+      expect(removed.keywordForbidden).toEqual(['slot online']);
+      const added = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/booking`,
+        sharedForbidden: ['time slot'],
+      });
+      expect(added.keywordForbidden).toEqual(['time slot']);
+      const none = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/spam`,
+        sharedForbidden: [],
+      });
+      expect(none.keywordForbidden).toEqual([]);
+    });
+
+    it('the whole-body read uses the given list too, its overlap from that list', async () => {
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/split-spam`,
+        scanWholeBody: true,
+        sharedForbidden: ['slot online', 'q'.repeat(60)],
+      });
+      expect(result.keywordForbidden).toEqual(['slot online']);
+    });
+
+    it('an empty list on a whole-body read keeps no growing window (engine-reviewer)', async () => {
+      const t0 = performance.now();
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/small-chunks`,
+        scanWholeBody: true,
+        sharedForbidden: [],
+      });
+      expect(result).toMatchObject({ keywordForbidden: [], scanComplete: true });
+      // Quadratic re-normalising of the text read so far took seconds on 3 MB.
+      expect(performance.now() - t0).toBeLessThan(1_500);
+    });
+
+    it('keepText hands back everything read on a complete pass, and nothing otherwise', async () => {
+      const deep = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/deep-spam`,
+        scanWholeBody: true,
+        keepText: true,
+      });
+      expect(deep.text!.length).toBeGreaterThan(262_144);
+      expect(deep.text).toContain('บาคาร่า');
+      const broken = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/broken-tail`,
+        scanWholeBody: true,
+        keepText: true,
+      });
+      expect(broken.text).toBeUndefined();
+      const plain = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok` });
+      expect(plain.text).toBeUndefined();
+    });
   });
 
   describe('the page fingerprint (S09d, D-046)', () => {
@@ -586,6 +662,13 @@ describe('runHttpCheck', () => {
       lookup: () => new Promise(() => {}),
     });
     expect(result).toMatchObject({ outcome: 'fail', error: 'Timeout' });
+  });
+});
+
+describe('tailOf (the scan window carried to the next chunk)', () => {
+  it('keeps the overlap; with none (an empty list, no own words) keeps nothing, never the whole text', () => {
+    expect(tailOf('abcdef', 2)).toBe('ef');
+    expect(tailOf('abcdef', 0)).toBe('');
   });
 });
 

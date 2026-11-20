@@ -5,6 +5,7 @@ import { hasBearer, unauthorized } from '@/lib/auth/bearer';
 import { serviceDb } from '@/server/db';
 import { engineAfterReport } from '@/server/engine/engine-and-deliver';
 import { dueForBangkok, storeBangkokResults } from '@/server/ingest/bangkok';
+import { loadForbiddenList } from '@/server/forbidden-list';
 import { loadWatchFacts, stampBeat } from '@/server/heartbeats';
 
 export const dynamic = 'force-dynamic';
@@ -31,15 +32,17 @@ export async function GET(request: Request): Promise<Response> {
   // then counts the sweep as unknown, not missed).
   // The agent's loop asks every minute and its watchdog judges right after: this GET is the
   // watchdog's beat on our side (Probes page; Healthchecks `vps-watchdog` is the outside one).
-  const [monitors, , watch] = await Promise.all([
+  // The shared forbidden list (D-069) rides along; a failed read gives the bundled one (logged).
+  const [monitors, , watch, forbidden] = await Promise.all([
     dueForBangkok(db, now, confirms),
     stampBeat(db, 'vps-watchdog', now),
     loadWatchFacts(db, now).catch((err: unknown) => {
       console.warn(JSON.stringify({ event: 'watch_facts_failed', error: String(err) }));
       return null;
     }),
+    loadForbiddenList(db),
   ]);
-  return Response.json(watch ? { monitors, ...watch } : { monitors });
+  return Response.json(watch ? { monitors, ...watch, forbidden } : { monitors, forbidden });
 }
 
 export async function POST(request: Request): Promise<Response> {

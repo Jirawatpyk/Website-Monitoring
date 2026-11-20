@@ -20,8 +20,15 @@ export class ApiError extends Error {
   }
 }
 
+/** What GET /api/ingest gives the probe loop. */
+export interface DueRound {
+  monitors: DueMonitor[];
+  /** The shared forbidden list (D-069); absent from an older web: the bundled list is used. */
+  forbidden?: readonly string[];
+}
+
 export interface Api {
-  dueMonitors(): Promise<DueMonitor[]>;
+  dueMonitors(): Promise<DueRound>;
   postResults(results: IngestBatch['results'], control?: IngestBatch['control']): Promise<void>;
   leaseJobs(max: number, sessions: number): Promise<LeasedJob[]>;
   /** False when the lease ran out (409): the result no longer counts. */
@@ -66,7 +73,9 @@ export function createApi(
       // D-051: this agent echoes the confirm flag, so it may be given confirm checks.
       const due = await json('/api/ingest?confirm=1', dueMonitorsResponseSchema);
       onContact?.({ at: Date.now(), engineSweepAt: due.engineSweepAt, onCall: due.onCall });
-      return due.monitors;
+      return due.forbidden
+        ? { monitors: due.monitors, forbidden: due.forbidden }
+        : { monitors: due.monitors };
     },
     async postResults(results, control) {
       const res = await call('/api/ingest', { method: 'POST', body: JSON.stringify({ results, control }) });

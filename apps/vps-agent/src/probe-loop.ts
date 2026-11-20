@@ -66,7 +66,7 @@ export async function runProbeRound({
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
 }: ProbeDeps): Promise<ProbeSummary> {
   const started = clock();
-  const monitors = await api.dueMonitors();
+  const { monitors, forbidden } = await api.dueMonitors();
   const run = (m: DueMonitor, timeoutMs: number) =>
     check({
       url: m.url,
@@ -75,6 +75,8 @@ export async function runProbeRound({
       headers: probeRequestHeaders(m.headers, secretHeader),
       mustContain: m.mustContain,
       mustNotContain: m.mustNotContain,
+      // The web's list (D-069); without it (an older web) the check uses its bundled list.
+      ...(forbidden ? { sharedForbidden: forbidden } : {}),
     });
 
   // The control check runs beside each batch it vouches for (D-027): ok while any control URL answers.

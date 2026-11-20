@@ -1,4 +1,5 @@
 import type { DbClient } from '@dxt/db';
+import { FORBIDDEN_PHRASES } from '@dxt/shared';
 
 type Op = 'select' | 'insert' | 'update' | 'upsert' | 'delete';
 type Result = { data?: unknown; error?: { message: string; code?: string } | null; count?: number };
@@ -31,13 +32,19 @@ const READ_RPCS = new Set([
   'engine_silent_incidents',
   'oncall_extend_shifts',
   'engine_oncall_reminders',
+  // the crawler's housekeeping (D-069): drops stored pages nobody reads
+  'crawler_prune_clean_pages',
 ]);
 
-/** Rows every engine run reads, unless a test registers its own: the seeded response hours (D-034). */
+/**
+ * Rows every engine or probe run reads, unless a test registers its own: the seeded response hours
+ * (D-034) and the seeded shared forbidden list (D-069).
+ */
 const DEFAULTS: Record<string, Result> = {
   'organisation_settings.select': {
     data: { response_start: '09:00:00', response_end: '18:00:00', response_days: [1, 2, 3, 4, 5] },
   },
+  'forbidden_phrases.select': { data: FORBIDDEN_PHRASES.map((phrase) => ({ phrase })) },
 };
 
 export function fakeDb(results: Record<string, Result | ((call: FakeCall) => Result)> = {}) {

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import type { HttpCheckResult } from '@dxt/probe';
+import { FORBIDDEN_PHRASES } from '@dxt/shared';
 import { fakeDb, type FakeCall } from '../../../test/fake-db';
 import { isDue, runProbe } from './run-probe';
 
@@ -118,6 +119,8 @@ describe('runProbe', () => {
       allowPrivateTargets: false,
       mustContain: ['Welcome'],
       mustNotContain: [],
+      // The table's list (the fake db's default is the seeded list, D-069).
+      sharedForbidden: FORBIDDEN_PHRASES,
     });
     expect(inserts(s.calls)).toEqual([
       [

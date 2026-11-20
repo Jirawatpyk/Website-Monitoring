@@ -33,6 +33,7 @@ function handler(access: Access, result: HttpCheckResult = pass) {
     check,
     secretHeader: () => ({ name: 'X-DxT-Monitor', value: 's3cret' }),
     knownHost: async (host) => host === 'eqho.example.com',
+    sharedForbidden: async () => ['slot online'],
   });
   return { POST, check };
 }
@@ -59,6 +60,8 @@ describe('Test check route (D-025)', () => {
       error: null,
     });
     expect(check).toHaveBeenCalledWith({
+      // The probes' shared list (D-069).
+      sharedForbidden: ['slot online'],
       url: 'https://eqho.example.com/',
       method: 'GET',
       // Capped at the probes' 30 s.

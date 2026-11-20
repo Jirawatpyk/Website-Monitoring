@@ -1,7 +1,8 @@
 // @vitest-environment node
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { HttpCheckRequest, HttpCheckResult } from '@dxt/probe';
-import { CRAWLER_CLIENTS } from '@dxt/shared';
+import { CRAWLER_CLIENTS, FORBIDDEN_PHRASES } from '@dxt/shared';
 import { fakeDb } from '../../../test/fake-db';
 import { crawlerConcurrency, isUsable, isUsablePlain, runCrawler } from './run-crawler';
 
@@ -175,6 +176,10 @@ describe('runCrawler', () => {
     expect(check.mock.calls[2]?.[0]).toMatchObject({ fingerprint: true, scanWholeBody: true });
     expect(check.mock.calls[2]?.[0].client).toBeUndefined();
     expect(check.mock.calls[2]?.[0].mustNotContain).toBeUndefined();
+    // D-069: every view looks for the table's list and keeps the text for the clean-page store.
+    for (const [req] of check.mock.calls) {
+      expect(req).toMatchObject({ sharedForbidden: FORBIDDEN_PHRASES, keepText: true });
+    }
 
     // Only primary monitors of active sites.
     const load = fake.calls.find((c) => c.table === 'monitors');
@@ -206,6 +211,7 @@ describe('runCrawler', () => {
       ok: true,
       fetched: 3,
       unusable: 0,
+      cleanPages: { written: 0, moved: 0, late: 0 },
       hits: [{ site: 'Site A', view: 'googlebot', forbidden: ['บาคาร่า'] }],
     });
   });
@@ -225,7 +231,12 @@ describe('runCrawler', () => {
     ]);
     // No baseline from a page that wasn't read.
     expect(fake.rpcCalls).toEqual([]);
-    expect(summary).toEqual({ ok: true, fetched: 3, unusable: 3 });
+    expect(summary).toEqual({
+      ok: true,
+      fetched: 3,
+      unusable: 3,
+      cleanPages: { written: 0, moved: 0, late: 0 },
+    });
   });
 
   it('starts no fetch past its budget, keeping the rows it stored', async () => {
@@ -272,7 +283,12 @@ describe('runCrawler', () => {
 
   it('writes nothing when no site is live, and fails loudly on a write error', async () => {
     const empty = fakeDb({ 'monitors.select': { data: [] } });
-    expect(await runCrawler({ db: empty.db, check: vi.fn() })).toEqual({ ok: true, fetched: 0, unusable: 0 });
+    expect(await runCrawler({ db: empty.db, check: vi.fn() })).toEqual({
+      ok: true,
+      fetched: 0,
+      unusable: 0,
+      cleanPages: { written: 0, moved: 0, late: 0 },
+    });
     expect(empty.calls.some((c) => c.table === 'crawler_checks')).toBe(false);
 
     const broken = fakeDb({
@@ -282,5 +298,158 @@ describe('runCrawler', () => {
     await expect(runCrawler({ db: broken.db, check: async () => result() })).rejects.toThrow(
       'crawler_checks: nope',
     );
+  });
+});
+
+describe('the clean-page store (S17 PR 3b, D-069)', () => {
+  const page = '<p>Welcome  to Site A</p>';
+  const cleanRun = (fake: ReturnType<typeof fakeDb>, answer: (req: HttpCheckRequest) => HttpCheckResult) =>
+    runCrawler({ db: fake.db, check: vi.fn(async (req: HttpCheckRequest) => answer(req)), clock: () => 0 });
+  const upserts = (fake: ReturnType<typeof fakeDb>) =>
+    fake.calls.filter((c) => c.table === 'crawler_clean_pages' && c.op === 'upsert').map((c) => c.values);
+
+  it('keeps each view’s clean page as the matcher reads it; a hit or a cut-off read keeps nothing', async () => {
+    const { fake } = setup(() => result());
+    const summary = await cleanRun(fake, (req) =>
+      req.fingerprint
+        ? result({ fingerprint: FP, text: page })
+        : req.client === CRAWLER_CLIENTS.googlebot
+          ? result({ keywordForbidden: ['บาคาร่า'], text: `${page} บาคาร่า` })
+          : result({ text: undefined }),
+    );
+    expect(upserts(fake)).toEqual([
+      expect.objectContaining({
+        monitor_id: 'm1',
+        view: 'plain',
+        url: 'https://a.example.test/',
+        body: '<p>welcome to site a</p>',
+        body_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      }),
+    ]);
+    expect(summary).toMatchObject({ cleanPages: { written: 1, moved: 0, late: 0 } });
+  });
+
+  it('a page sent off the site is no clean page of it', async () => {
+    const { fake } = setup(() => result());
+    await cleanRun(fake, (req) =>
+      req.fingerprint
+        ? result({ text: page })
+        : result({ finalUrl: 'https://casino.example.net/', text: page }),
+    );
+    expect(upserts(fake)).toEqual([]);
+  });
+
+  it('the same text again only moves checked_at', async () => {
+    const fake = fakeDb({
+      'monitors.select': { data: [monitor] },
+      'crawler_checks.insert': { data: { id: 'c1' } },
+      'rpc.crawler_set_baseline': { data: false },
+      'crawler_clean_pages.select': {
+        data: [
+          {
+            monitor_id: 'm1',
+            view: 'google_referer',
+            url: 'https://a.example.test/',
+            // sha-256 of '<p>welcome to site a</p>'
+            body_hash: createHash('sha256').update('<p>welcome to site a</p>').digest('hex'),
+          },
+        ],
+      },
+    });
+    await cleanRun(fake, (req) =>
+      req.client === CRAWLER_CLIENTS.google_referer ? result({ text: page }) : result(),
+    );
+    expect(upserts(fake)).toEqual([]);
+    const moved = fake.calls.find((c) => c.table === 'crawler_clean_pages' && c.op === 'update');
+    expect(moved?.values).toEqual({ checked_at: '1970-01-01T00:00:00.000Z' });
+    expect(moved?.filters).toEqual(expect.arrayContaining([['eq', 'view', 'google_referer']]));
+  });
+
+  it('without the store (a deploy ahead of its migration) every site is still checked, and it is logged', async () => {
+    const fake = fakeDb({
+      'monitors.select': { data: [monitor] },
+      'crawler_checks.insert': { data: { id: 'c1' } },
+      'rpc.crawler_set_baseline': { data: false },
+      'crawler_clean_pages.select': { error: { code: 'PGRST205', message: 'no table' } },
+    });
+    const check = vi.fn(async (_req: HttpCheckRequest) => result({ text: page }));
+    const summary = await runCrawler({ db: fake.db, check, clock: () => 0 });
+    expect(check).toHaveBeenCalledTimes(3);
+    expect(check.mock.calls[0]?.[0]).toMatchObject({ keepText: false });
+    expect(upserts(fake)).toEqual([]);
+    expect(summary).toMatchObject({
+      ok: true,
+      fetched: 3,
+      cleanPagesFailed: ['Error: crawler_clean_pages: PGRST205 no table'],
+    });
+  });
+
+  it('a failed write is logged, not fatal', async () => {
+    const fake = fakeDb({
+      'monitors.select': { data: [monitor] },
+      'crawler_checks.insert': { data: { id: 'c1' } },
+      'rpc.crawler_set_baseline': { data: false },
+      'crawler_clean_pages.upsert': { error: { message: 'too big' } },
+    });
+    const summary = await cleanRun(fake, () => result({ text: page }));
+    expect(summary).toMatchObject({
+      ok: true,
+      cleanPages: { written: 0, moved: 0, late: 0 },
+      cleanPagesFailed: ['too big'],
+    });
+  });
+
+  it('a page with the site’s own forbidden word is no clean page, in the plain view too', async () => {
+    const { fake } = setup(() => result());
+    await cleanRun(fake, (req) =>
+      req.fingerprint ? result({ fingerprint: FP, text: '<h1>Index of /</h1>' }) : result(),
+    );
+    expect(upserts(fake)).toEqual([]);
+  });
+
+  it('is stored after the row the engine reads', async () => {
+    const { fake } = setup(() => result());
+    await cleanRun(fake, (req) => (req.fingerprint ? result({ fingerprint: FP, text: page }) : result()));
+    const order = fake.calls.map((c) => `${c.table}.${c.op}`);
+    expect(order.lastIndexOf('crawler_checks.insert')).toBeLessThan(
+      order.indexOf('crawler_clean_pages.upsert'),
+    );
+  });
+
+  it('drops the pages it no longer reads, after the run, through the database (D-069)', async () => {
+    const { fake } = setup(() => result());
+    await cleanRun(fake, () => result());
+    expect(fake.readCalls.map((c) => c.name)).toContain('crawler_prune_clean_pages');
+  });
+
+  it('past the fetch budget, stores and prunes nothing: the margin is the log’s and the pings’', async () => {
+    let t = 0;
+    const { fake } = setup(() => result());
+    const summary = await runCrawler({
+      db: fake.db,
+      check: vi.fn(async () => {
+        t += 96_000; // the fetch ends past the 95 s budget
+        return result({ text: page });
+      }),
+      clock: () => t,
+    });
+    expect(upserts(fake)).toEqual([]);
+    expect(fake.readCalls.map((c) => c.name)).not.toContain('crawler_prune_clean_pages');
+    expect(summary.cleanPages).toEqual({ written: 0, moved: 0, late: 1 });
+  });
+
+  it('frees each page’s text once it is stored', async () => {
+    const { fake } = setup(() => result());
+    const kept: HttpCheckResult[] = [];
+    await runCrawler({
+      db: fake.db,
+      check: vi.fn(async () => {
+        const r = result({ text: page });
+        kept.push(r);
+        return r;
+      }),
+      clock: () => 0,
+    });
+    expect(kept.every((r) => r.text === undefined)).toBe(true);
   });
 });

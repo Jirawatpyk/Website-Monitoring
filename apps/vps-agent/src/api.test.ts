@@ -25,13 +25,35 @@ describe('createApi — the only way out of the VPS (PRD §10)', () => {
     const fetchImpl = vi.fn(async () => ok({ monitors: [MONITOR] }));
     const api = createApi('https://monitor.example.test', TOKEN, fetchImpl);
     // A server that doesn't send keywords (D-022) or headers (S05) yet: none to check or send.
-    expect(await api.dueMonitors()).toEqual([
-      { ...MONITOR, mustContain: [], mustNotContain: [], headers: [] },
-    ]);
+    // …nor the shared list (D-069): the round goes with the bundled one.
+    expect(await api.dueMonitors()).toEqual({
+      monitors: [{ ...MONITOR, mustContain: [], mustNotContain: [], headers: [] }],
+    });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit];
     // D-051: this agent echoes the confirm flag, so it asks for confirm checks.
     expect(url.toString()).toBe('https://monitor.example.test/api/ingest?confirm=1');
     expect(init.headers).toMatchObject({ authorization: `Bearer ${TOKEN}` });
+  });
+
+  it('takes the web’s shared list (D-069); a list that doesn’t parse is dropped, never the round', async () => {
+    const fetchImpl = vi.fn(async () => ok({ monitors: [MONITOR], forbidden: ['slot online', 'ufabet'] }));
+    const api = createApi('https://monitor.example.test', TOKEN, fetchImpl);
+    expect((await api.dueMonitors()).forbidden).toEqual(['slot online', 'ufabet']);
+    // One bad entry is dropped, the rest kept.
+    fetchImpl.mockResolvedValueOnce(
+      ok({ monitors: [MONITOR], forbidden: ['', 42, 'ufabet', '🎰 slot vip'] }),
+    );
+    expect((await api.dueMonitors()).forbidden).toEqual(['ufabet', '🎰 slot vip']);
+    // Nothing usable, or not a list: the bundled list, and the round still runs.
+    for (const forbidden of [['', 42], 'slot', Array(1001).fill('x y')]) {
+      fetchImpl.mockResolvedValueOnce(ok({ monitors: [MONITOR], forbidden }));
+      const bad = await api.dueMonitors();
+      expect(bad.monitors).toHaveLength(1);
+      expect(bad).not.toHaveProperty('forbidden');
+    }
+    // An empty list from the web is a list with nothing in it.
+    fetchImpl.mockResolvedValueOnce(ok({ monitors: [MONITOR], forbidden: [] }));
+    expect((await api.dueMonitors()).forbidden).toEqual([]);
   });
 
   it('hands each ingest answer to the watchdog: when, the sweep, who is on call (S12a)', async () => {

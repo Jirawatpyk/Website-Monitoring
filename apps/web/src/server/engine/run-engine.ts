@@ -42,7 +42,6 @@ import {
 import {
   CRAWLER_LABELS,
   pageFingerprintSchema,
-  isForbiddenPhrase,
   TIER_CONFIG,
   type CrawlerView,
   type ProbeLocation,
@@ -318,11 +317,13 @@ export async function runEngine(
   /**
    * A check as the engine sees it. With DEFACEMENT_ALERTS off (D-042), a shared-list entry the probe
    * found — one that isn't also the site's own word — is taken out and logged, so it opens nothing.
+   * D-069: any found word that isn't the site's own is a shared-list entry, in today's list or not
+   * (removed since the check, or found by an agent on its bundled list), never the site's own word.
    */
   const storedFor = (site: SiteRow, m: MonitorRow) => (c: CheckRow) => {
     const stored = toStoredCheck(c);
     if (defacementAlerts || !c.keyword_forbidden?.length) return stored;
-    const shared = (w: string) => isForbiddenPhrase(w) && !m.mustNotContain.includes(w);
+    const shared = (w: string) => !m.mustNotContain.includes(w);
     if (Date.parse(c.checked_at) >= now.getTime() - HELD_LOG_WINDOW_MS) {
       for (const w of c.keyword_forbidden.filter(shared)) hold(`${site.name} · “${w}”`, c.location);
     }
