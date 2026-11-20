@@ -26,6 +26,14 @@ describe('phoneBarFor (spec §22.1, D-045)', () => {
     expect(bar.back?.label).toMatch(/^Back to /);
   });
 
+  it('the guide goes back to the Overview, an open topic to the topic list (MGuide)', () => {
+    expect(phoneBarFor('/guide').back?.href).toBe('/');
+    expect(phoneBarFor('/guide', { topic: 'alert' })).toEqual({
+      title: 'User guide',
+      back: { href: '/guide', label: 'Back to all topics' },
+    });
+  });
+
   it('an unknown path falls back to the brand', () => {
     expect(phoneBarFor('/nowhere/at/all')).toEqual({ title: null });
   });

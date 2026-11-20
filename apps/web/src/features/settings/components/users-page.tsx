@@ -30,6 +30,7 @@ import {
 import { ROLE_LABELS, type Role } from '@dxt/shared';
 import { useEffect, useRef, useState } from 'react';
 import { HandOverDialog, type OncallData } from '@/features/oncall';
+import { RoleMark } from '@/components/role-mark';
 import {
   changeBlockedWhy,
   countLine,
@@ -358,7 +359,7 @@ function MatrixTable() {
               <Td>{row.label}</Td>
               {row.cells.map((c, i) => (
                 <Td key={i} className="text-center">
-                  <Mark cell={c} />
+                  <RoleMark cell={c} />
                 </Td>
               ))}
             </Tr>
@@ -366,29 +367,6 @@ function MatrixTable() {
         </TBody>
       </Table>
     </div>
-  );
-}
-
-function Mark({ cell }: { cell: string }) {
-  if (cell === 'Y')
-    return (
-      <span className="text-fg-positive">
-        <IconCheck size="sm" aria-label="Allowed" />
-      </span>
-    );
-  if (cell === 'N')
-    return (
-      <span className="text-fg-tertiary">
-        <IconMinus size="sm" aria-label="Not allowed" />
-      </span>
-    );
-  return (
-    <span className="inline-flex items-start gap-1.5 text-left">
-      <span className="text-fg-secondary">
-        <IconCheck size="sm" aria-label="Allowed with limits" />
-      </span>
-      <span className="text-xs leading-snug text-fg-secondary">{cell}</span>
-    </span>
   );
 }
 

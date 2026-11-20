@@ -121,7 +121,7 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         live: true,
         scope: '/settings',
       },
-      { id: 'guide', label: 'User guide', icon: <IconInfo />, href: '/guide', slice: 'S18', live: false },
+      { id: 'guide', label: 'User guide', icon: <IconInfo />, href: '/guide', slice: 'S18', live: true },
     ],
   },
 ];
