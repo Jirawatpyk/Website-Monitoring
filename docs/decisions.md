@@ -142,7 +142,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   - **Rewrite cost:** a page with a per-request token changes its hash every run and is rewritten whole each time.
     - Each crawler summary counts `cleanPages: { written, moved, late }`, so the rate is read from the production log after 3b, with no database read.
     - If the rate is high, fewer views are kept.
-  - **The Data kept card** gets a row for the stored pages in 3c, with the editor that uses them: "Newest clean page per site · replaced each crawler run · removed when a site stops".
+  - **The Data kept card** gets a row for the stored pages in 3c, with the editor that uses them: "Newest clean page per site · Replaced each crawler run". The removal when a site stops is left out: at 820 the full value ran over four lines (`/verify`).
 - **Guards 3c must add** (reviews of 3b):
   - "Already in the list" compares phrases through `normalizeForMatch`, not only through the table's unique key. The key folds `\s` runs, but the matcher also folds `&nbsp;` and U+00A0.
   - A cap on the number of phrases, well under PostgREST's 1,000 rows and the agent's `.max(1000)` (proposed 300). It also bounds the crawler's CPU per fetch.
@@ -153,6 +153,54 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   - It checks only the home pages' crawler views. Key pages, and sites with no clean fetch yet (blocked by bot protection, a broken certificate, or never fetched), aren't covered.
   - The pass line counts the sites it really checked and names those it couldn't.
   - The save runs the same check on the server; the button alone isn't trusted.
+
+**PR 3c (the editor, board OrganisationLists §41 items 4–8), settled by the recommendation rule (20 Nov):**
+
+- **Every rule is in SQL too.** `add_forbidden_phrase` refuses what the page refuses, so a direct call by an Admin can't skip a rule:
+  - 1–60 characters, stored trimmed with single spaces;
+  - the short-word rule (`private.phrase_is_short`, the same cases as `phraseRefusal`);
+  - at most 300 phrases;
+  - already in the list, compared as the matcher sees it (23505);
+  - found on a live site's stored clean page. That is the same search as "Check phrase", run again at save, so a stale check can't slip a phrase through.
+
+  `remove_forbidden_phrase` keeps the last phrase of a group. One advisory lock covers the cap and that rule. Each change writes one audit row with the note (`forbidden_phrase.create` / `.delete`).
+- **The short-word rule:** a phrase with no space is refused if it has under 6 letters, or, when it holds any Thai, under 4 Thai characters not counting vowel and tone marks ("พนัน" counts 3).
+- **The search runs in SQL** (`check_forbidden_phrase`, Admins only). The stored pages are already `normalizeForMatch` text, so `position(lower(phrase with single spaces) in body)` is the same comparison for any phrase of letters and spaces. It returns counts and at most five snippets of 80 characters each side; a page is never returned.
+- **The snippet** is cut from lower-case page source, not the readable text the board draws. Tags, and any tag cut at either end, become spaces, and it keeps 60 characters each side of the match. It is shown as plain text, with the match marked.
+- **Coverage:** "Not found on any of the N sites' last clean fetch" only when every live site had a page. Otherwise "Not found on the X of N sites with a clean fetch", with the rest named. With no page at all: "No site has a clean fetch yet — nothing was checked", and the phrase can still be added.
+- **The Remove copy** is "The Googlebot and Google-search views stop at the next crawler run (within 30 min). An incident it opened recovers once no check finds it and stays open until it's resolved — a short, unacknowledged one resolves itself".
+  - The board's "stay open until they're resolved" leaves out the auto-resolve (D-024).
+  - A crawler row that already holds the phrase keeps its finding until the next crawler run replaces it.
+- **One phone line** under both lists: "Holidays and phrases change on a larger screen." (MOrganisationLists). The holidays' own line goes.
+- **The board's footer line** ("Checked · ready to add", …) sits above the buttons, not beside them. At the dialog's width it would wrap the primary button onto its own row.
+- **The chips** are AURA `Tag` with `onRemove` (28 px ×, as drawn) from md. Phones show plain tags. A removable Tag ignores `touchHeight`, so on a touch tablet (820) the × is under 44 px. That is an AURA request; until it ships, the × stays as drawn.
+- **Schema lag:** the new functions answer `PGRST202` during the deploy and the page says "Forbidden words can't be changed for a minute — try again shortly". The 3b table exists by then.
+- **From the reviews (20 Nov):**
+  - **Words only.** A phrase with `&`, `<` or `>` is refused in TS and SQL (security review: `of&nbsp;the` passed every check and would have matched "of the" on every site).
+    - SQL folds every space the matcher folds (`private.phrase_clean`): the Unicode spaces and U+FEFF, collapsed before trimming.
+    - "Check phrase" takes at most 200 characters.
+    - Each change waits at most 5 s for the lock.
+  - **The tone follows the coverage.**
+    - Success only when every live site had a page.
+    - Some or none checked: the warning tone, with the footer "Not checked against every site — it can still be added".
+    - Found on several sites: "Found on X's home page and N more sites".
+  - **No dead controls (§14.16).**
+    - A group's last phrase shows no ×.
+    - At 300 phrases "Add phrase" is off with "The list holds 300 phrases — remove one first."
+    - A refusal at save sends the dialog back to "Check phrase".
+  - **Focus and announcement.** The check's result takes focus, because the pressed button may now be off, and focus reads it out. It is not a live region as well, which would read it twice (`/verify`). Only the checking line is a `status`.
+  - **Language marks.** Only the phrase carries `lang`, never the × button's English name. That covers the snippet and the Remove title.
+  - **Dialogs.**
+    - Both phrase dialogs ignore a click on the scrim, so a typed note isn't lost.
+    - Remove is an `alertdialog`.
+    - The Remove result line is the board's ("Removed “…” from Gambling · Thai · logged").
+  - **Phone.** The heading is "SHARED FORBIDDEN WORDS · 36" and the line is "Checked on every site on top of its own list. Groups stay closed until you open one." (MOrganisationLists).
+  - **Groups.** Group names are `h3`, as the holiday years are. Show and Hide carry the eye icons. After an add, the group that was changed is opened.
+  - **The short-word rule with mixed Thai and Latin** counts every character, not every Thai one, once any Thai is present ("pgสล" passes). That is the intended rule.
+  - **Left for later:**
+    - the Organisation loading skeleton's blocks for the two lists, shared with 3a;
+    - the whole phone row as the tap target;
+    - the response-hours dialog's scrim.
 
 **Impact.** S17 PR 1: migration `organisation_hours` (`save_response_hours`, `organisation_storage`), `features/organisation`, `/settings/organisation`, the Settings select, the hours copy on Sites, "Edit in Organisation" on Escalation and Profile, the audit words. PR 2: Alert channels (read-only routing, the test alert, the delivery log). PR 3a: migration `company_holidays_edit` (`kind`, `add_company_holiday` / `rename_company_holiday` / `remove_company_holiday`, audited by the row trigger) and the holiday section. PR 3b: the forbidden-word list. Plan: S17 Done-when 4–5; backlog lines for D-059 and D-046.
 

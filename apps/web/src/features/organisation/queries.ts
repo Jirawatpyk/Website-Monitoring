@@ -1,8 +1,16 @@
 import 'server-only';
-import { formatResponseHours, minutesToClock, timeToMinutes, type Tier } from '@dxt/shared';
+import {
+  FORBIDDEN_GROUP_IDS,
+  formatResponseHours,
+  minutesToClock,
+  timeToMinutes,
+  type ForbiddenGroup,
+  type Tier,
+} from '@dxt/shared';
 import type { ServerClient } from '@/lib/supabase/server';
 import { bangkokToday, type Holiday, type Hours as HolidayHours } from './holidays';
 import { daySetOf, TIME_OPTIONS, type Hours, type OrgClient, type OrgSite } from './model';
+import type { Phrase } from './phrases';
 
 export interface OrganisationData {
   hours: Hours;
@@ -22,6 +30,26 @@ export interface OrganisationData {
   hoursNow: HolidayHours;
   /** When the page was read (ISO), so "today" is the same on the server and in the browser. */
   now: string;
+  /** The shared forbidden list (S17 PR 3c, Admins read it); null when it couldn't be read. */
+  phrases: Phrase[] | null;
+}
+
+const GROUPS = new Set<string>(FORBIDDEN_GROUP_IDS);
+
+/** The shared forbidden list as it grew. A failed read leaves the section saying so, not the page. */
+export async function loadPhrases(db: Pick<ServerClient, 'from'>): Promise<Phrase[] | null> {
+  const { data, error } = await db
+    .from('forbidden_phrases')
+    .select('id, phrase_group, phrase')
+    .order('created_at')
+    .order('id');
+  if (error) {
+    console.error(JSON.stringify({ event: 'forbidden_phrases_unreadable', error: error.message }));
+    return null;
+  }
+  return data
+    .filter((r) => GROUPS.has(r.phrase_group))
+    .map((r) => ({ id: r.id, group: r.phrase_group as ForbiddenGroup, phrase: r.phrase }));
 }
 
 /**
@@ -44,7 +72,7 @@ const hhmm = (t: string) => minutesToClock(timeToMinutes(t));
 
 /** The Organisation page for an Admin (RLS as the user: staff read; the storage RPC is Admin-only). */
 export async function loadOrganisation(db: ServerClient, now = new Date()): Promise<OrganisationData> {
-  const [settings, sites, clients, storage, holidays] = await Promise.all([
+  const [settings, sites, clients, storage, holidays, phrases] = await Promise.all([
     db.from('organisation_settings').select('response_start, response_end, response_days').single(),
     db.from('sites').select('name, tier, client_id').eq('is_active', true).order('name'),
     db
@@ -53,6 +81,7 @@ export async function loadOrganisation(db: ServerClient, now = new Date()): Prom
       .order('name'),
     db.rpc('organisation_storage'),
     loadHolidays(db, now),
+    loadPhrases(db),
   ]);
   if (settings.error) throw new Error(`organisation_settings: ${settings.error.message}`);
   if (sites.error) throw new Error(`sites: ${sites.error.message}`);
@@ -90,6 +119,7 @@ export async function loadOrganisation(db: ServerClient, now = new Date()): Prom
     })),
     storageBytes: storage.error ? null : Number(storage.data),
     holidays,
+    phrases,
     now: now.toISOString(),
     hoursNow: {
       startMin: timeToMinutes(settings.data.response_start),

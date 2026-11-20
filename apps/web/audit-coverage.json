@@ -34,6 +34,12 @@
     "features/organisation/actions.ts#removeHoliday": {
       "rpc": ["remove_company_holiday"]
     },
+    "features/organisation/actions.ts#addPhrase": {
+      "rpc": ["add_forbidden_phrase"]
+    },
+    "features/organisation/actions.ts#removePhrase": {
+      "rpc": ["remove_forbidden_phrase"]
+    },
     "features/settings/actions.ts#inviteUser": {
       "rpc": ["invite_user"]
     },
@@ -195,6 +201,9 @@
     },
     "features/sites/actions.ts#saveMonitors": {
       "rpc": ["save_monitors"]
+    },
+    "features/organisation/actions.ts#checkPhrase": {
+      "exempt": "Check phrase: reads where a phrase is found on the stored clean pages; changes nothing."
     }
   },
   "routes": {

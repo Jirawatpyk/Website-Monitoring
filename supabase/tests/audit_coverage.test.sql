@@ -87,6 +87,8 @@ insert into audit_classes (fn, kind, note) values
   ('open_system_alert', 'audited', 'verifier.test.sql'),
   ('clear_system_alert', 'audited', 'verifier.test.sql'),
   ('crawler_set_baseline', 'audited', 'page_change.test.sql'),
+  ('add_forbidden_phrase', 'audited', 'forbidden_phrases_edit.test.sql'),
+  ('remove_forbidden_phrase', 'audited', 'forbidden_phrases_edit.test.sql'),
   ('crawler_prune_clean_pages', 'exempt', 'Drops stored crawler pages nobody reads any more (retention of monitoring data, D-069).'),
   ('engine_post_late_alert', 'audited', 'oncall_routing.test.sql'),
   -- Exempt: no config or incident state changes

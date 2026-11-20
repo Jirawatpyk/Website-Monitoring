@@ -105,6 +105,57 @@ test.describe('organisation (local Supabase)', () => {
     await expect(page.getByRole('button', { name: /^Remove E2E / })).toHaveCount(0);
   });
 
+  test('an Admin checks, adds and removes a shared forbidden phrase with a note (PR 3c, §41)', async ({
+    page,
+    context,
+    baseURL,
+  }, info) => {
+    test.skip(info.project.name === 'mobile', 'view only on phones (§22.5)');
+    await ensureUser('tao@example.test');
+    await signIn(context, baseURL!, 'tao@example.test');
+    await page.goto('/settings/organisation#forbidden');
+    await expect(page.getByRole('heading', { name: 'Shared forbidden words' })).toBeVisible();
+
+    // A run that stopped half way leaves its phrase: take it out first. The group stays open after a
+    // change, so it is opened only while closed.
+    const toggle = page.getByRole('button', { name: /^(Show|Hide) \d+ phrases? in Gambling · English$/ });
+    const openGroup = async () => {
+      if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+    };
+    await openGroup();
+    const leftover = page.getByRole('button', { name: /^Remove e2e slot vip room / });
+    while ((await leftover.count()) > 0) {
+      await leftover.first().click();
+      const dialog = page.getByRole('alertdialog');
+      await dialog.getByRole('textbox', { name: /Change note/ }).fill('E2E clean-up');
+      await dialog.getByRole('button', { name: 'Remove and log' }).click();
+      await expect(page.getByText(/^Removed “e2e slot vip room” /)).toBeFocused();
+      await openGroup();
+    }
+
+    await page.getByRole('button', { name: 'Add phrase' }).click();
+    const add = page.getByRole('dialog', { name: 'Add a forbidden phrase' });
+    await add.locator('select.aura-select__native').selectOption({ label: 'Gambling · English' });
+    const field = add.getByRole('textbox', { name: /Phrase/ });
+    await field.fill('slot');
+    await expect(add.getByText(/a single short word is refused/)).toBeVisible();
+    await field.fill('e2e slot vip room');
+    await add.getByRole('button', { name: 'Check phrase' }).click();
+    await expect(add.getByText(/^(Not found on|No site has a clean fetch yet)/)).toBeVisible();
+    await add.getByRole('textbox', { name: /Change note/ }).fill('E2E check');
+    await add.getByRole('button', { name: 'Add and log' }).click();
+    await expect(page.getByText(/^Added “e2e slot vip room” to Gambling · English · logged/)).toBeFocused();
+
+    await openGroup();
+    await page.getByRole('button', { name: 'Remove e2e slot vip room from Gambling · English' }).click();
+    const remove = page.getByRole('alertdialog', { name: 'Remove “e2e slot vip room”?' });
+    await remove.getByRole('textbox', { name: /Change note/ }).fill('E2E clean-up');
+    await remove.getByRole('button', { name: 'Remove and log' }).click();
+    await expect(
+      page.getByText(/^Removed “e2e slot vip room” from Gambling · English · logged/),
+    ).toBeFocused();
+  });
+
   test('on a phone it is view only', async ({ page, context, baseURL }, info) => {
     test.skip(info.project.name !== 'mobile', 'phone view');
     await ensureUser('tao@example.test');
@@ -115,7 +166,16 @@ test.describe('organisation (local Supabase)', () => {
     // Holidays are listed without their buttons (§41 item 7).
     await expect(page.getByRole('heading', { name: 'Company holidays' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add holiday' })).toBeHidden();
-    await expect(page.getByText('Holidays change on a larger screen.', { exact: false })).toBeVisible();
+    // Phrases: groups with a count, a tap opens one read-only.
+    await expect(page.getByRole('button', { name: 'Add phrase' })).toBeHidden();
+    await page.getByRole('button', { name: /^Show \d+ phrases in Pharma$/ }).click();
+    await expect(
+      page.getByRole('list', { name: 'Pharma phrases' }).getByText('buy viagra').first(),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Remove buy viagra/ })).toBeHidden();
+    await expect(
+      page.getByText('Holidays and phrases change on a larger screen.', { exact: false }),
+    ).toBeVisible();
     // The Settings pages are a select on a phone (§35.1).
     await page.locator('select.aura-select__native').first().selectOption({ label: 'Users & roles' });
     await expect(page).toHaveURL(/\/settings\/users$/);

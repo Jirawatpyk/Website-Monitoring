@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { UnsavedBar } from '@/components/unsaved-bar';
 import { SECTION_HEADING, SettingsHeader, ViewOnlyLine } from '@/features/settings';
 import { saveResponseHours } from '../actions';
+import { ForbiddenSection } from './forbidden-section';
 import { HolidaysSection } from './holidays-section';
 import {
   BUDGET,
@@ -165,6 +166,7 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
       <ClientsSection rows={clientRows(data.clients)} />
 
       <HolidaysSection holidays={data.holidays} hours={data.hoursNow} now={new Date(data.now)} />
+      <ForbiddenSection phrases={data.phrases} liveSites={data.sites.length} />
 
       <div id="data-kept" className="grid scroll-mt-18 lg:scroll-mt-4 gap-4 md:grid-cols-2">
         <DataKept bytes={data.storageBytes} />
@@ -449,13 +451,13 @@ function ClientsSection({ rows }: { rows: ClientRow[] }) {
 }
 
 /**
- * "On this page" (§41 item 1) so the long page stays navigable. It lists the sections that exist:
- * Shared forbidden words joins with PR 3b (D-069).
+ * "On this page" (§41 item 1) so the long page stays navigable, every section in page order.
  */
 const ON_THIS_PAGE = [
   { href: '#tiers', label: 'Tiers' },
   { href: '#clients', label: 'Clients' },
   { href: '#holidays', label: 'Company holidays' },
+  { href: '#forbidden', label: 'Shared forbidden words' },
   { href: '#data-kept', label: 'Data kept' },
   { href: '#monthly-cost', label: 'Monthly cost' },
 ] as const;

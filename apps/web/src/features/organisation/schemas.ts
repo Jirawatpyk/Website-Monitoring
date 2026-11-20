@@ -1,4 +1,4 @@
-import { HOLIDAY_KINDS } from '@dxt/shared';
+import { FORBIDDEN_GROUP_IDS, HOLIDAY_KINDS } from '@dxt/shared';
 import { z } from 'zod';
 import { HOLIDAY_NAME_MAX } from './holidays';
 import { DAY_SET_LABELS, TIME_OPTIONS, type DaySet } from './model';
@@ -38,3 +38,22 @@ export const renameHolidaySchema = z.object({ id: z.uuid(), name: holidayName })
 export type RenameHolidayInput = z.input<typeof renameHolidaySchema>;
 
 export const removeHolidaySchema = z.object({ id: z.uuid() });
+
+// ── Shared forbidden words (S17 PR 3c) ──────────────────────────────────────
+const changeNote = z
+  .string()
+  .trim()
+  .min(1, 'Add a short note — it goes in the audit log with the change.')
+  .max(500, 'The note is too long.');
+/** Long enough for any phrase the table takes; the rules come from `phraseRefusal` and the SQL. */
+const phraseText = z.string().max(200, 'Up to 60 characters.');
+
+export const checkPhraseSchema = z.object({ phrase: phraseText });
+export const addPhraseSchema = z.object({
+  group: z.enum(FORBIDDEN_GROUP_IDS),
+  phrase: phraseText,
+  note: changeNote,
+});
+export type AddPhraseInput = z.input<typeof addPhraseSchema>;
+export const removePhraseSchema = z.object({ id: z.uuid(), note: changeNote });
+export type RemovePhraseInput = z.input<typeof removePhraseSchema>;

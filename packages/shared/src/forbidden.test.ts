@@ -7,6 +7,9 @@ import {
   MAX_PHRASE_LENGTH,
   findForbiddenPhrases,
   findInNormalized,
+  isShortPhrase,
+  phraseRefusal,
+  cleanPhrase,
   longestPhrase,
   normalizeForMatch,
 } from './forbidden';
@@ -74,6 +77,45 @@ describe('the list itself', () => {
   it('is the groups in order, each entry within the stored length', () => {
     expect(FORBIDDEN_PHRASES).toEqual(FORBIDDEN_GROUP_IDS.flatMap((g) => FORBIDDEN_GROUPS[g]));
     expect(longestPhrase(FORBIDDEN_PHRASES)).toBeLessThanOrEqual(MAX_PHRASE_LENGTH);
+  });
+});
+
+describe('the phrase rules for an Admin’s new phrase (spec §41 item 5, D-069)', () => {
+  it.each([
+    ['slot', 'short'],
+    ['Slot', 'short'],
+    ['casino', null], // 6 letters: a word that long is allowed (the Admin's call)
+    ['ufa365', null], // a 6-letter brand passes
+    ['ufabet', 'taken'],
+    ['joker388', null],
+    ['พนัน', 'short'], // 3 Thai characters: the vowel mark ั doesn't count
+    ['สล็อต', null], // ส ล อ ต: 4
+    ['หวย', 'short'],
+    ['time slot', null],
+    ['  slot   gacor ', 'taken'],
+    ['SLOT ONLINE', 'taken'],
+    ['of&nbsp;the', 'markup'],
+    ['slot&#160;', 'markup'],
+    ['<script src', 'markup'],
+    ['slot online', 'taken'],
+    ['', 'empty'],
+    ['   ', 'empty'],
+    ['a b'.repeat(21), 'too_long'],
+  ])('“%s” → %s', (phrase, refusal) => {
+    expect(phraseRefusal(phrase, FORBIDDEN_PHRASES)).toBe(refusal);
+  });
+
+  it('every seeded phrase passes the short-word rule', () => {
+    for (const p of FORBIDDEN_PHRASES) expect(isShortPhrase(p), p).toBe(false);
+  });
+
+  it('counts characters as the table does, not UTF-16 units (an emoji is one)', () => {
+    expect(phraseRefusal('🎰'.repeat(40), [])).toBeNull();
+    expect(phraseRefusal('🎰'.repeat(61), [])).toBe('too_long');
+  });
+
+  it('stores a phrase trimmed, its spaces as one', () => {
+    expect(cleanPhrase('  slot \t  vip ')).toBe('slot vip');
   });
 });
 

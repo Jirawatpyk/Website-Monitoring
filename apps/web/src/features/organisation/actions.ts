@@ -4,7 +4,13 @@ import { revalidatePath } from 'next/cache';
 import { getAccess } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import * as m from './mutations';
-import type { AddHolidayInput, RenameHolidayInput, SaveHoursInput } from './schemas';
+import type {
+  AddHolidayInput,
+  AddPhraseInput,
+  RemovePhraseInput,
+  RenameHolidayInput,
+  SaveHoursInput,
+} from './schemas';
 
 /** Saves the response hours as the signed-in Admin (the SQL checks the role again, D-069). */
 export async function saveResponseHours(input: SaveHoursInput): Promise<m.SaveHoursResult> {
@@ -42,4 +48,30 @@ export async function renameHoliday(input: RenameHolidayInput): Promise<m.SaveHo
 }
 export async function removeHoliday(id: string): Promise<m.SaveHoursResult> {
   return asAdmin((db) => m.removeHoliday(id, { db }));
+}
+
+const NOT_ADMIN_WORDS = 'Only an Admin can change the shared forbidden words.';
+const isAdmin = async () => {
+  const access = await getAccess();
+  return access.status === 'active' && access.profile.role === 'admin';
+};
+
+/** "Check phrase" as the signed-in Admin (the SQL checks the role again; nothing is written). */
+export async function checkPhrase(phrase: string): Promise<m.CheckPhraseResult> {
+  if (!(await isAdmin())) return { ok: false, message: NOT_ADMIN_WORDS };
+  return m.checkPhrase(phrase, { db: await createClient() });
+}
+
+/** Adds or removes one shared forbidden phrase with a note (audited in SQL). */
+export async function addPhrase(input: AddPhraseInput): Promise<m.SaveHoursResult> {
+  if (!(await isAdmin())) return { ok: false, message: NOT_ADMIN_WORDS };
+  const result = await m.addPhrase(input, { db: await createClient() });
+  if (result.ok) revalidatePath('/settings/organisation');
+  return result;
+}
+export async function removePhrase(input: RemovePhraseInput): Promise<m.SaveHoursResult> {
+  if (!(await isAdmin())) return { ok: false, message: NOT_ADMIN_WORDS };
+  const result = await m.removePhrase(input, { db: await createClient() });
+  if (result.ok) revalidatePath('/settings/organisation');
+  return result;
 }
