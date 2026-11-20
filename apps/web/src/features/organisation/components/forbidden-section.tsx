@@ -248,7 +248,9 @@ function AddDialog({
   const [group, setGroup] = useState<ForbiddenGroup>('gambling_th');
   const [text, setText] = useState('');
   const [note, setNote] = useState('');
+  // Each button marks its own field: Check the phrase, Add the note.
   const [tried, setTried] = useState(false);
+  const [triedSave, setTriedSave] = useState(false);
   // The check belongs to the phrase it was run on: editing the phrase asks for a new one.
   const [checked, setChecked] = useState<{ phrase: string; words: CheckWords } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -266,7 +268,7 @@ function AddDialog({
   const ready = current?.kind === 'clear';
   const n = note.trim();
   const noteError =
-    ready && tried && !n ? 'Add a short note — it goes in the audit log with the change.' : null;
+    ready && triedSave && !n ? 'Add a short note — it goes in the audit log with the change.' : null;
   const foot =
     !phrase || refusal
       ? ''
@@ -287,7 +289,7 @@ function AddDialog({
     });
   };
   const save = () => {
-    setTried(true);
+    setTriedSave(true);
     if (!n) return;
     setFailure(null);
     startSave(async () => {
@@ -307,7 +309,6 @@ function AddDialog({
       description="Every site is checked for it on top of its own “Must not contain”."
       footer={
         <>
-          <span className="grow text-xs text-fg-secondary">{foot}</span>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
@@ -362,6 +363,8 @@ function AddDialog({
           placeholder="Why add it? e.g. seen on a client site this week"
           hint="Saved with the change in the audit log."
         />
+        {/* The board's footer line; above the buttons, which keep one row at every width. */}
+        {foot && <span className="text-xs text-fg-secondary">{foot}</span>}
         <Failure text={failure} />
       </div>
     </Dialog>

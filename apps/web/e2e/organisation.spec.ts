@@ -105,6 +105,52 @@ test.describe('organisation (local Supabase)', () => {
     await expect(page.getByRole('button', { name: /^Remove E2E / })).toHaveCount(0);
   });
 
+  test('an Admin checks, adds and removes a shared forbidden phrase with a note (PR 3c, §41)', async ({
+    page,
+    context,
+    baseURL,
+  }, info) => {
+    test.skip(info.project.name === 'mobile', 'view only on phones (§22.5)');
+    await ensureUser('tao@example.test');
+    await signIn(context, baseURL!, 'tao@example.test');
+    await page.goto('/settings/organisation#forbidden');
+    await expect(page.getByRole('heading', { name: 'Shared forbidden words' })).toBeVisible();
+
+    // A run that stopped half way leaves its phrase: take it out first.
+    await page.getByRole('button', { name: /^Show \d+ phrases? in Gambling · English$/ }).click();
+    const leftover = page.getByRole('button', { name: /^Remove e2e slot vip room / });
+    while ((await leftover.count()) > 0) {
+      await leftover.first().click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('textbox', { name: /Change note/ }).fill('E2E clean-up');
+      await dialog.getByRole('button', { name: 'Remove and log' }).click();
+      await expect(page.getByText(/^Removed “e2e slot vip room” /)).toBeFocused();
+      await page.getByRole('button', { name: /^Show \d+ phrases? in Gambling · English$/ }).click();
+    }
+
+    await page.getByRole('button', { name: 'Add phrase' }).click();
+    const add = page.getByRole('dialog', { name: 'Add a forbidden phrase' });
+    await add.locator('select.aura-select__native').selectOption({ label: 'Gambling · English' });
+    const field = add.getByRole('textbox', { name: /Phrase/ });
+    await field.fill('slot');
+    await expect(add.getByText(/a single short word is refused/)).toBeVisible();
+    await field.fill('e2e slot vip room');
+    await add.getByRole('button', { name: 'Check phrase' }).click();
+    await expect(add.getByText(/^(Not found on|No site has a clean fetch yet)/)).toBeVisible();
+    await add.getByRole('textbox', { name: /Change note/ }).fill('E2E check');
+    await add.getByRole('button', { name: 'Add and log' }).click();
+    await expect(page.getByText(/^Added “e2e slot vip room” to Gambling · English · logged/)).toBeFocused();
+
+    // The group is still open from the clean-up above.
+    await page.getByRole('button', { name: 'Remove e2e slot vip room from Gambling · English' }).click();
+    const remove = page.getByRole('dialog', { name: 'Remove “e2e slot vip room”?' });
+    await remove.getByRole('textbox', { name: /Change note/ }).fill('E2E clean-up');
+    await remove.getByRole('button', { name: 'Remove and log' }).click();
+    await expect(
+      page.getByText(/^Removed “e2e slot vip room” from Gambling · English · logged/),
+    ).toBeFocused();
+  });
+
   test('on a phone it is view only', async ({ page, context, baseURL }, info) => {
     test.skip(info.project.name !== 'mobile', 'phone view');
     await ensureUser('tao@example.test');
@@ -115,6 +161,13 @@ test.describe('organisation (local Supabase)', () => {
     // Holidays are listed without their buttons (§41 item 7).
     await expect(page.getByRole('heading', { name: 'Company holidays' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add holiday' })).toBeHidden();
+    // Phrases: groups with a count, a tap opens one read-only.
+    await expect(page.getByRole('button', { name: 'Add phrase' })).toBeHidden();
+    await page.getByRole('button', { name: /^Show \d+ phrases in Pharma$/ }).click();
+    await expect(
+      page.getByRole('list', { name: 'Pharma phrases' }).getByText('buy viagra').first(),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Remove buy viagra/ })).toBeHidden();
     await expect(
       page.getByText('Holidays and phrases change on a larger screen.', { exact: false }),
     ).toBeVisible();

@@ -154,6 +154,26 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   - The pass line counts the sites it really checked and names those it couldn't.
   - The save runs the same check on the server; the button alone isn't trusted.
 
+**PR 3c (the editor, board OrganisationLists §41 items 4–8), settled by the recommendation rule (20 Nov):**
+
+- **Every rule is in SQL too.** `add_forbidden_phrase` refuses what the page refuses, so a direct call by an Admin can't skip a rule:
+  - 1–60 characters, stored trimmed with single spaces;
+  - the short-word rule (`private.phrase_is_short`, the same cases as `phraseRefusal`);
+  - at most 300 phrases;
+  - already in the list, compared as the matcher sees it (23505);
+  - found on a live site's stored clean page. That is the same search as "Check phrase", run again at save, so a stale check can't slip a phrase through.
+
+  `remove_forbidden_phrase` keeps the last phrase of a group. One advisory lock covers the cap and that rule. Each change writes one audit row with the note (`forbidden_phrase.create` / `.delete`).
+- **The short-word rule:** a phrase with no space is refused if it has under 6 letters, or, when it holds any Thai, under 4 Thai characters not counting vowel and tone marks ("พนัน" counts 3).
+- **The search runs in SQL** (`check_forbidden_phrase`, Admins only). The stored pages are already `normalizeForMatch` text, so `position(lower(phrase with single spaces) in body)` is the same comparison for any phrase of letters and spaces. It returns counts and at most five snippets of 80 characters each side; a page is never returned.
+- **The snippet** is cut from lower-case page source, not the readable text the board draws. Tags, and any tag cut at either end, become spaces, and it keeps 60 characters each side of the match. It is shown as plain text, with the match marked.
+- **Coverage:** "Not found on any of the N sites' last clean fetch" only when every live site had a page. Otherwise "Not found on the X of N sites with a clean fetch", with the rest named. With no page at all: "No site has a clean fetch yet — nothing was checked", and the phrase can still be added.
+- **The Remove copy** is "An incident it opened recovers on the next round and stays open until it's resolved — a short, unacknowledged one resolves itself". The board's "stay open until they're resolved" leaves out the auto-resolve (D-024).
+- **One phone line** under both lists: "Holidays and phrases change on a larger screen." (MOrganisationLists). The holidays' own line goes.
+- **The board's footer line** ("Checked · ready to add", …) sits above the buttons, not beside them. At the dialog's width it would wrap the primary button onto its own row.
+- **The chips** are AURA `Tag` with `onRemove` (28 px ×, as drawn) from md. Phones show plain tags.
+- **Schema lag:** the new functions answer `PGRST202` during the deploy and the page says "Forbidden words can't be changed for a minute — try again shortly". The 3b table exists by then.
+
 **Impact.** S17 PR 1: migration `organisation_hours` (`save_response_hours`, `organisation_storage`), `features/organisation`, `/settings/organisation`, the Settings select, the hours copy on Sites, "Edit in Organisation" on Escalation and Profile, the audit words. PR 2: Alert channels (read-only routing, the test alert, the delivery log). PR 3a: migration `company_holidays_edit` (`kind`, `add_company_holiday` / `rename_company_holiday` / `remove_company_holiday`, audited by the row trigger) and the holiday section. PR 3b: the forbidden-word list. Plan: S17 Done-when 4–5; backlog lines for D-059 and D-046.
 
 ## D-068 — S13 PR 4: back up but still expiring, and who the set-aside ack names
