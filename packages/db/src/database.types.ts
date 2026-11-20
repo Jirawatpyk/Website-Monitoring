@@ -215,6 +215,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"crawler_clean_pages": {
+                  Row: {
+                    "body": string,"body_hash": string,"checked_at": string,"created_at": string,"monitor_id": string,"updated_at": string,"view": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body": string,"body_hash": string,"checked_at": string,"created_at"?: string,"monitor_id": string,"updated_at"?: string,"view": string
+                  }
+                  Update: {
+                    "body"?: string,"body_hash"?: string,"checked_at"?: string,"created_at"?: string,"monitor_id"?: string,"updated_at"?: string,"view"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "crawler_clean_pages_monitor_id_fkey"
+      columns: ["monitor_id"]
+isOneToOne: false
+      referencedRelation: "monitors"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"engine_sweep_minutes": {
                   Row: {
                     "minute": string
@@ -260,6 +280,26 @@ isOneToOne: false
       columns: ["policy_id"]
 isOneToOne: false
       referencedRelation: "escalation_policies"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"forbidden_phrases": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"id": string,"phrase": string,"phrase_group": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"phrase": string,"phrase_group": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"phrase"?: string,"phrase_group"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "forbidden_phrases_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
       referencedColumns: ["id"]
     }
                   ]

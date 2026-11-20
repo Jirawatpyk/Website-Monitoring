@@ -4,6 +4,7 @@ import { probeRequestHeaders } from '@dxt/shared';
 import { getAccess, type Access } from '@/lib/auth/session';
 import { serverEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
+import { loadForbiddenList } from '@/server/forbidden-list';
 import { testCheckInputSchema } from './schemas';
 import type { TestCheckResult } from './types';
 
@@ -16,6 +17,12 @@ export interface TestCheckDeps {
   secretHeader?: () => { name: string; value: string } | undefined;
   /** Is this host already a saved monitor's? Only then does the WAF secret header go out. */
   knownHost?: (host: string) => Promise<boolean>;
+  /** The shared forbidden list the probes use (D-069); Admins read it under RLS. */
+  sharedForbidden?: () => Promise<readonly string[]>;
+}
+
+async function forbiddenFromDb(): Promise<readonly string[]> {
+  return loadForbiddenList(await createClient());
 }
 
 function secretFromEnv() {
@@ -50,6 +57,7 @@ export function monitorTestHandler(location: TestCheckResult['location'], deps: 
     check = runHttpCheck,
     secretHeader = secretFromEnv,
     knownHost = knownHostFromDb,
+    sharedForbidden = forbiddenFromDb,
   } = deps;
   return async function POST(request: Request): Promise<Response> {
     const who = await access();
@@ -63,8 +71,10 @@ export function monitorTestHandler(location: TestCheckResult['location'], deps: 
     const m = body.data;
     // The secret header goes only to a host the team already monitors (security review): a test of a
     // new address can't be used to read the secret off a server someone controls.
-    const secret = (await knownHost(new URL(m.url).host)) ? secretHeader() : undefined;
+    const [known, shared] = await Promise.all([knownHost(new URL(m.url).host), sharedForbidden()]);
+    const secret = known ? secretHeader() : undefined;
     const r = await check({
+      sharedForbidden: shared,
       url: m.url,
       method: m.method,
       timeoutMs: Math.min(m.timeoutSec * 1000, MAX_TIMEOUT_MS),

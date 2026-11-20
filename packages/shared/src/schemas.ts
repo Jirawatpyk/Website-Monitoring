@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CHECK_OUTCOMES, PROBE_LOCATIONS, WAF_VENDORS } from './domain';
+import { MAX_PHRASE_LENGTH } from './forbidden';
 
 /**
  * One check result as a probe reports it. The VPS probe posts these to the Ingest API;
@@ -91,6 +92,12 @@ export const dueMonitorsResponseSchema = z.object({
     })
     .nullable()
     .optional(),
+  /**
+   * S17 PR 3b (D-069): the shared forbidden list the probes use (the `forbidden_phrases` table). Absent
+   * from an older web, and a list that doesn't parse is dropped, never the round: the agent then uses
+   * its bundled list.
+   */
+  forbidden: z.array(z.string().min(1).max(MAX_PHRASE_LENGTH)).max(1000).optional().catch(undefined),
 });
 export type DueMonitorsResponse = z.infer<typeof dueMonitorsResponseSchema>;
 

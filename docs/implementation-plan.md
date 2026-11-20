@@ -747,8 +747,9 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - **PRs:**
   1. Organisation: `save_response_hours` (+ `organisation_storage`), `/settings/organisation`, the Settings select on phones, the hours copy on Sites / Site detail, "Edit in Organisation" on Escalation and Profile. Merged #214 (19 Nov, `/verify` PASS on staging: INC-0071 held until the new opening).
   2. Alert channels: read-only routing, the test alert (`send_channel_test`; also Profile's test for Stakeholders and Viewers, D-062 item 12), the delivery log. Merged #215 (20 Nov, `/verify` PASS on staging: the test card and email reached Tao, both Delivered in the log).
-  3. a. Company holidays: `add_company_holiday` / `rename_company_holiday` / `remove_company_holiday` (audited by the row trigger), `company_holidays.kind`, the holiday section and "On this page" (board OrganisationLists, §41).
-     b. The editable shared forbidden-word list (probes, crawler and the VPS agent read it; "Check phrase" reads each live site's last clean fetch, stored by the crawler; deploy `dxt-agent`).
+  3. a. Company holidays: `add_company_holiday` / `rename_company_holiday` / `remove_company_holiday` (audited by the row trigger), `company_holidays.kind`, the holiday section and "On this page" (board OrganisationLists, §41). Merged #216 (20 Nov; staging: INC-0072's PROBLEM held until Mon 23 Nov 09:00 with today a company day off; `/verify` checked add / rename / remove and the refusals).
+     b. The shared list moves to the database with no change in behaviour: `forbidden_phrases`, seeded from the code list. The probes, the crawler, the monitor test and the VPS agent (through the Ingest GET) read it, and fall back to the code list. The crawler stores each site's last clean fetch per view. Deploy `dxt-agent`.
+     c. The editor on Organisation (board OrganisationLists, §41 items 4–8): groups with counts, Add phrase with "Check phrase" against the stored clean fetches, Remove, a note on each change, audited.
 - **Moved out (D-069):** a per-site uptime target (D-059) and the editable tracking allowlist (D-046) — backlog, no slice yet.
 - **Depends on:** S10, S11
 - **Done when:**

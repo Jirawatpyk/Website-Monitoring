@@ -25,13 +25,24 @@ describe('createApi — the only way out of the VPS (PRD §10)', () => {
     const fetchImpl = vi.fn(async () => ok({ monitors: [MONITOR] }));
     const api = createApi('https://monitor.example.test', TOKEN, fetchImpl);
     // A server that doesn't send keywords (D-022) or headers (S05) yet: none to check or send.
-    expect(await api.dueMonitors()).toEqual([
-      { ...MONITOR, mustContain: [], mustNotContain: [], headers: [] },
-    ]);
+    // …nor the shared list (D-069): the round goes with the bundled one.
+    expect(await api.dueMonitors()).toEqual({
+      monitors: [{ ...MONITOR, mustContain: [], mustNotContain: [], headers: [] }],
+    });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit];
     // D-051: this agent echoes the confirm flag, so it asks for confirm checks.
     expect(url.toString()).toBe('https://monitor.example.test/api/ingest?confirm=1');
     expect(init.headers).toMatchObject({ authorization: `Bearer ${TOKEN}` });
+  });
+
+  it('takes the web’s shared list (D-069); a list that doesn’t parse is dropped, never the round', async () => {
+    const fetchImpl = vi.fn(async () => ok({ monitors: [MONITOR], forbidden: ['slot online', 'ufabet'] }));
+    const api = createApi('https://monitor.example.test', TOKEN, fetchImpl);
+    expect((await api.dueMonitors()).forbidden).toEqual(['slot online', 'ufabet']);
+    fetchImpl.mockResolvedValueOnce(ok({ monitors: [MONITOR], forbidden: ['', 42] }));
+    const bad = await api.dueMonitors();
+    expect(bad.monitors).toHaveLength(1);
+    expect(bad).not.toHaveProperty('forbidden');
   });
 
   it('hands each ingest answer to the watchdog: when, the sweep, who is on call (S12a)', async () => {

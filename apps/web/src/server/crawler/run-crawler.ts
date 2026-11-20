@@ -11,7 +11,9 @@ import {
 } from '@dxt/shared';
 import { isAllowedHost } from '@dxt/engine';
 import type { CronJobResult } from '../cron-job';
+import { loadForbiddenList } from '../forbidden-list';
 import { inBatches } from '../in-batches';
+import { loadCleanHashes, storeCleanPage } from './clean-pages';
 import { HTTP_MONITOR_TYPES } from '../probe/due-monitors';
 
 /** The crawler runs from Singapore only (vercel.json `functions`); it is a view, not a location (D-041). */
@@ -120,7 +122,12 @@ export async function runCrawler({
     return { ok: false, skipped: 'wrong_region', expected: CRAWLER_REGION };
   }
   const started = clock();
-  const monitors = await loadCrawlerMonitors(db);
+  const [monitors, sharedForbidden, hashes] = await Promise.all([
+    loadCrawlerMonitors(db),
+    loadForbiddenList(db),
+    // Without the store (a deploy ahead of its migration) the run still checks every site.
+    loadCleanHashes(db).catch((err: unknown) => String(err)),
+  ]);
   const views = [...CRAWLER_VIEWS, FINGERPRINT_VIEW] as const;
   const all = monitors.flatMap((m) => views.map((view) => ({ m, view })));
   // Start each run further down the list, so a run cut by its budget never skips the same sites twice.
@@ -141,10 +148,27 @@ export async function runCrawler({
         : { client: CRAWLER_CLIENTS[view], mustNotContain: m.mustNotContain }),
       scanWholeBody: true,
       allowPrivateTargets,
+      sharedForbidden,
+      keepText: typeof hashes !== 'string',
     });
     const usable = plain
       ? isUsablePlain(result, m.url, m.allowedRedirectDomains)
       : isUsable(result, m.url, m.allowedRedirectDomains);
+    // D-069: the site's own page, read whole, with nothing forbidden on it, is its newest clean page.
+    const clean =
+      usable &&
+      result.text !== undefined &&
+      (result.keywordForbidden?.length ?? 0) === 0 &&
+      !endedOffSite(result, m.url, m.allowedRedirectDomains);
+    const cleanError =
+      clean && typeof hashes !== 'string'
+        ? await storeCleanPage(db, hashes, {
+            monitorId: m.id,
+            view,
+            checkedAt: checkedAt.toISOString(),
+            text: result.text!,
+          })
+        : null;
     const { data: row, error } = await db
       .from('crawler_checks')
       .insert({
@@ -171,7 +195,18 @@ export async function runCrawler({
       baseline = set.error?.message ?? null;
       baselineSet = set.data === true;
     }
-    return { m, view, checkedAt, result, usable, stored: error?.message ?? null, baseline, baselineSet };
+    return {
+      m,
+      view,
+      checkedAt,
+      result,
+      usable,
+      stored: error?.message ?? null,
+      baseline,
+      baselineSet,
+      clean: clean && cleanError === null,
+      cleanError,
+    };
   });
   const done = ran.filter((r) => r !== null);
   const writeErrors = [...new Set(done.map((r) => r.stored).filter((e) => e !== null))];
@@ -187,10 +222,19 @@ export async function runCrawler({
     )
     .map(({ m, view, result }) => ({ site: m.siteName, view, forbidden: result.keywordForbidden }));
   const baselinesSet = done.filter((r) => r.baselineSet).map((r) => r.m.siteName);
+  // The clean-page store is for 3c's check, not for monitoring: a failure is logged, never fatal.
+  const cleanErrors = [
+    ...new Set([
+      ...(typeof hashes === 'string' ? [hashes] : []),
+      ...done.map((r) => r.cleanError).filter((e) => e !== null),
+    ]),
+  ];
   return {
     ok: true,
     fetched: done.length,
     unusable: done.filter((r) => !r.usable).length,
+    cleanPages: done.filter((r) => r.clean).length,
+    ...(cleanErrors.length ? { cleanPagesFailed: cleanErrors } : {}),
     ...(baselinesSet.length ? { baselinesSet } : {}),
     ...(ran.length > done.length ? { skipped: ran.length - done.length } : {}),
     ...(hits.length ? { hits } : {}),

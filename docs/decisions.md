@@ -120,6 +120,26 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - **Phrase rules for 3b:** the spec's proposal (one word under 6 letters, or under 4 Thai characters, is refused) plus "Already in the list".
   - "Check phrase" reads each live site's last clean fetch, which the crawler stores from 3b on (Tao, 20 Nov: option A — store, not fetch on press).
 
+**PR 3b / 3c (the shared forbidden-word list), settled by the recommendation rule (20 Nov):**
+
+- **Three PRs, not two.**
+  - 3b moves the list into the database with no change in behaviour. It also stores the clean fetches, so production holds them before the editor exists. Schema lag and the agent release are proved while nothing changes.
+  - 3c is the editor.
+- **Table `forbidden_phrases`** holds the group, the phrase and who added it. The groups are fixed, as the board draws them: Gambling · Thai, Gambling · English, Brands, Adult, Pharma. The table is seeded from the code list, and a test holds the seed equal to the code list. The code list stays as the fallback.
+- **Readers.**
+  - **Readers on Vercel** (the Vercel probes, the crawler, the monitor test and the engine) read the table each run.
+  - **The Bangkok agent** gets the list in the Ingest GET as `forbidden`. A response without it, from an older web, means the agent uses its bundled list. The agent's schema ignores unknown keys, so an older agent is unaffected by the new field.
+  - **When the read fails** (a missing table on a deploy ahead of `migrate-production`, or any error), the code list is used and `forbidden_phrases_read_failed` is logged. A probe never stops for it. An empty table is a valid list.
+- **Matching is unchanged.** It is case-insensitive and treats a run of whitespace as one space (D-042), with one matcher (`findForbiddenPhrases`) everywhere. The stream overlap comes from the list in use. A phrase is at most 60 characters.
+- **The engine gate.** A word a check found that isn't in the site's own `must_not_contain` counts as a shared-list word, whether or not it is in today's list. So a phrase removed after a check found it, or one found by an agent on the bundled list, is gated by `DEFACEMENT_ALERTS` like the rest of the list. It is never read as the site's own word.
+- **Clean fetches.**
+  - **What is kept:** one row per primary monitor and crawler view (googlebot, google-search, plain), holding the newest usable fetch with no forbidden hit. Its text is matched as stored (`normalizeForMatch`, at most 3 MB, as the crawler reads). Each row is overwritten, and removed with the monitor.
+  - **Who can read it:** RLS is on with no policy, so only the service role can. The check returns only a short snippet around the match.
+- **What "Check phrase" covers (3c).**
+  - It checks only the home pages' crawler views. Key pages, and sites with no clean fetch yet (blocked by bot protection, a broken certificate, or never fetched), aren't covered.
+  - The pass line counts the sites it really checked and names those it couldn't.
+  - The save runs the same check on the server; the button alone isn't trusted.
+
 **Impact.** S17 PR 1: migration `organisation_hours` (`save_response_hours`, `organisation_storage`), `features/organisation`, `/settings/organisation`, the Settings select, the hours copy on Sites, "Edit in Organisation" on Escalation and Profile, the audit words. PR 2: Alert channels (read-only routing, the test alert, the delivery log). PR 3a: migration `company_holidays_edit` (`kind`, `add_company_holiday` / `rename_company_holiday` / `remove_company_holiday`, audited by the row trigger) and the holiday section. PR 3b: the forbidden-word list. Plan: S17 Done-when 4–5; backlog lines for D-059 and D-046.
 
 ## D-068 — S13 PR 4: back up but still expiring, and who the set-aside ack names

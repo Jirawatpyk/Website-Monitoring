@@ -374,6 +374,57 @@ describe('runHttpCheck', () => {
       const unknown = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/bad-charset` });
       expect(unknown.keywordForbidden).toEqual(['slot online']);
     });
+
+    it('uses the list it is given (D-069): an entry removed is not looked for, one added is', async () => {
+      const removed = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/spam`,
+        sharedForbidden: ['slot online'],
+      });
+      expect(removed.keywordForbidden).toEqual(['slot online']);
+      const added = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/booking`,
+        sharedForbidden: ['time slot'],
+      });
+      expect(added.keywordForbidden).toEqual(['time slot']);
+      const none = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/spam`,
+        sharedForbidden: [],
+      });
+      expect(none.keywordForbidden).toEqual([]);
+    });
+
+    it('the whole-body read uses the given list too, its overlap from that list', async () => {
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/split-spam`,
+        scanWholeBody: true,
+        sharedForbidden: ['slot online', 'q'.repeat(60)],
+      });
+      expect(result.keywordForbidden).toEqual(['slot online']);
+    });
+
+    it('keepText hands back everything read on a complete pass, and nothing otherwise', async () => {
+      const deep = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/deep-spam`,
+        scanWholeBody: true,
+        keepText: true,
+      });
+      expect(deep.text!.length).toBeGreaterThan(262_144);
+      expect(deep.text).toContain('บาคาร่า');
+      const broken = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/broken-tail`,
+        scanWholeBody: true,
+        keepText: true,
+      });
+      expect(broken.text).toBeUndefined();
+      const plain = await runHttpCheck({ allowPrivateTargets: true, url: `${base}/ok` });
+      expect(plain.text).toBeUndefined();
+    });
   });
 
   describe('the page fingerprint (S09d, D-046)', () => {

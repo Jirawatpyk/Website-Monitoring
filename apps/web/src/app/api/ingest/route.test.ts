@@ -9,7 +9,9 @@ const m = vi.hoisted(() => ({
   engine: vi.fn(),
   watch: vi.fn(),
   beat: vi.fn(),
+  forbidden: vi.fn(async () => ['slot online']),
 }));
+vi.mock('@/server/forbidden-list', () => ({ loadForbiddenList: m.forbidden }));
 vi.mock('next/server', () => ({ after: m.after }));
 vi.mock('@/server/db', () => ({ serviceDb: () => 'db' }));
 vi.mock('@/server/ingest/bangkok', () => ({
@@ -119,7 +121,9 @@ describe('GET /api/ingest (monitors due for Bangkok)', () => {
     m.watch.mockResolvedValue(watch);
     const { GET } = await import('./route');
     const res = await GET(get(TOKEN));
-    expect(await res.json()).toEqual({ monitors, ...watch });
+    // D-069: the shared forbidden list rides along for the agent's checks.
+    expect(await res.json()).toEqual({ monitors, ...watch, forbidden: ['slot online'] });
+    expect(m.forbidden).toHaveBeenCalledWith('db');
     expect(m.watch).toHaveBeenCalledWith('db', new Date(NOW));
     expect(m.beat).toHaveBeenCalledWith('db', 'vps-watchdog', new Date(NOW));
     // No `?confirm=1`: an agent that doesn't echo the flag gets no D-051 confirm checks.
@@ -133,7 +137,7 @@ describe('GET /api/ingest (monitors due for Bangkok)', () => {
     const { GET } = await import('./route');
     const res = await GET(get(TOKEN));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ monitors: [] });
+    expect(await res.json()).toEqual({ monitors: [], forbidden: ['slot online'] });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('watch_facts_failed'));
     warn.mockRestore();
   });

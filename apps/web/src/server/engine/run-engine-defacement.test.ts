@@ -139,6 +139,13 @@ describe('runEngine — defacement alerts off (production until Done-when 3)', (
     expect(summary.defacementHeld).toEqual(['Tubtong · “บาคาร่า” (SIN, TYO)']);
   });
 
+  it('a found word in neither list (removed since the check, D-069) is the shared list’s, never the site’s', async () => {
+    const { db, rpcCalls } = setup([pass('SIN', 0, ['removed phrase']), pass('TYO', 1, ['removed phrase'])]);
+    const summary = await runEngine(db, now);
+    expect(opened(rpcCalls)).toBeUndefined();
+    expect(summary.defacementHeld).toEqual(['Tubtong · “removed phrase” (SIN, TYO)']);
+  });
+
   it('logs a crawler finding only in the runs just after its fetch, not for its whole window', async () => {
     const { db } = setup([pass('SIN', 0), pass('TYO', 1)], [{ ...googlebotHit, checked_at: at(-600) }]);
     expect('defacementHeld' in (await runEngine(db, now))).toBe(false);
