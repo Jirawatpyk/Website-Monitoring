@@ -116,8 +116,13 @@ test.describe('organisation (local Supabase)', () => {
     await page.goto('/settings/organisation#forbidden');
     await expect(page.getByRole('heading', { name: 'Shared forbidden words' })).toBeVisible();
 
-    // A run that stopped half way leaves its phrase: take it out first.
-    await page.getByRole('button', { name: /^Show \d+ phrases? in Gambling · English$/ }).click();
+    // A run that stopped half way leaves its phrase: take it out first. The group stays open after a
+    // change, so it is opened only while closed.
+    const toggle = page.getByRole('button', { name: /^(Show|Hide) \d+ phrases? in Gambling · English$/ });
+    const openGroup = async () => {
+      if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+    };
+    await openGroup();
     const leftover = page.getByRole('button', { name: /^Remove e2e slot vip room / });
     while ((await leftover.count()) > 0) {
       await leftover.first().click();
@@ -125,7 +130,7 @@ test.describe('organisation (local Supabase)', () => {
       await dialog.getByRole('textbox', { name: /Change note/ }).fill('E2E clean-up');
       await dialog.getByRole('button', { name: 'Remove and log' }).click();
       await expect(page.getByText(/^Removed “e2e slot vip room” /)).toBeFocused();
-      await page.getByRole('button', { name: /^Show \d+ phrases? in Gambling · English$/ }).click();
+      await openGroup();
     }
 
     await page.getByRole('button', { name: 'Add phrase' }).click();
@@ -141,7 +146,7 @@ test.describe('organisation (local Supabase)', () => {
     await add.getByRole('button', { name: 'Add and log' }).click();
     await expect(page.getByText(/^Added “e2e slot vip room” to Gambling · English · logged/)).toBeFocused();
 
-    // The group is still open from the clean-up above.
+    await openGroup();
     await page.getByRole('button', { name: 'Remove e2e slot vip room from Gambling · English' }).click();
     const remove = page.getByRole('dialog', { name: 'Remove “e2e slot vip room”?' });
     await remove.getByRole('textbox', { name: /Change note/ }).fill('E2E clean-up');

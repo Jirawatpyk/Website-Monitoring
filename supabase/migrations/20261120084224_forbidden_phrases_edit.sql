@@ -50,30 +50,29 @@ stable
 set search_path = ''
 as $$
   with live as (
-    select m.id, m.url, s.name
+    select m.id, m.url, s.id as site_id, s.name
     from public.monitors m
     join public.sites s on s.id = m.site_id
     where m.is_primary and m.enabled and m.removed_at is null and s.is_active
   ),
   pages as (
-    select l.name, c.view, c.checked_at, c.body
+    select l.site_id, l.name, c.view, c.checked_at, c.body
     from live l
     join public.crawler_clean_pages c on c.monitor_id = l.id and c.url = l.url
   ),
   hits as (
-    select distinct on (name) name, view, checked_at,
+    select distinct on (site_id) site_id, name, view, checked_at,
       substring(body from greatest(position(p_needle in body) - 80, 1)
                 for char_length(p_needle) + 160) as snippet
     from pages
     where p_needle <> '' and position(p_needle in body) > 0
-    order by name, checked_at desc
+    order by site_id, checked_at desc
   )
   select jsonb_build_object(
     'sites', (select count(*) from live),
-    'checked', (select count(distinct name) from pages),
+    'checked', (select count(distinct site_id) from pages),
     'unchecked', coalesce((select jsonb_agg(name order by name) from live
-                           where name not in (select name from pages)), '[]'::jsonb),
-    'newest', (select max(checked_at) from pages),
+                           where site_id not in (select site_id from pages)), '[]'::jsonb),
     'hits', coalesce((select jsonb_agg(jsonb_build_object('site', name, 'view', view,
                        'checkedAt', checked_at, 'snippet', snippet) order by name)
                       from (select * from hits order by name limit 5) h), '[]'::jsonb)

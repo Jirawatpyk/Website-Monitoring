@@ -194,7 +194,7 @@ describe('shared forbidden words (S17 PR 3c)', () => {
   });
 
   it('check reads the counts and hits; a bad answer or a refusal says so', async () => {
-    const answer = { sites: 2, checked: 1, unchecked: ['B'], newest: null, hits: [] };
+    const answer = { sites: 2, checked: 1, unchecked: ['B'], hits: [] };
     const ok = {
       deps: {
         db: { rpc: vi.fn().mockResolvedValue({ data: answer, error: null }) },
@@ -209,6 +209,14 @@ describe('shared forbidden words (S17 PR 3c)', () => {
     expect(await checkPhrase('slot vip room', odd.deps)).toEqual({
       ok: false,
       message: 'Couldn’t check. Try again.',
+    });
+    expect(await checkPhrase('slot vip room', db({ code: '42501', message: 'x' }).deps)).toEqual({
+      ok: false,
+      message: 'Only an Admin can check a forbidden phrase.',
+    });
+    expect(await checkPhrase('slot vip room', db({ code: 'PGRST202', message: 'x' }).deps)).toEqual({
+      ok: false,
+      message: 'Phrases can’t be checked for a minute — try again shortly.',
     });
     expect(await checkPhrase('slot vip room', db({ code: '57014', message: 't' }).deps)).toEqual({
       ok: false,

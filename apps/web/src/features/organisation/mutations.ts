@@ -136,7 +136,6 @@ const phraseCheckSchema = z.object({
   sites: z.number().int(),
   checked: z.number().int(),
   unchecked: z.array(z.string()),
-  newest: z.string().nullable(),
   hits: z.array(z.object({ site: z.string(), view: z.string(), checkedAt: z.string(), snippet: z.string() })),
 });
 
@@ -148,8 +147,10 @@ export async function checkPhrase(phrase: string, { db }: OrganisationDeps): Pro
   if (!parsed.success) return { ok: false, message: REFUSAL_WORDS.too_long };
   const { data, error } = await db.rpc('check_forbidden_phrase', { p_phrase: parsed.data.phrase });
   if (error) {
-    const r = phraseRefusalWords(error);
-    return { ok: false, message: r.ok ? '' : r.message.replace('Couldn’t save', 'Couldn’t check') };
+    if (error.code === '42501') return { ok: false, message: 'Only an Admin can check a forbidden phrase.' };
+    if (error.code === 'PGRST202')
+      return { ok: false, message: 'Phrases can’t be checked for a minute — try again shortly.' };
+    return { ok: false, message: 'Couldn’t check. Check your connection and try again.' };
   }
   const check = phraseCheckSchema.safeParse(data);
   return check.success

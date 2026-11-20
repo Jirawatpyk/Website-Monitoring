@@ -105,6 +105,11 @@ describe('the phrase rules for an Admin’s new phrase (spec §41 item 5, D-069)
     for (const p of FORBIDDEN_PHRASES) expect(isShortPhrase(p), p).toBe(false);
   });
 
+  it('counts characters as the table does, not UTF-16 units (an emoji is one)', () => {
+    expect(phraseRefusal('🎰'.repeat(40), [])).toBeNull();
+    expect(phraseRefusal('🎰'.repeat(61), [])).toBe('too_long');
+  });
+
   it('stores a phrase trimmed, its spaces as one', () => {
     expect(cleanPhrase('  slot \t  vip ')).toBe('slot vip');
   });

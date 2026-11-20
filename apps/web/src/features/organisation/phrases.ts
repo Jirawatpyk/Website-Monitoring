@@ -65,8 +65,6 @@ export interface PhraseCheck {
   sites: number;
   checked: number;
   unchecked: string[];
-  /** The newest stored page's time (ISO), for the "Last clean fetch" line. */
-  newest: string | null;
   hits: { site: string; view: string; checkedAt: string; snippet: string }[];
 }
 
@@ -84,12 +82,15 @@ const SNIPPET_SIDE = 60;
  * plain text, never as markup.
  */
 export function snippetOf(raw: string, phrase: string): Snippet {
-  const text = raw
-    .replace(/^[^<]*>/u, ' ')
-    .replace(/<[^>]*$/u, ' ')
-    .replace(/<[^>]*>/gu, ' ')
-    .replace(/\s+/gu, ' ');
   const needle = normalizeForMatch(cleanPhrase(phrase));
+  const clean = (lead: boolean) =>
+    // A tag cut at the start ends in '>' after attribute text (quotes or '='); plain text with a '>' isn't one.
+    (lead ? raw.replace(/^[^<>]*["'=][^<>]*>/u, ' ') : raw)
+      .replace(/<[^>]*$/u, ' ')
+      .replace(/<[^>]*>/gu, ' ')
+      .replace(/\s+/gu, ' ');
+  const stripped = clean(true);
+  const text = stripped.includes(needle) ? stripped : clean(false);
   const at = text.indexOf(needle);
   if (at < 0) return { before: '', match: needle, after: '' };
   const before = text.slice(Math.max(0, at - SNIPPET_SIDE), at);

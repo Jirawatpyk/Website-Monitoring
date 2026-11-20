@@ -248,8 +248,7 @@ function AddDialog({
   const [group, setGroup] = useState<ForbiddenGroup>('gambling_th');
   const [text, setText] = useState('');
   const [note, setNote] = useState('');
-  // Each button marks its own field: Check the phrase, Add the note.
-  const [tried, setTried] = useState(false);
+  // Add marks the note; an empty phrase only disables Check.
   const [triedSave, setTriedSave] = useState(false);
   // The check belongs to the phrase it was run on: editing the phrase asks for a new one.
   const [checked, setChecked] = useState<{ phrase: string; words: CheckWords } | null>(null);
@@ -262,7 +261,7 @@ function AddDialog({
     text,
     phrases.map((p) => p.phrase),
   );
-  const shownRefusal = refusal === 'empty' ? (tried ? refusal : null) : refusal;
+  const shownRefusal = refusal === 'empty' ? null : refusal;
   const current = checked && checked.phrase === phrase ? checked.words : null;
   const found = current?.kind === 'found';
   const ready = current?.kind === 'clear';
@@ -279,7 +278,6 @@ function AddDialog({
         : 'Checked against every live site before it’s saved.';
 
   const check = () => {
-    setTried(true);
     if (refusal) return;
     setFailure(null);
     startCheck(async () => {

@@ -26,7 +26,6 @@ const check = (over: Partial<PhraseCheck> = {}): PhraseCheck => ({
   sites: 17,
   checked: 17,
   unchecked: [],
-  newest: '2026-09-25T02:30:00Z',
   hits: [],
   ...over,
 });
@@ -94,6 +93,15 @@ describe('the snippet (lower-case page source shown as text)', () => {
     expect(s.before.startsWith('… ')).toBe(true);
     expect(s.after.endsWith(' …')).toBe(true);
     expect(`${s.before}${s.after}`).not.toMatch(/[<>]/u);
+  });
+});
+
+describe('the snippet keeps text that has a “>” in it', () => {
+  it('plain text before a “>” is not a cut tag', () => {
+    expect(snippetOf('rooms > 5 · pick a time slot today', 'time slot')).toMatchObject({
+      before: 'rooms > 5 · pick a ',
+      match: 'time slot',
+    });
   });
 });
 

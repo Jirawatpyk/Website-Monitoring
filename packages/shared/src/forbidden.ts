@@ -105,7 +105,8 @@ export type PhraseRefusal = 'empty' | 'too_long' | 'short' | 'taken';
 export function phraseRefusal(phrase: string, list: readonly string[]): PhraseRefusal | null {
   const p = cleanPhrase(phrase);
   if (p === '') return 'empty';
-  if (p.length > MAX_PHRASE_LENGTH) return 'too_long';
+  // Characters, as the table counts them (char_length), not UTF-16 units.
+  if ([...p].length > MAX_PHRASE_LENGTH) return 'too_long';
   if (isShortPhrase(p)) return 'short';
   const needle = normalizeForMatch(p);
   if (list.some((q) => normalizeForMatch(cleanPhrase(q)) === needle)) return 'taken';

@@ -18,7 +18,7 @@ const LIST: Phrase[] = [
   { id: '00000000-0000-4000-8000-000000000002', group: 'gambling_th', phrase: 'แทงบอล' },
   { id: '00000000-0000-4000-8000-000000000003', group: 'gambling_en', phrase: 'slot online' },
 ];
-const CLEAR = { sites: 17, checked: 17, unchecked: [], newest: '2026-09-25T02:30:00Z', hits: [] };
+const CLEAR = { sites: 17, checked: 17, unchecked: [], hits: [] };
 
 beforeEach(() => vi.clearAllMocks());
 
