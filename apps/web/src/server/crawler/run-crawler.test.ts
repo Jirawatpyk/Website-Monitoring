@@ -387,4 +387,33 @@ describe('the clean-page store (S17 PR 3b, D-069)', () => {
     const summary = await cleanRun(fake, () => result({ text: page }));
     expect(summary).toMatchObject({ ok: true, cleanPages: 0, cleanPagesFailed: ['too big'] });
   });
+
+  it('a page with the site’s own forbidden word is no clean page, in the plain view too', async () => {
+    const { fake } = setup(() => result());
+    await cleanRun(fake, (req) =>
+      req.fingerprint ? result({ fingerprint: FP, text: '<h1>Index of /</h1>' }) : result(),
+    );
+    expect(upserts(fake)).toEqual([]);
+  });
+
+  it('is stored after the row the engine reads', async () => {
+    const { fake } = setup(() => result());
+    await cleanRun(fake, (req) => (req.fingerprint ? result({ fingerprint: FP, text: page }) : result()));
+    const order = fake.calls.map((c) => `${c.table}.${c.op}`);
+    expect(order.lastIndexOf('crawler_checks.insert')).toBeLessThan(
+      order.indexOf('crawler_clean_pages.upsert'),
+    );
+  });
+
+  it('drops the pages of monitors it no longer reads; with none live, all of them', async () => {
+    const { fake } = setup(() => result());
+    await cleanRun(fake, () => result());
+    const pruned = fake.calls.find((c) => c.table === 'crawler_clean_pages' && c.op === 'delete');
+    expect(pruned?.filters).toEqual([['not', 'monitor_id', 'in', '(m1)']]);
+
+    const empty = fakeDb({ 'monitors.select': { data: [] } });
+    await runCrawler({ db: empty.db, check: vi.fn() });
+    const all = empty.calls.find((c) => c.table === 'crawler_clean_pages' && c.op === 'delete');
+    expect(all?.filters).toEqual([['not', 'monitor_id', 'is', null]]);
+  });
 });

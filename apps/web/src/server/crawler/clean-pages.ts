@@ -24,6 +24,22 @@ export async function loadCleanHashes(db: DbClient): Promise<Map<string, string>
 }
 
 /**
+ * Drops the stored pages of every monitor the crawler no longer reads (a stopped site, a removed or
+ * replaced monitor): client content isn't kept past its use, and the check never reads a page nobody
+ * watches. Returns the error message, or null.
+ */
+export async function pruneCleanPages(
+  db: DbClient,
+  liveMonitorIds: readonly string[],
+): Promise<string | null> {
+  const q = db.from('crawler_clean_pages').delete();
+  const { error } = await (liveMonitorIds.length
+    ? q.not('monitor_id', 'in', `(${liveMonitorIds.join(',')})`)
+    : q.not('monitor_id', 'is', null));
+  return error?.message ?? null;
+}
+
+/**
  * S17 PR 3b (D-069): keep a clean fetch as the site's newest clean page for that view — the text as the
  * matcher reads it, for 3c's "Check phrase". Unchanged text only moves `checked_at`. Returns the error
  * message, or null.

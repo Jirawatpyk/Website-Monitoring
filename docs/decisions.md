@@ -135,6 +135,11 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - **Clean fetches.**
   - **What is kept:** one row per primary monitor and crawler view (googlebot, google-search, plain), holding the newest usable fetch with no forbidden hit. Its text is matched as stored (`normalizeForMatch`, at most 3 MB, as the crawler reads). Each row is overwritten, and removed with the monitor.
   - **Who can read it:** RLS is on with no policy, so only the service role can. The check returns only a short snippet around the match.
+  - **What counts as clean:** a fetch that ended on the site and carries no shared-list word and none of the site's own words. The plain view, too, is checked for those, although it doesn't scan for them.
+  - **Order:** the page is stored after the `crawler_checks` row, so monitoring never waits on it.
+  - **Pruning:** each run deletes the pages of monitors it no longer reads (a stopped site, a removed monitor). A soft removal never deletes the monitor row, so the cascade alone would keep them.
+  - **Rewrite cost:** a page with a per-request token changes its hash every run and is rewritten whole each time. The rate is measured on staging and production after 3b; if it is high, fewer views are kept.
+- **3c's "Already in the list"** compares phrases through `normalizeForMatch`, not only through the table's unique key. The key folds `\s` runs, but the matcher also folds `&nbsp;` and U+00A0.
 - **What "Check phrase" covers (3c).**
   - It checks only the home pages' crawler views. Key pages, and sites with no clean fetch yet (blocked by bot protection, a broken certificate, or never fetched), aren't covered.
   - The pass line counts the sites it really checked and names those it couldn't.
