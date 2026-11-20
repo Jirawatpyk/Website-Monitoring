@@ -30,6 +30,7 @@ export function RoleMatrixPicker({
         }))}
         value={role}
         onChange={(e) => setRole(e.target.value as Role)}
+        touchHeight
       />
       <div className="rounded-aura-lg border border-border-default bg-bg-surface px-3.5 py-1">
         {cells.map((r) => (

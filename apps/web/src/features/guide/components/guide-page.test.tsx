@@ -77,7 +77,7 @@ describe('GuidePage (Guide, MGuide)', () => {
     const { rerender } = renderGuide();
     const list = screen.getByRole('group', { name: 'Filter by role' }).parentElement!;
     await user.click(within(list).getByRole('button', { name: /Recover, root cause & resolve/ }));
-    expect(push).toHaveBeenCalledWith(null, '', '/guide?topic=resolve');
+    expect(push).toHaveBeenCalledWith({ guide: true }, '', '/guide?topic=resolve');
     nav.topic = 'resolve';
     rerender(
       <GuidePage
@@ -121,6 +121,30 @@ describe('GuidePage (Guide, MGuide)', () => {
     nav.topic = null;
     rerender(view());
     expect(container.querySelector('[data-topic="client"]')).toHaveFocus();
+  });
+
+  it('a Related topic replaces the open one; Back focuses the row the list opened', async () => {
+    const user = userEvent.setup();
+    const push = vi.spyOn(window.history, 'pushState').mockImplementation(() => {});
+    const replace = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+    const view = () => (
+      <GuidePage desktop={guideTopics(FACTS, 'desktop')} phone={guideTopics(FACTS, 'phone')} mine="Viewer" />
+    );
+    const { rerender } = render(view());
+    const list = screen.getByRole('group', { name: 'Filter by role' }).parentElement!;
+    await user.click(within(list).getByRole('button', { name: /Statuses & badges/ }));
+    expect(push).toHaveBeenCalledTimes(1);
+    nav.topic = 'statuses';
+    rerender(view());
+    // Statuses → Related "When an alert arrives", which the Viewer chip hides in the list.
+    await user.click(within(list).getByRole('button', { name: /When an alert arrives/ }));
+    expect(replace).toHaveBeenLastCalledWith(window.history.state, '', '/guide?topic=alert');
+    nav.topic = 'alert';
+    rerender(view());
+    nav.topic = null;
+    rerender(view());
+    // Back lands on the row the list opened (Statuses), not the hidden Related topic.
+    expect(list.querySelector('[data-topic="statuses"]')).toHaveFocus();
   });
 
   it('a Responder isn’t offered Admin-only screens', () => {

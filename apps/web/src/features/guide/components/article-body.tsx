@@ -157,7 +157,7 @@ function BlockView({ block, phone }: { block: Block; phone: boolean }) {
   switch (block.kind) {
     case 'bullets':
       return (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+        <ul className={`m-0 flex list-none flex-col gap-3 p-0 ${phone ? 'text-sm' : ''}`}>
           {block.items.map((b) => (
             <li key={b.lead} className="flex gap-3 leading-relaxed">
               <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-aura-full bg-fg-tertiary" />

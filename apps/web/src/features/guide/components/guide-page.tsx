@@ -36,9 +36,23 @@ const FIRST_TOPIC = 'alert';
  * `useSearchParams` in step with the History API, so the page and the phone bar (`GuideBar`) follow,
  * and the browser's Back works. The chip and the search stay as they were.
  */
-export function setGuideTopic(pathname: string, id: string | null) {
-  window.history.pushState(null, '', id ? `${pathname}?topic=${id}` : pathname);
+export function setGuideTopic(pathname: string, id: string | null, how: 'push' | 'replace' = 'push') {
+  const url = id ? `${pathname}?topic=${id}` : pathname;
+  if (how === 'push') window.history.pushState({ guide: true }, '', url);
+  else window.history.replaceState(window.history.state, '', url);
 }
+
+/**
+ * Back to the topic list: the entry the guide pushed is popped (so the browser's Back then leaves the
+ * guide instead of reopening the topic); a topic loaded from a link is replaced (spec-checker, S18).
+ */
+export function guideBackToList(pathname: string) {
+  if ((window.history.state as { guide?: boolean } | null)?.guide) window.history.back();
+  else setGuideTopic(pathname, null, 'replace');
+}
+
+/** The desktop topic an id opens: the phone's two Admin halves are one topic there. */
+const desktopId = (id: string) => (id === 'escalation' || id === 'users' ? 'admin' : id);
 
 /**
  * The User guide (boards Guide, MGuide; spec §18; S18, D-070). One state drives both trees: from xl
@@ -61,7 +75,8 @@ export function GuidePage({
   const [chip, setChip] = useState<Chip>(mine);
   const [q, setQ] = useState('');
   const [sel, setSel] = useState<string>(() => {
-    const wanted = openId && desktop.some((t) => t.id === openId) ? openId : FIRST_TOPIC;
+    const id = openId && desktopId(openId);
+    const wanted = id && desktop.some((t) => t.id === id) ? id : FIRST_TOPIC;
     return nextSelection(desktop, mine, '', wanted) ?? wanted;
   });
 
@@ -76,18 +91,25 @@ export function GuidePage({
     picked.current = false;
     articleHeading.current?.focus();
   }, [sel]);
-  // The topic the phone last opened: Back returns focus to its row.
-  // A topic opened from a link (first load) doesn't take focus; one opened from a row does.
-  const opened = useRef<string | null>(openId);
+  // The list row the phone opened from: Back returns focus to it, or to the search when the chip hides
+  // it. A topic opened from a link (first load) doesn't take focus; one opened from a row does.
+  const fromRow = useRef<string | null>(null);
   const focusOpened = useRef(false);
+  const wasOpen = useRef(!!openId);
   useEffect(() => {
     if (openId) {
-      if (focusOpened.current) phoneHeading.current?.focus();
+      if (focusOpened.current) {
+        window.scrollTo({ top: 0 });
+        phoneHeading.current?.focus();
+      }
       focusOpened.current = false;
-      opened.current = openId;
-    } else if (opened.current) {
-      phoneList.current?.querySelector<HTMLElement>(`[data-topic="${opened.current}"]`)?.focus();
-      opened.current = null;
+      wasOpen.current = true;
+    } else if (wasOpen.current) {
+      const list = phoneList.current;
+      const row = fromRow.current && list?.querySelector<HTMLElement>(`[data-topic="${fromRow.current}"]`);
+      (row || list?.querySelector<HTMLElement>('input'))?.focus();
+      fromRow.current = null;
+      wasOpen.current = false;
     }
   }, [openId]);
 
@@ -103,9 +125,14 @@ export function GuidePage({
     picked.current = true;
     setSel(id);
   };
+  /** From the list: one entry deeper. From a topic's Related: the same depth, so Back is the list. */
   const open = (id: string) => {
     focusOpened.current = true;
-    setGuideTopic(pathname, id);
+    if (openId) setGuideTopic(pathname, id, 'replace');
+    else {
+      fromRow.current = id;
+      setGuideTopic(pathname, id);
+    }
   };
 
   const shownDesktop = visibleTopics(desktop, chip, q);
@@ -265,7 +292,7 @@ export function GuidePage({
             phone={phone}
             headingRef={phoneHeading}
             onOpen={open}
-            onBack={() => setGuideTopic(pathname, null)}
+            onBack={() => guideBackToList(pathname)}
           />
         ) : (
           <>
@@ -278,9 +305,8 @@ export function GuidePage({
               ))}
             </div>
             <span role="status" className="text-xs text-fg-secondary">
-              {isMine ? '' : phoneCountLine(shownPhone.length, phone.length, chip, mine, q)}
+              {isMine ? mineLine : phoneCountLine(shownPhone.length, phone.length, chip, mine, q)}
             </span>
-            {isMine && <div className="-mt-3">{mineLine}</div>}
             <nav aria-label="Topic list" className="flex flex-col gap-3">
               {groupTopics(shownPhone).map((g) => (
                 <div key={g.group} role="group" aria-label={g.group} className="flex flex-col gap-1.5">
@@ -296,7 +322,7 @@ export function GuidePage({
               ))}
             </nav>
             {empty(shownPhone.length, true)}
-            <span className="flex items-start gap-1.5 text-xs leading-snug text-fg-secondary">
+            <span className="flex items-start gap-1.5 text-xs leading-snug text-fg-secondary lg:hidden">
               <span className="flex pt-px">
                 <IconMonitor size="sm" />
               </span>
