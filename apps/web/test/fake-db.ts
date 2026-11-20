@@ -32,6 +32,8 @@ const READ_RPCS = new Set([
   'engine_silent_incidents',
   'oncall_extend_shifts',
   'engine_oncall_reminders',
+  // the crawler's housekeeping (D-069): drops stored pages nobody reads
+  'crawler_prune_clean_pages',
 ]);
 
 /**

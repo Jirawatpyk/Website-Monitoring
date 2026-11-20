@@ -190,15 +190,19 @@ export async function runCrawler({
       (result.keywordForbidden?.length ?? 0) === 0 &&
       !m.mustNotContain.some((k) => text.includes(k)) &&
       !endedOffSite(result, m.url, m.allowedRedirectDomains);
+    // Past the fetch budget the run keeps its margin for the log and the pings (engine-reviewer).
     const cleanError =
-      clean && typeof hashes !== 'string'
+      clean && typeof hashes !== 'string' && clock() - started <= CRAWLER_BUDGET_MS
         ? await storeCleanPage(db, hashes, {
             monitorId: m.id,
             view,
+            url: m.url,
             checkedAt: checkedAt.toISOString(),
             text,
           })
         : null;
+    // The page text isn't kept past its store: a run holds no 3 MB strings until it ends (db-reviewer).
+    delete result.text;
     return {
       m,
       view,
@@ -227,14 +231,9 @@ export async function runCrawler({
     .map(({ m, view, result }) => ({ site: m.siteName, view, forbidden: result.keywordForbidden }));
   const baselinesSet = done.filter((r) => r.baselineSet).map((r) => r.m.siteName);
   // The clean-page store is for 3c's check, not for monitoring: a failure is logged, never fatal.
-  // Pages of monitors no longer read (a stopped site, a removed monitor) go.
+  // Pages the crawler no longer reads (a stopped site, a removed monitor, an old URL) go.
   const pruned =
-    typeof hashes === 'string'
-      ? null
-      : await pruneCleanPages(
-          db,
-          monitors.map((m) => m.id),
-        );
+    typeof hashes === 'string' || clock() - started > CRAWLER_BUDGET_MS ? null : await pruneCleanPages(db);
   const cleanErrors = [
     ...new Set([
       ...(typeof hashes === 'string' ? [hashes] : []),

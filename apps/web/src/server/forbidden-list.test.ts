@@ -42,7 +42,10 @@ describe('the forbidden_phrases seed', () => {
   const sql = readFileSync(join(dir, file), 'utf8');
 
   it('is the code list, group by group, in order', () => {
-    const seeded = [...sql.matchAll(/^\s*\('(\w+)', '([^']+)'\),?$/gmu)].map((m) => [m[1], m[2]]);
+    const rows = [...sql.matchAll(/^\s*\((\d+), '(\w+)', '([^']+)'\),?$/gmu)];
+    // numbered 1…n, so the stored order is the list's
+    expect(rows.map((m) => Number(m[1]))).toEqual(rows.map((_, i) => i + 1));
+    const seeded = rows.map((m) => [m[2], m[3]]);
     expect(seeded).toEqual(FORBIDDEN_GROUP_IDS.flatMap((g) => FORBIDDEN_GROUPS[g].map((p) => [g, p])));
   });
 

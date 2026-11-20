@@ -406,6 +406,19 @@ describe('runHttpCheck', () => {
       expect(result.keywordForbidden).toEqual(['slot online']);
     });
 
+    it('an empty list on a whole-body read keeps no growing window (engine-reviewer)', async () => {
+      const t0 = performance.now();
+      const result = await runHttpCheck({
+        allowPrivateTargets: true,
+        url: `${base}/too-deep`,
+        scanWholeBody: true,
+        sharedForbidden: [],
+      });
+      expect(result).toMatchObject({ keywordForbidden: [], scanComplete: true });
+      // Quadratic re-normalising of the text read so far took seconds on 3 MB.
+      expect(performance.now() - t0).toBeLessThan(1_500);
+    });
+
     it('keepText hands back everything read on a complete pass, and nothing otherwise', async () => {
       const deep = await runHttpCheck({
         allowPrivateTargets: true,

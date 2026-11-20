@@ -127,8 +127,8 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   - 3c is the editor.
 - **Table `forbidden_phrases`** holds the group, the phrase and who added it. The groups are fixed, as the board draws them: Gambling · Thai, Gambling · English, Brands, Adult, Pharma. The table is seeded from the code list, and a test holds the seed equal to the code list. The code list stays as the fallback.
 - **Readers.**
-  - **Readers on Vercel** (the Vercel probes, the crawler, the monitor test and the engine) read the table each run.
-  - **The Bangkok agent** gets the list in the Ingest GET as `forbidden`. A response without it, from an older web, means the agent uses its bundled list. The agent's schema ignores unknown keys, so an older agent is unaffected by the new field.
+  - **Readers on Vercel** read the table each run: the Vercel probes and the crawler with the service role, the Test check as the Admin. The engine needs no list (the gate below).
+  - **The Bangkok agent** gets the list in the Ingest GET as `forbidden`. A response without it, from an older web, means the agent uses its bundled list. The agent's schema ignores unknown keys, so an older agent is unaffected by the new field. The new agent drops an entry that isn't a phrase and keeps the rest; a list with nothing usable left is dropped, and so is a list that isn't a list. Either way it uses the bundled list and the round still runs.
   - **When the read fails** (a missing table on a deploy ahead of `migrate-production`, or any error), the code list is used and `forbidden_phrases_read_failed` is logged. A probe never stops for it. An empty table is a valid list.
 - **Matching is unchanged.** It is case-insensitive and treats a run of whitespace as one space (D-042), with one matcher (`findForbiddenPhrases`) everywhere. The stream overlap comes from the list in use. A phrase is at most 60 characters.
 - **The engine gate.** A word a check found that isn't in the site's own `must_not_contain` counts as a shared-list word, whether or not it is in today's list. So a phrase removed after a check found it, or one found by an agent on the bundled list, is gated by `DEFACEMENT_ALERTS` like the rest of the list. It is never read as the site's own word.
@@ -137,9 +137,15 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   - **Who can read it:** RLS is on with no policy, so only the service role can. The check returns only a short snippet around the match.
   - **What counts as clean:** a fetch that ended on the site and carries no shared-list word and none of the site's own words. The plain view, too, is checked for those, although it doesn't scan for them.
   - **Order:** the page is stored after the `crawler_checks` row, so monitoring never waits on it.
-  - **Pruning:** each run deletes the pages of monitors it no longer reads (a stopped site, a removed monitor). A soft removal never deletes the monitor row, so the cascade alone would keep them.
+  - **Pruning:** after each run `crawler_prune_clean_pages` deletes every page the crawler no longer reads: a stopped site, a removed, disabled or no-longer-primary monitor, or a page of the monitor's old URL (each row keeps the URL it was fetched from). A soft removal never deletes the monitor row, so the cascade alone would keep them.
+  - **The run's time:** the store and the prune are skipped once the run is past its 95 s fetch budget, so the margin stays for the log, the Healthchecks ping and the beat. A fetch's text is dropped from memory once it is stored.
   - **Rewrite cost:** a page with a per-request token changes its hash every run and is rewritten whole each time. The rate is measured on staging and production after 3b; if it is high, fewer views are kept.
-- **3c's "Already in the list"** compares phrases through `normalizeForMatch`, not only through the table's unique key. The key folds `\s` runs, but the matcher also folds `&nbsp;` and U+00A0.
+- **Guards 3c must add** (reviews of 3b):
+  - "Already in the list" compares phrases through `normalizeForMatch`, not only through the table's unique key. The key folds `\s` runs, but the matcher also folds `&nbsp;` and U+00A0.
+  - A cap on the number of phrases, well under PostgREST's 1,000 rows and the agent's `.max(1000)` (proposed 300). It also bounds the crawler's CPU per fetch.
+  - Removing the last phrase of a group is refused, so the list never quietly empties.
+  - The Check phrase snippet is short and only ever rendered escaped.
+  - Release `dxt-agent` with 3b before 3c, so Bangkok reads the edited list. A Bangkok-only voter (a site behind a WAF) would otherwise judge by the old list.
 - **What "Check phrase" covers (3c).**
   - It checks only the home pages' crawler views. Key pages, and sites with no clean fetch yet (blocked by bot protection, a broken certificate, or never fetched), aren't covered.
   - The pass line counts the sites it really checked and names those it couldn't.

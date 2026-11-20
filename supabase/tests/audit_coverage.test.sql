@@ -87,6 +87,7 @@ insert into audit_classes (fn, kind, note) values
   ('open_system_alert', 'audited', 'verifier.test.sql'),
   ('clear_system_alert', 'audited', 'verifier.test.sql'),
   ('crawler_set_baseline', 'audited', 'page_change.test.sql'),
+  ('crawler_prune_clean_pages', 'exempt', 'Drops stored crawler pages nobody reads any more (retention of monitoring data, D-069).'),
   ('engine_post_late_alert', 'audited', 'oncall_routing.test.sql'),
   -- Exempt: no config or incident state changes
   ('post_window_action_now', 'exempt', 'Sends early the messages an audited window action already queued.'),

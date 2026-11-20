@@ -9,40 +9,35 @@ export const CLEAN_PAGE_MAX_CHARS = 3_200_000;
 export interface CleanPage {
   monitorId: string;
   view: string;
+  /** The monitor's URL the page was fetched from. */
+  url: string;
   checkedAt: string;
   /** The decoded page, as read. */
   text: string;
 }
 
-const keyOf = (monitorId: string, view: string) => `${monitorId}/${view}`;
+const keyOf = (monitorId: string, view: string, url: string) => `${monitorId}/${view}/${url}`;
 
 /** Each stored page's hash, so a run sends the text only when it changed. */
 export async function loadCleanHashes(db: DbClient): Promise<Map<string, string>> {
-  const { data, error } = await db.from('crawler_clean_pages').select('monitor_id, view, body_hash');
+  const { data, error } = await db.from('crawler_clean_pages').select('monitor_id, view, url, body_hash');
   if (error) throw new Error(`crawler_clean_pages: ${error.code ?? ''} ${error.message}`.trim());
-  return new Map(data.map((r) => [keyOf(r.monitor_id, r.view), r.body_hash]));
+  return new Map(data.map((r) => [keyOf(r.monitor_id, r.view, r.url), r.body_hash]));
 }
 
 /**
- * Drops the stored pages of every monitor the crawler no longer reads (a stopped site, a removed or
- * replaced monitor): client content isn't kept past its use, and the check never reads a page nobody
- * watches. Returns the error message, or null.
+ * Drops every stored page the crawler no longer reads (`crawler_prune_clean_pages`: a stopped site, a
+ * removed monitor, an old URL). Returns the error message, or null.
  */
-export async function pruneCleanPages(
-  db: DbClient,
-  liveMonitorIds: readonly string[],
-): Promise<string | null> {
-  const q = db.from('crawler_clean_pages').delete();
-  const { error } = await (liveMonitorIds.length
-    ? q.not('monitor_id', 'in', `(${liveMonitorIds.join(',')})`)
-    : q.not('monitor_id', 'is', null));
+export async function pruneCleanPages(db: DbClient): Promise<string | null> {
+  const { error } = await db.rpc('crawler_prune_clean_pages');
   return error?.message ?? null;
 }
 
 /**
  * S17 PR 3b (D-069): keep a clean fetch as the site's newest clean page for that view — the text as the
- * matcher reads it, for 3c's "Check phrase". Unchanged text only moves `checked_at`. Returns the error
- * message, or null.
+ * matcher reads it, for 3c's "Check phrase". Unchanged text from the same URL only moves `checked_at`.
+ * Returns the error message, or null.
  */
 export async function storeCleanPage(
   db: DbClient,
@@ -51,7 +46,7 @@ export async function storeCleanPage(
 ): Promise<string | null> {
   const body = normalizeForMatch(page.text).slice(0, CLEAN_PAGE_MAX_CHARS);
   const hash = createHash('sha256').update(body).digest('hex');
-  const key = keyOf(page.monitorId, page.view);
+  const key = keyOf(page.monitorId, page.view, page.url);
   if (hashes.get(key) === hash) {
     const { error } = await db
       .from('crawler_clean_pages')
@@ -63,6 +58,7 @@ export async function storeCleanPage(
   const { error } = await db.from('crawler_clean_pages').upsert({
     monitor_id: page.monitorId,
     view: page.view,
+    url: page.url,
     checked_at: page.checkedAt,
     body_hash: hash,
     body,

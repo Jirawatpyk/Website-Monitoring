@@ -2,8 +2,8 @@
 /**
  * S17 PR 3b (D-069) on the LOCAL Supabase stack: the clean-page store as the crawler uses it — the list
  * read from `forbidden_phrases`, a page kept as the matcher reads it, the same text again only moving
- * `checked_at`, and the pages of a monitor no longer read dropped. Run with `pnpm --filter @dxt/web
- * test:int` (CI: the `db` job).
+ * `checked_at`, new text overwriting it, and `crawler_prune_clean_pages` dropping a page of an old URL or
+ * of a monitor no longer read. Run with `pnpm --filter @dxt/web test:int` (CI: the `db` job).
  */
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -20,14 +20,28 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost):/.test(URL_))
 
 const db: DbClient = createClient<Database>(URL_, SECRET_KEY, { auth: { persistSession: false } });
 
-async function twoMonitors(): Promise<[string, string]> {
-  const { data, error } = await db.from('monitors').select('id').is('removed_at', null).limit(2);
-  if (error || !data || data.length < 2) throw new Error('the local seed needs two monitors');
-  return [data[0]!.id, data[1]!.id];
+/** A live site's primary monitor, as the crawler reads it. */
+async function livePrimary(): Promise<{ id: string; url: string }> {
+  const { data, error } = await db
+    .from('monitors')
+    .select('id, url, sites!inner(is_active)')
+    .eq('sites.is_active', true)
+    .eq('is_primary', true)
+    .eq('enabled', true)
+    .is('removed_at', null)
+    .limit(1)
+    .single();
+  if (error) throw new Error(`the local seed needs a live primary monitor: ${error.message}`);
+  return { id: data.id, url: data.url };
 }
 
+const clear = () => db.from('crawler_clean_pages').delete().not('monitor_id', 'is', null);
+const rows = async () =>
+  (await db.from('crawler_clean_pages').select('view, url, body, checked_at').order('view')).data ?? [];
+const at = (mmss: string) => new Date(`2026-11-20T03:${mmss}Z`).toISOString();
+
 afterAll(async () => {
-  await db.from('crawler_clean_pages').delete().not('monitor_id', 'is', null);
+  await clear();
 });
 
 describe('the clean-page store (D-069)', () => {
@@ -35,51 +49,50 @@ describe('the clean-page store (D-069)', () => {
     expect(await loadForbiddenList(db)).toEqual(FORBIDDEN_PHRASES);
   });
 
-  it('keeps a page as the matcher reads it, moves only checked_at for the same text, prunes the rest', async () => {
-    const [a, b] = await twoMonitors();
-    await db.from('crawler_clean_pages').delete().not('monitor_id', 'is', null);
-    const hashes = await loadCleanHashes(db);
-    const at = (s: string) => new Date(`2026-11-20T03:${s}Z`).toISOString();
-    expect(
-      await storeCleanPage(db, hashes, {
-        monitorId: a,
-        view: 'plain',
-        checkedAt: at('00:00'),
-        text: '<P>Hello  World</P>',
-      }),
-    ).toBeNull();
-    expect(
-      await storeCleanPage(db, hashes, {
-        monitorId: b,
-        view: 'googlebot',
-        checkedAt: at('00:00'),
-        text: 'b',
-      }),
-    ).toBeNull();
+  it('keeps, moves, overwrites, and prunes an old URL’s page', async () => {
+    const m = await livePrimary();
+    await clear();
+    const page = (view: string, text: string, url = m.url, checkedAt = at('00:00')) =>
+      storeCleanPage(db, hashes, { monitorId: m.id, view, url, checkedAt, text });
 
-    const again = await loadCleanHashes(db);
-    expect(again.size).toBe(2);
+    let hashes = await loadCleanHashes(db);
+    expect(await page('plain', '<P>Hello  World</P>')).toBeNull();
+    expect(await page('googlebot', 'old host', 'https://old.example.test/')).toBeNull();
+
+    // The same text again only moves checked_at; new text overwrites the row.
+    hashes = await loadCleanHashes(db);
+    expect(await page('plain', '<p>hello world</p>', m.url, at('30:00'))).toBeNull();
+    expect((await rows()).find((r) => r.view === 'plain')).toMatchObject({ body: '<p>hello world</p>' });
+    expect(await page('plain', '<p>Changed</p>', m.url, at('59:00'))).toBeNull();
+    const plain = (await rows()).find((r) => r.view === 'plain')!;
+    expect(plain.body).toBe('<p>changed</p>');
+    expect(Date.parse(plain.checked_at)).toBe(Date.parse(at('59:00')));
+
+    // The old URL's page goes; the live one stays.
+    expect(await pruneCleanPages(db)).toBeNull();
+    expect((await rows()).map((r) => r.view)).toEqual(['plain']);
+  });
+
+  it('drops the page of a monitor no longer read', async () => {
+    const { data } = await db
+      .from('monitors')
+      .select('id, url')
+      .eq('is_primary', false)
+      .is('removed_at', null)
+      .limit(1);
+    const key = data?.[0];
+    if (!key) return; // the seed has no key page: the old-URL case above covers the rule
+    await clear();
     expect(
-      await storeCleanPage(db, again, {
-        monitorId: a,
+      await storeCleanPage(db, new Map(), {
+        monitorId: key.id,
         view: 'plain',
-        checkedAt: at('30:00'),
-        text: '<p>hello world</p>',
+        url: key.url,
+        checkedAt: at('00:00'),
+        text: 'key page',
       }),
     ).toBeNull();
-    const { data: row } = await db
-      .from('crawler_clean_pages')
-      .select('body, checked_at')
-      .eq('monitor_id', a)
-      .single();
-    expect(row).toMatchObject({ body: '<p>hello world</p>' });
-    expect(Date.parse(row!.checked_at)).toBe(Date.parse(at('30:00')));
-
-    expect(await pruneCleanPages(db, [a])).toBeNull();
-    const { data: left } = await db.from('crawler_clean_pages').select('monitor_id');
-    expect(left).toEqual([{ monitor_id: a }]);
-    expect(await pruneCleanPages(db, [])).toBeNull();
-    const { count } = await db.from('crawler_clean_pages').select('*', { count: 'exact', head: true });
-    expect(count).toBe(0);
+    expect(await pruneCleanPages(db)).toBeNull();
+    expect(await rows()).toEqual([]);
   });
 });

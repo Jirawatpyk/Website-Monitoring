@@ -110,7 +110,7 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
   const started = performance.now();
   const mustContain = req.mustContain ?? [];
   const mustNotContain = req.mustNotContain ?? [];
-  const shared = req.sharedForbidden ?? FORBIDDEN_PHRASES;
+  const sharedList = req.sharedForbidden ?? FORBIDDEN_PHRASES;
   // Every GET is keyword-checked: the shared forbidden list applies to every monitor (D-041).
   const keywords = (req.method ?? 'GET') === 'GET';
   const { agent, owned } = dispatcherFor(req);
@@ -124,7 +124,7 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       KEYWORD_BODY_BYTES,
       keywords ? mustContain : [],
       keywords && (req.scanWholeBody || builder) ? mustNotContain : null,
-      shared,
+      sharedList,
       builder || kept
         ? (text) => {
             builder?.write(text);
@@ -147,7 +147,9 @@ export async function runHttpCheck(req: HttpCheckRequest): Promise<HttpCheckResu
       bodySample,
       finalUrl: url.href.slice(0, MAX_FINAL_URL),
       keywordMissing: checked && missing ? capped(missing) : null,
-      keywordForbidden: checked ? capped(forbidden ?? forbiddenIn(bodySample, mustNotContain, shared)) : null,
+      keywordForbidden: checked
+        ? capped(forbidden ?? forbiddenIn(bodySample, mustNotContain, sharedList))
+        : null,
       waf: outcome === 'blocked' ? wafSignature(snapshot) : null,
       ...(req.scanWholeBody || builder ? { scanComplete: complete } : {}),
       ...(fingerprint ? { fingerprint } : {}),
@@ -317,7 +319,8 @@ async function readBody(
     if (scanForbidden) {
       const window = scanTail + text;
       for (const k of forbiddenIn(window, scanForbidden, shared)) found.add(k);
-      scanTail = window.slice(-scanOverlap);
+      // An empty list with no own words has no overlap; slice(-0) would keep the whole text (engine-reviewer).
+      scanTail = scanOverlap > 0 ? window.slice(-scanOverlap) : '';
     }
   };
   // The sample: a read error here is the page failing to load, as before.

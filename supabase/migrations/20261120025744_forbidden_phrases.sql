@@ -1,8 +1,8 @@
 -- S17 PR 3b (D-069, spec §41): the shared forbidden-phrase list moves from code to the database, with
 -- no change in behaviour, so PR 3c can let Admins edit it.
 --   · forbidden_phrases — one row per phrase in one of the board's five groups, seeded from the list
---     in @dxt/shared (`FORBIDDEN_GROUPS`; `forbidden-seed.test.ts` holds the two equal). The Vercel
---     probes, the crawler, the monitor test and the engine read it with the service role each run;
+--     in @dxt/shared (`FORBIDDEN_GROUPS`; `forbidden-list.test.ts` holds the two equal). The Vercel
+--     probes and the crawler read it with the service role each run, the Test check as the Admin;
 --     the Bangkok agent gets it in the Ingest GET. A failed read falls back to the code list.
 --     Admins read it (3c's section); 3c adds the audited add / remove functions.
 --   · crawler_clean_pages — each live home page's newest clean fetch per crawler view (usable, no
@@ -46,46 +46,46 @@ grant all on public.forbidden_phrases to service_role;
 
 -- The code list as of 20 Nov 2026 (packages/shared/src/forbidden.ts), in its order.
 insert into public.forbidden_phrases (phrase_group, phrase, created_at)
--- created_at a second apart keeps the code list's order (a VALUES list is read in order)
-select g, p, timestamptz '2026-10-13 00:00:00+00' + make_interval(secs => (row_number() over ())::int)
+-- created_at a second apart keeps the code list's order
+select g, p, timestamptz '2026-10-13 00:00:00+00' + make_interval(secs => n)
 from (values
-  ('gambling_th', 'สล็อตออนไลน์'),
-  ('gambling_th', 'สล็อตเว็บตรง'),
-  ('gambling_th', 'เว็บสล็อต'),
-  ('gambling_th', 'สล็อต pg'),
-  ('gambling_th', 'บาคาร่า'),
-  ('gambling_th', 'แทงบอล'),
-  ('gambling_th', 'เว็บพนัน'),
-  ('gambling_th', 'คาสิโนออนไลน์'),
-  ('gambling_th', 'เว็บตรงไม่ผ่านเอเย่นต์'),
-  ('gambling_th', 'ฝากถอนออโต้'),
-  ('gambling_th', 'สล็อตเครดิตฟรี'),
-  ('gambling_th', 'หวยออนไลน์'),
-  ('gambling_th', 'แทงหวย'),
-  ('gambling_en', 'slot online'),
-  ('gambling_en', 'online slot'),
-  ('gambling_en', 'slot gacor'),
-  ('gambling_en', 'situs slot'),
-  ('gambling_en', 'judi online'),
-  ('gambling_en', 'online casino'),
-  ('gambling_en', 'casino online'),
-  ('gambling_en', 'baccarat online'),
-  ('gambling_en', 'pg slot'),
-  ('brands', 'slotxo'),
-  ('brands', 'ufabet'),
-  ('brands', 'sbobet'),
-  ('brands', 'joker123'),
-  ('adult', 'porn video'),
-  ('adult', 'xxx video'),
-  ('adult', 'sex video'),
-  ('adult', 'คลิปโป๊'),
-  ('adult', 'หนังโป๊'),
-  ('pharma', 'buy viagra'),
-  ('pharma', 'cheap viagra'),
-  ('pharma', 'viagra online'),
-  ('pharma', 'cialis online'),
-  ('pharma', 'buy cialis')
-) as s (g, p);
+  (1, 'gambling_th', 'สล็อตออนไลน์'),
+  (2, 'gambling_th', 'สล็อตเว็บตรง'),
+  (3, 'gambling_th', 'เว็บสล็อต'),
+  (4, 'gambling_th', 'สล็อต pg'),
+  (5, 'gambling_th', 'บาคาร่า'),
+  (6, 'gambling_th', 'แทงบอล'),
+  (7, 'gambling_th', 'เว็บพนัน'),
+  (8, 'gambling_th', 'คาสิโนออนไลน์'),
+  (9, 'gambling_th', 'เว็บตรงไม่ผ่านเอเย่นต์'),
+  (10, 'gambling_th', 'ฝากถอนออโต้'),
+  (11, 'gambling_th', 'สล็อตเครดิตฟรี'),
+  (12, 'gambling_th', 'หวยออนไลน์'),
+  (13, 'gambling_th', 'แทงหวย'),
+  (14, 'gambling_en', 'slot online'),
+  (15, 'gambling_en', 'online slot'),
+  (16, 'gambling_en', 'slot gacor'),
+  (17, 'gambling_en', 'situs slot'),
+  (18, 'gambling_en', 'judi online'),
+  (19, 'gambling_en', 'online casino'),
+  (20, 'gambling_en', 'casino online'),
+  (21, 'gambling_en', 'baccarat online'),
+  (22, 'gambling_en', 'pg slot'),
+  (23, 'brands', 'slotxo'),
+  (24, 'brands', 'ufabet'),
+  (25, 'brands', 'sbobet'),
+  (26, 'brands', 'joker123'),
+  (27, 'adult', 'porn video'),
+  (28, 'adult', 'xxx video'),
+  (29, 'adult', 'sex video'),
+  (30, 'adult', 'คลิปโป๊'),
+  (31, 'adult', 'หนังโป๊'),
+  (32, 'pharma', 'buy viagra'),
+  (33, 'pharma', 'cheap viagra'),
+  (34, 'pharma', 'viagra online'),
+  (35, 'pharma', 'cialis online'),
+  (36, 'pharma', 'buy cialis')
+) as s (n, g, p);
 
 create table public.crawler_clean_pages (
   monitor_id uuid not null references public.monitors (id) on delete cascade,
@@ -94,10 +94,14 @@ create table public.crawler_clean_pages (
     constraint crawler_clean_pages_view_check check (view in ('googlebot', 'google_referer', 'plain')),
   -- the fetch the text is from (updated on every clean fetch, even when the text is the same)
   checked_at timestamptz not null,
+  -- the monitor's URL when it was fetched: a page of an old URL is pruned (security-reviewer)
+  url text not null constraint crawler_clean_pages_url_check check (char_length(url) <= 2048),
   -- sha-256 of `body`, so a run sends the text only when it changed
   body_hash text not null constraint crawler_clean_pages_hash_check check (body_hash ~ '^[0-9a-f]{64}$'),
-  -- normalizeForMatch(the decoded page), up to the crawler's 3 MB read
-  body text not null constraint crawler_clean_pages_body_check check (char_length(body) <= 3200000),
+  -- normalizeForMatch(the decoded page), capped at 3.2M characters by the crawler. The check counts
+  -- bytes (4 per character at most): octet_length reads the stored length, char_length would decompress
+  -- the whole page on every checked_at-only update (db-reviewer).
+  body text not null constraint crawler_clean_pages_body_check check (octet_length(body) <= 12800000),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (monitor_id, view)
@@ -110,3 +114,33 @@ alter table public.crawler_clean_pages enable row level security;
 -- No policy: client page content, read only by the service role (3c's check returns a snippet).
 revoke all on public.crawler_clean_pages from public, anon, authenticated;
 grant all on public.crawler_clean_pages to service_role;
+
+-- After each crawler run: drop every stored page the crawler no longer reads — a stopped site, a
+-- removed, disabled or no-longer-primary monitor, or a page of the monitor's old URL. Client content
+-- isn't kept past its use, and 3c's check never reads a page nobody watches. Returns the rows dropped.
+create function public.crawler_prune_clean_pages()
+returns integer
+language sql
+security definer
+set search_path = ''
+as $$
+  with gone as (
+    delete from public.crawler_clean_pages c
+    where not exists (
+      select 1
+      from public.monitors m
+      join public.sites s on s.id = m.site_id
+      where m.id = c.monitor_id
+        and m.url = c.url
+        and m.is_primary
+        and m.enabled
+        and m.removed_at is null
+        and s.is_active
+    )
+    returning 1
+  )
+  select count(*)::int from gone;
+$$;
+
+revoke execute on function public.crawler_prune_clean_pages() from public, anon, authenticated;
+grant execute on function public.crawler_prune_clean_pages() to service_role;

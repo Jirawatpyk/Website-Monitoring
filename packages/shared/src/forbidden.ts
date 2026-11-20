@@ -55,7 +55,7 @@ export const FORBIDDEN_GROUP_LABELS: Record<ForbiddenGroup, string> = {
 /**
  * S17 PR 3b (D-069): the list the database was seeded with, by group. Since then the list lives in
  * `forbidden_phrases`; this copy is the fallback when that read fails, and what an older web gives the
- * Bangkok agent. `forbidden-seed.test.ts` holds the migration's seed equal to it.
+ * Bangkok agent. `apps/web/src/server/forbidden-list.test.ts` holds the migration's seed equal to it.
  */
 export const FORBIDDEN_GROUPS: Record<ForbiddenGroup, readonly string[]> = {
   gambling_th: GAMBLING_TH,

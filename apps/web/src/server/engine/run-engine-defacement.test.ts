@@ -77,6 +77,12 @@ describe('runEngine — defacement alerts on (staging)', () => {
     expect(opened(rpcCalls)?.p_context.cause).toBe('Found “สล็อตออนไลน์” on / (SIN, TYO)');
   });
 
+  it('a found word in neither list (a stale agent’s, D-069) still opens PROBLEM (Keyword)', async () => {
+    const { db, rpcCalls } = setup([pass('SIN', 0, ['removed phrase']), pass('TYO', 1, ['removed phrase'])]);
+    await runEngine(db, now, { defacementAlerts: true });
+    expect(opened(rpcCalls)?.p_context.cause).toBe('Found “removed phrase” on / (SIN, TYO)');
+  });
+
   it('a crawler read that fails never holds the run back', async () => {
     const { db } = baseFakeDb({
       'probe_locations.select': { data: beating },
@@ -144,6 +150,19 @@ describe('runEngine — defacement alerts off (production until Done-when 3)', (
     const summary = await runEngine(db, now);
     expect(opened(rpcCalls)).toBeUndefined();
     expect(summary.defacementHeld).toEqual(['Tubtong · “removed phrase” (SIN, TYO)']);
+  });
+
+  it('an own word the site no longer has (edited since the check) is held like a list word (D-069)', async () => {
+    const edited = { ...monitor, must_not_contain: ['Database Error'] };
+    const { db, rpcCalls } = baseFakeDb({
+      'probe_locations.select': { data: beating },
+      'monitors.select': { data: [edited] },
+      'rpc.engine_checks': { data: [pass('SIN', 0, ['Database error']), pass('TYO', 1, ['Database error'])] },
+      'rpc.engine_open_incident': { data: 'i1' },
+    });
+    const summary = await runEngine(db, now);
+    expect(opened(rpcCalls)).toBeUndefined();
+    expect(summary.defacementHeld).toEqual(['Tubtong · “Database error” (SIN, TYO)']);
   });
 
   it('logs a crawler finding only in the runs just after its fetch, not for its whole window', async () => {

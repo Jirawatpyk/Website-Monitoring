@@ -217,14 +217,14 @@ isOneToOne: false
                   ]
                 },"crawler_clean_pages": {
                   Row: {
-                    "body": string,"body_hash": string,"checked_at": string,"created_at": string,"monitor_id": string,"updated_at": string,"view": string
+                    "body": string,"body_hash": string,"checked_at": string,"created_at": string,"monitor_id": string,"updated_at": string,"url": string,"view": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "body": string,"body_hash": string,"checked_at": string,"created_at"?: string,"monitor_id": string,"updated_at"?: string,"view": string
+                    "body": string,"body_hash": string,"checked_at": string,"created_at"?: string,"monitor_id": string,"updated_at"?: string,"url": string,"view": string
                   }
                   Update: {
-                    "body"?: string,"body_hash"?: string,"checked_at"?: string,"created_at"?: string,"monitor_id"?: string,"updated_at"?: string,"view"?: string
+                    "body"?: string,"body_hash"?: string,"checked_at"?: string,"created_at"?: string,"monitor_id"?: string,"updated_at"?: string,"url"?: string,"view"?: string
                   }
                   Relationships: [
                     {
@@ -1120,6 +1120,9 @@ isOneToOne: false
       } },
 "confirm_oncall_test":
 { Args: { "p_token": string }; Returns: string
+                           },
+"crawler_prune_clean_pages":
+{ Args: Record<PropertyKey, never>; Returns: number
                            },
 "crawler_set_baseline":
 { Args: { "p_check_id": string }; Returns: boolean
