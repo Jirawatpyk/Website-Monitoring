@@ -166,7 +166,7 @@ describe('Shared forbidden words', () => {
     expect(screen.queryByRole('button', { name: /^Remove buy viagra/ })).not.toBeInTheDocument();
   });
 
-  it('a found result takes focus (the pressed button is now off) and is announced', async () => {
+  it('a found result takes focus (the pressed button is now off), which reads it out', async () => {
     actions.checkPhrase.mockResolvedValue({
       ok: true,
       check: {
@@ -179,8 +179,9 @@ describe('Shared forbidden words', () => {
     await userEvent.type(within(dialog).getByRole('textbox', { name: /Phrase/ }), 'slot vip room');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Check phrase' }));
     const box = await within(dialog).findByText(/^Found on MuvMi/);
-    const region = box.closest('[aria-live]');
-    expect(region).toHaveAttribute('aria-live', 'polite');
+    // Focus reads it out; it is no live region as well, or it would be read twice (/verify).
+    const region = box.closest('[tabindex="-1"]');
+    expect(region).not.toHaveAttribute('aria-live');
     await waitFor(() => expect(region).toHaveFocus());
   });
 

@@ -134,7 +134,7 @@ export function ForbiddenSection({ phrases, liveSites }: { phrases: Phrase[] | n
               <div key={g.id} className={i > 0 ? 'border-t border-border-subtle' : undefined}>
                 <div className="flex min-h-13 items-center gap-3 py-1 pr-3 pl-4 md:pl-5">
                   <h3 className="m-0 grow text-base font-semibold">{g.label}</h3>
-                  <span className="text-sm text-fg-secondary">{g.count}</span>
+                  <span className="shrink-0 text-sm whitespace-nowrap text-fg-secondary">{g.count}</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -384,10 +384,11 @@ function AddDialog({
           error={shownRefusal ? REFUSAL_WORDS[shownRefusal] : undefined}
           hint="A phrase, not a single short word. Case and spacing don’t matter."
         />
-        {/* One live region, always mounted: the checking line, then the result (spec-checker). */}
-        <div ref={resultRef} tabIndex={-1} aria-live="polite" className={`flex flex-col ${FOCUS_TARGET}`}>
+        {/* The result takes focus, which reads it out; a live region too would read it twice (/verify).
+            Only the checking line is a status. */}
+        <div ref={resultRef} tabIndex={-1} className={`flex flex-col ${FOCUS_TARGET}`}>
           {checking ? (
-            <span className="flex items-center gap-2 text-sm text-fg-secondary">
+            <span role="status" className="flex items-center gap-2 text-sm text-fg-secondary">
               <span className="flex motion-safe:animate-spin" aria-hidden>
                 <IconLoaderCircle size="sm" />
               </span>

@@ -54,6 +54,9 @@ The defacement modes (S09c, D-042) open a PROBLEM only with `DEFACEMENT_ALERTS=o
 - With `DEFACEMENT_ALERTS=on`, swap one of the two phrases `defaced` serves for text that can't match: `update forbidden_phrases set phrase = 'zz staging list check zz' where phrase = 'บาคาร่า' returning id`. An update keeps `id` and `created_at`, so the order holds.
 - Set the mode to `defaced`. Expect `check_results.keyword_forbidden = {สล็อตออนไลน์}` from BKK, SIN and TYO, and the cause "Found “สล็อตออนไลน์” on / (BKK, SIN, TYO)" (INC-0073, 20 Nov).
 - Put the phrase back by its `id`, confirm 36 rows in order, set `ok`, and run the reset.
+- **Clean-up with the crawler (S17 PR 3c `/verify`).** A crawler row that holds a phrase keeps its PROBLEM until the next crawler run (at :00 and :30) fetches a clean page. That is the Remove copy, and it isn't a bug.
+  - Set the mode back to `ok` before the next :00 or :30. A switch even a minute late leaves a row with the phrase for another 30 min (INC-0076).
+  - Run `reset-test-incident.sql` only after a clean crawler row: `select view, forbidden, checked_at from crawler_checks where view <> 'plain' order by checked_at desc limit 2`. A reset before that leaves an incident that the crawler reopens.
 - **Clean pages:** read `select view, url, length(body), checked_at, updated_at from crawler_clean_pages`. The crawler summary in the Vercel log counts `cleanPages: { written, moved, late }`: the first run after the db push writes, an unchanged page then only moves.
 - **Order of a 3b-style deploy:** web first, where the log shows `forbidden_phrases_read_failed` with PGRST205 and the rounds still come from all three locations. Then the db push, a BKK round on the old agent, then `release.sh staging`.
 

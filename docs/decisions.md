@@ -142,7 +142,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   - **Rewrite cost:** a page with a per-request token changes its hash every run and is rewritten whole each time.
     - Each crawler summary counts `cleanPages: { written, moved, late }`, so the rate is read from the production log after 3b, with no database read.
     - If the rate is high, fewer views are kept.
-  - **The Data kept card** gets a row for the stored pages in 3c, with the editor that uses them: "Newest clean page per site · replaced each crawler run · removed when a site stops".
+  - **The Data kept card** gets a row for the stored pages in 3c, with the editor that uses them: "Newest clean page per site · Replaced each crawler run". The removal when a site stops is left out: at 820 the full value ran over four lines (`/verify`).
 - **Guards 3c must add** (reviews of 3b):
   - "Already in the list" compares phrases through `normalizeForMatch`, not only through the table's unique key. The key folds `\s` runs, but the matcher also folds `&nbsp;` and U+00A0.
   - A cap on the number of phrases, well under PostgREST's 1,000 rows and the agent's `.max(1000)` (proposed 300). It also bounds the crawler's CPU per fetch.
