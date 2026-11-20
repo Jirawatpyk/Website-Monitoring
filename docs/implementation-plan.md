@@ -38,7 +38,7 @@
 | S14 | Digest, weekly summary & recurring maintenance | 2 · P1 | M | FR-12, FR-10b | S09, S11 | 5 | Done |
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Done |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Done |
-| S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | In progress |
+| S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Done |
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Todo |
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | Todo |
 | G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov) | Todo |
@@ -749,7 +749,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   2. Alert channels: read-only routing, the test alert (`send_channel_test`; also Profile's test for Stakeholders and Viewers, D-062 item 12), the delivery log. Merged #215 (20 Nov, `/verify` PASS on staging: the test card and email reached Tao, both Delivered in the log).
   3. a. Company holidays: `add_company_holiday` / `rename_company_holiday` / `remove_company_holiday` (audited by the row trigger), `company_holidays.kind`, the holiday section and "On this page" (board OrganisationLists, §41). Merged #216 (20 Nov; staging: INC-0072's PROBLEM held until Mon 23 Nov 09:00 with today a company day off; `/verify` checked add / rename / remove and the refusals).
      b. The shared list moves to the database with no change in behaviour: `forbidden_phrases`, seeded from the code list. The probes, the crawler, the monitor test and the VPS agent (through the Ingest GET) read it, and fall back to the code list. The crawler stores each site's last clean fetch per view. Deploy `dxt-agent`. Merged #217 (20 Nov; staging: the table is what BKK, SIN and TYO use; `/verify` PASS; `dxt-agent@production` released 10:18Z).
-     c. The editor on Organisation (board OrganisationLists, §41 items 4–8): groups with counts, Add phrase with "Check phrase" against the stored clean fetches, Remove, a note on each change, audited. Every rule also holds in `add_forbidden_phrase` (D-069 PR 3c block).
+     c. The editor on Organisation (board OrganisationLists, §41 items 4–8): groups with counts, Add phrase with "Check phrase" against the stored clean fetches, Remove, a note on each change, audited. Every rule also holds in `add_forbidden_phrase` (D-069 PR 3c block). Merged #218 (20 Nov; staging: “Lucky Deals” added, reported by BKK, SIN and TYO on the next round, INC-0075, then removed; `/verify` PASS with “lucky DEALS”, INC-0076 recovered after the next crawler run).
 - **Moved out (D-069):** a per-site uptime target (D-059) and the editable tracking allowlist (D-046) — backlog, no slice yet.
 - **Depends on:** S10, S11
 - **Done when:**
