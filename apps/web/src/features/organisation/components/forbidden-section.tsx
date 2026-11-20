@@ -21,6 +21,7 @@ import { addPhrase, checkPhrase, removePhrase } from '../actions';
 import {
   addedLine,
   checkFoot,
+  checkingLine,
   checkWords,
   GROUP_OPTIONS,
   MAX_PHRASES,
@@ -388,7 +389,7 @@ function AddDialog({
               <span className="flex motion-safe:animate-spin" aria-hidden>
                 <IconLoaderCircle size="sm" />
               </span>
-              Checking {liveSites} sites’ last clean fetch…
+              {checkingLine(liveSites)}
             </span>
           ) : (
             current && <CheckBox words={current} phrase={phrase} />

@@ -170,9 +170,13 @@ export function checkWords(check: PhraseCheck, phrase: string): CheckWords {
 export function removeWords(group: ForbiddenGroup) {
   return {
     description: `From ${FORBIDDEN_GROUP_LABELS[group]} · sites stop being checked for it from the next round.`,
-    body: 'An incident it opened recovers on the next round and stays open until it’s resolved — a short, unacknowledged one resolves itself.',
+    body: 'The Googlebot and Google-search views stop at the next crawler run (within 30 min). An incident it opened recovers once no check finds it and stays open until it’s resolved — a short, unacknowledged one resolves itself.',
   };
 }
+
+/** "Checking 17 sites’ last clean fetch…" (board), one site in the singular. */
+export const checkingLine = (sites: number) =>
+  `Checking ${sites === 1 ? 'the site’s' : `${sites} sites’`} last clean fetch…`;
 
 /** The result line under the heading after a change. */
 export const addedLine = (phrase: string, group: ForbiddenGroup) =>

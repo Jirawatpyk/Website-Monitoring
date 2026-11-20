@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkWords, phraseGroups, removeWords, snippetOf, type PhraseCheck } from './phrases';
+import { checkingLine, checkWords, phraseGroups, removeWords, snippetOf, type PhraseCheck } from './phrases';
 
 const id = (n: number) => `00000000-0000-4000-8000-00000000000${n}`;
 
@@ -113,11 +113,18 @@ describe('the snippet keeps text that has a “>” in it', () => {
   });
 });
 
+describe('the checking line', () => {
+  it('counts the live sites, one in the singular', () => {
+    expect(checkingLine(17)).toBe('Checking 17 sites’ last clean fetch…');
+    expect(checkingLine(1)).toBe('Checking the site’s last clean fetch…');
+  });
+});
+
 describe('remove', () => {
   it('names the group and what happens to an incident it opened', () => {
     expect(removeWords('gambling_th')).toEqual({
       description: 'From Gambling · Thai · sites stop being checked for it from the next round.',
-      body: 'An incident it opened recovers on the next round and stays open until it’s resolved — a short, unacknowledged one resolves itself.',
+      body: 'The Googlebot and Google-search views stop at the next crawler run (within 30 min). An incident it opened recovers once no check finds it and stays open until it’s resolved — a short, unacknowledged one resolves itself.',
     });
   });
 });
