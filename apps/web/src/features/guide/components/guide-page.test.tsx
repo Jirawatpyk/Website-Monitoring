@@ -4,10 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { guideTopics, type GuideFacts } from '../content';
 import { GuidePage } from './guide-page';
 
-const nav = vi.hoisted(() => ({ topic: null as string | null, push: vi.fn() }));
+const nav = vi.hoisted(() => ({ topic: null as string | null }));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/guide',
-  useRouter: () => ({ push: nav.push }),
   useSearchParams: () => new URLSearchParams(nav.topic ? { topic: nav.topic } : {}),
 }));
 
@@ -38,7 +37,7 @@ const desktopNav = () => screen.getByRole('navigation', { name: 'Guide topics' }
 
 beforeEach(() => {
   nav.topic = null;
-  nav.push.mockClear();
+  vi.restoreAllMocks();
 });
 
 describe('GuidePage (Guide, MGuide)', () => {
@@ -59,7 +58,7 @@ describe('GuidePage (Guide, MGuide)', () => {
     expect(heading).toHaveFocus();
     expect(within(desktopNav()).getByRole('button', { name: /Mute vs maintenance/ })).toHaveAttribute(
       'aria-current',
-      'page',
+      'true',
     );
   });
 
@@ -72,12 +71,13 @@ describe('GuidePage (Guide, MGuide)', () => {
     expect(within(desktopNav()).getByText('11 topics')).toBeInTheDocument();
   });
 
-  it('on the phone a topic opens through ?topic=, and the open topic takes focus', async () => {
+  it('on the phone a topic opens through ?topic= without a navigation, and takes focus', async () => {
     const user = userEvent.setup();
+    const push = vi.spyOn(window.history, 'pushState');
     const { rerender } = renderGuide();
     const list = screen.getByRole('group', { name: 'Filter by role' }).parentElement!;
     await user.click(within(list).getByRole('button', { name: /Recover, root cause & resolve/ }));
-    expect(nav.push).toHaveBeenCalledWith('/guide?topic=resolve');
+    expect(push).toHaveBeenCalledWith(null, '', '/guide?topic=resolve');
     nav.topic = 'resolve';
     rerender(
       <GuidePage
@@ -105,6 +105,7 @@ describe('GuidePage (Guide, MGuide)', () => {
 
   it('back from a phone topic puts focus on its row', async () => {
     const user = userEvent.setup();
+    vi.spyOn(window.history, 'pushState').mockImplementation(() => {});
     const view = () => (
       <GuidePage
         desktop={guideTopics(FACTS, 'desktop')}

@@ -178,7 +178,9 @@ export function ladderRows(steps: readonly EscalationStep[]): LadderRow[] {
     who: `${cap(whoOf(s, 'owner inside response hours, on-call outside'))} · ${channelsOf(s)}`,
     ack:
       s.level === 0
-        ? 'Chat at once, email after 5 min'
+        ? s.channels.includes('email')
+          ? 'Chat at once, email after 5 min'
+          : 'Sent at once'
         : s.fyi
           ? 'Also after an ack: FYI, no call'
           : 'Stopped by ack',
@@ -416,7 +418,7 @@ function drafts(f: GuideFacts): Draft[] {
           },
           {
             status: 'down',
-            text: 'At least 2 of 3 locations hard-fail (timeout, 5xx, DNS or TLS error, connection refused) on two checks in a row — the second is an immediate recheck about 30 s later.',
+            text: 'At least 2 of 3 locations hard-fail. A 5xx, DNS or TLS error or a refused connection counts once the immediate recheck about 30 s later fails too; a timeout alone needs two failing rounds in a row (Tier 2–3: a confirm check a minute later).',
           },
           {
             status: 'maintenance',
@@ -571,7 +573,7 @@ function drafts(f: GuideFacts): Draft[] {
           B('Client doesn’t need one?', 'Choose Not needed… and give a reason — the reason is required.'),
           B(
             'Required only when the track fired.',
-            `A Tier 1 DOWN longer than ${updT1} min can’t be resolved until the update is marked or Not needed.`,
+            `A Tier 1 DOWN that reached ${updT1} min can’t be resolved until the update is marked or Not needed.`,
           ),
           B(
             'Who can mark:',
@@ -632,7 +634,7 @@ function drafts(f: GuideFacts): Draft[] {
               { t: 'OK for 2 rounds', d: 'The site has passed two check rounds in a row.' },
               {
                 t: 'Client update marked — or not required',
-                d: `Required only if the track fired (Tier 1 DOWN over ${updT1} min, Tier 2 DOWN ${updT2} min inside response hours). Met by Mark client updated or Not needed + a reason.`,
+                d: `Required only if the track fired (Tier 1 DOWN reaching ${updT1} min, Tier 2 DOWN reaching ${updT2} min inside response hours). Met by Mark client updated or Not needed + a reason.`,
               },
               { t: 'Root cause written', d: 'Any category except “Unknown — keep investigating”.' },
             ],
@@ -925,6 +927,22 @@ function drafts(f: GuideFacts): Draft[] {
 }
 
 const PHONE_ONLY = new Set(['escalation', 'users']);
+
+/** The topics the phone can open at `?topic=` (the bar's back goes to the list only for these). */
+export const PHONE_TOPIC_IDS: readonly string[] = [
+  'signin',
+  'phone',
+  'statuses',
+  'mute',
+  'rotation',
+  'reports',
+  'alert',
+  'client',
+  'resolve',
+  'monitor',
+  'escalation',
+  'users',
+];
 
 /** The topics for a layout, in the boards' order, with Admin-only links left out for everyone else. */
 export function guideTopics(f: GuideFacts, layout: GuideLayout): Topic[] {

@@ -95,14 +95,15 @@ export function countLabel(shown: number, total: number, chip: Chip, mine: Guide
   return `${shown} of ${total} topics${chip !== 'All' ? ` · ${chip}` : ''}`;
 }
 
-const article = (r: GuideRole) => (r === 'Admin' || r === 'On-call' ? 'an' : 'a');
+const article = (r: GuideRole) => (r === 'Admin' ? 'an' : 'a');
 
 /** The phone list's line under the chips (MGuide), when it isn't "Showing topics for you". */
 export function phoneCountLine(shown: number, total: number, chip: Chip, mine: GuideRole, q: string): string {
   const needle = q.trim();
   if (needle)
     return `${shown} ${shown === 1 ? 'result' : 'results'} for “${needle}”${chip !== 'All' ? ` · ${chip}` : ''}`;
-  if (chip === 'All') return `${total} topics · you’re ${article(mine)} ${mine}`;
+  if (chip === 'All')
+    return `${total} topics · ${mine === 'On-call' ? 'you’re on call' : `you’re ${article(mine)} ${mine}`}`;
   return `${shown} topics for ${chip}`;
 }
 

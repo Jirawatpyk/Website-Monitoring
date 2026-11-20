@@ -1,13 +1,15 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { Button, SegmentedControl, Tag, TextField } from '@jirawatpyk/aura-react';
+import { Button, EmptyState, SegmentedControl, Tag, TextField, linkClass } from '@jirawatpyk/aura-react';
 import {
+  IconArrowLeft,
   IconArrowUpRight,
   IconChevronRight,
   IconMonitor,
   IconSearch,
+  IconUsers,
   IconX,
 } from '@jirawatpyk/aura-react/icons';
 import type { Topic } from '../content';
@@ -30,9 +32,18 @@ const CAPS = 'font-mono text-xs text-fg-tertiary';
 const FIRST_TOPIC = 'alert';
 
 /**
- * The User guide (boards Guide, MGuide; spec §18; S18, D-070). One state drives both trees: from lg
- * the topic list beside the article, below lg the list and a drill-in article (`?topic=`), where the
- * Admin topic is split in two.
+ * Opens or closes a topic in the URL without a server round trip (spec-checker, S18): Next keeps
+ * `useSearchParams` in step with the History API, so the page and the phone bar (`GuideBar`) follow,
+ * and the browser's Back works. The chip and the search stay as they were.
+ */
+export function setGuideTopic(pathname: string, id: string | null) {
+  window.history.pushState(null, '', id ? `${pathname}?topic=${id}` : pathname);
+}
+
+/**
+ * The User guide (boards Guide, MGuide; spec §18; S18, D-070). One state drives both trees: from xl
+ * the topic list beside the article, below xl the list and a drill-in article (`?topic=`), where the
+ * Admin topic is split in two. The article column is too narrow for the tables between lg and xl.
  */
 export function GuidePage({
   desktop,
@@ -44,7 +55,6 @@ export function GuidePage({
   /** The chip the guide opens on: the viewer's role, or On-call during their shift. */
   mine: GuideRole;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const openId = params.get('topic');
@@ -67,11 +77,15 @@ export function GuidePage({
     articleHeading.current?.focus();
   }, [sel]);
   // The topic the phone last opened: Back returns focus to its row.
-  const opened = useRef<string | null>(null);
+  // A topic opened from a link (first load) doesn't take focus; one opened from a row does.
+  const opened = useRef<string | null>(openId);
+  const focusOpened = useRef(false);
   useEffect(() => {
-    if (!opened.current) return;
-    if (openId) phoneHeading.current?.focus();
-    else {
+    if (openId) {
+      if (focusOpened.current) phoneHeading.current?.focus();
+      focusOpened.current = false;
+      opened.current = openId;
+    } else if (opened.current) {
       phoneList.current?.querySelector<HTMLElement>(`[data-topic="${opened.current}"]`)?.focus();
       opened.current = null;
     }
@@ -90,8 +104,8 @@ export function GuidePage({
     setSel(id);
   };
   const open = (id: string) => {
-    opened.current = id;
-    router.push(`${pathname}?topic=${id}`);
+    focusOpened.current = true;
+    setGuideTopic(pathname, id);
   };
 
   const shownDesktop = visibleTopics(desktop, chip, q);
@@ -120,7 +134,7 @@ export function GuidePage({
       <button
         type="button"
         onClick={() => refilter('All', q)}
-        className="cursor-pointer rounded-aura-sm border-0 bg-transparent p-0 text-xs font-medium text-fg-accent underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring pointer-coarse:min-h-11"
+        className={linkClass({ touchHeight: true, className: 'text-xs font-medium' })}
       >
         Show all
       </button>
@@ -129,37 +143,40 @@ export function GuidePage({
 
   const empty = (shown: number, phoneLayout: boolean) =>
     shown === 0 && (
-      <div className="flex flex-col gap-3 rounded-aura-md border border-dashed border-border-default p-5 leading-normal">
-        <span className="flex text-fg-tertiary">
-          <IconSearch />
-        </span>
-        <span className="font-semibold">{emptyTitle(q, chip)}</span>
-        <span className="text-sm text-fg-secondary">
-          {phoneLayout
-            ? 'Try “acknowledge”, “mute” or “root cause”, or show all roles.'
-            : 'Try one of these, or ask in DxT Website Alerts.'}
-        </span>
-        {!phoneLayout && (
-          <div className="flex flex-wrap gap-2">
-            {SEARCH_SUGGESTIONS.map((w) => (
-              <Tag key={w} onClick={() => refilter('All', w)}>
-                {w}
-              </Tag>
-            ))}
-          </div>
-        )}
-        <span className="flex">
-          <Button variant="secondary" size="sm" icon={<IconX />} onClick={clear} fullWidth="below-md">
+      <EmptyState
+        bordered
+        size="sm"
+        headingLevel={2}
+        icon={<IconSearch />}
+        title={emptyTitle(q, chip)}
+        description={
+          phoneLayout ? (
+            'Try “acknowledge”, “mute” or “root cause”, or show all roles.'
+          ) : (
+            <span className="flex flex-col gap-3">
+              <span>Try one of these, or ask in DxT Website Alerts.</span>
+              <span className="flex flex-wrap gap-2">
+                {SEARCH_SUGGESTIONS.map((w) => (
+                  <Tag key={w} onClick={() => refilter('All', w)} touchHeight>
+                    {w}
+                  </Tag>
+                ))}
+              </span>
+            </span>
+          )
+        }
+        action={
+          <Button variant="secondary" icon={<IconX />} onClick={clear} touchHeight fullWidth={phoneLayout}>
             Clear search and filters
           </Button>
-        </span>
-      </div>
+        }
+      />
     );
 
   return (
     <>
       {/* ── Desktop (Guide) ───────────────────────────────────────────── */}
-      <div className="flex flex-col gap-6 max-lg:hidden">
+      <div className="flex flex-col gap-6 max-xl:hidden">
         <div className="flex items-end justify-between gap-6">
           <div className="flex w-95 flex-col">{search}</div>
           <div className="flex flex-col gap-1">
@@ -169,14 +186,14 @@ export function GuidePage({
               options={[...CHIPS]}
               value={chip}
               onChange={(v) => refilter(v as Chip, q)}
-              size="sm"
+              touchHeight="always"
             />
           </div>
         </div>
         <div className="-mt-1 grid grid-cols-[calc(var(--spacing)*75)_minmax(0,1fr)] items-start gap-6">
           <nav aria-label="Guide topics" className="flex flex-col gap-4">
             <div className="flex min-h-8 items-center justify-between gap-2 text-sm text-fg-secondary">
-              <span>{countLabel(shownDesktop.length, desktop.length, chip, mine, q)}</span>
+              <span role="status">{countLabel(shownDesktop.length, desktop.length, chip, mine, q)}</span>
               {filtered && shownDesktop.length > 0 && (
                 <Button variant="ghost" size="sm" icon={<IconX />} onClick={clear}>
                   Clear
@@ -184,8 +201,8 @@ export function GuidePage({
               )}
             </div>
             {groupTopics(shownDesktop).map((g) => (
-              <div key={g.group} className="flex flex-col gap-0.5">
-                <span className="px-3 pb-1 font-mono text-xs tracking-wide text-fg-tertiary">
+              <div key={g.group} role="group" aria-label={g.group} className="flex flex-col gap-0.5">
+                <span aria-hidden className="px-3 pb-1 font-mono text-xs tracking-wide text-fg-tertiary">
                   {g.group.toUpperCase()}
                 </span>
                 {g.topics.map((t) => {
@@ -195,7 +212,7 @@ export function GuidePage({
                       key={t.id}
                       type="button"
                       onClick={() => pick(t.id)}
-                      aria-current={on ? 'page' : undefined}
+                      aria-current={on ? 'true' : undefined}
                       className={`flex min-h-11 w-full cursor-pointer items-start gap-3 rounded-aura-md border border-transparent px-3 py-2.5 text-left text-fg-primary hover:border-border-default focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring ${on ? 'bg-bg-selected' : 'bg-transparent'}`}
                     >
                       <span
@@ -240,48 +257,50 @@ export function GuidePage({
         </div>
       </div>
 
-      {/* ── Phone (MGuide) ────────────────────────────────────────────── */}
-      <div ref={phoneList} className="flex flex-col gap-3 lg:hidden">
+      {/* ── Phone and tablet (MGuide) ─────────────────────────────────── */}
+      <div ref={phoneList} className="flex flex-col gap-3 xl:hidden">
         {phoneTopic ? (
-          <PhoneArticle topic={phoneTopic} phone={phone} headingRef={phoneHeading} onOpen={open} />
+          <PhoneArticle
+            topic={phoneTopic}
+            phone={phone}
+            headingRef={phoneHeading}
+            onOpen={open}
+            onBack={() => setGuideTopic(pathname, null)}
+          />
         ) : (
           <>
             {search}
-            <div
-              role="group"
-              aria-label="Filter by role"
-              // Wraps rather than scrolling sideways (D-018: no box scrolls sideways at 390).
-              className="flex flex-wrap gap-2"
-            >
+            <div role="group" aria-label="Filter by role" className="flex flex-wrap gap-2">
               {CHIPS.map((c) => (
                 <Tag key={c} selected={c === chip} onClick={() => refilter(c, q)} touchHeight>
                   {c}
                 </Tag>
               ))}
             </div>
-            {isMine ? (
-              mineLine
-            ) : (
-              <span className="text-xs text-fg-secondary">
-                {phoneCountLine(shownPhone.length, phone.length, chip, mine, q)}
-              </span>
-            )}
-            {groupTopics(shownPhone).map((g) => (
-              <div key={g.group} className="flex flex-col gap-1.5">
-                <span className={CAPS}>{g.group.toUpperCase()}</span>
-                <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
-                  {g.topics.map((t) => (
-                    <TopicRow key={t.id} topic={t} onOpen={open} />
-                  ))}
+            <span role="status" className="text-xs text-fg-secondary">
+              {isMine ? '' : phoneCountLine(shownPhone.length, phone.length, chip, mine, q)}
+            </span>
+            {isMine && <div className="-mt-3">{mineLine}</div>}
+            <nav aria-label="Topic list" className="flex flex-col gap-3">
+              {groupTopics(shownPhone).map((g) => (
+                <div key={g.group} role="group" aria-label={g.group} className="flex flex-col gap-1.5">
+                  <span aria-hidden className={CAPS}>
+                    {g.group.toUpperCase()}
+                  </span>
+                  <div className="overflow-hidden rounded-aura-lg border border-border-default bg-bg-surface">
+                    {g.topics.map((t) => (
+                      <TopicRow key={t.id} topic={t} onOpen={open} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </nav>
             {empty(shownPhone.length, true)}
             <span className="flex items-start gap-1.5 text-xs leading-snug text-fg-secondary">
               <span className="flex pt-px">
                 <IconMonitor size="sm" />
               </span>
-              <span>Same topics as the desktop User guide. Screens for Admin settings open on desktop.</span>
+              <span>Same topics as the desktop User guide. Admin settings open view only on phones.</span>
             </span>
           </>
         )}
@@ -302,7 +321,7 @@ function TopicRow({ topic, onOpen }: { topic: Topic; onOpen: (id: string) => voi
         {GUIDE_ICONS[topic.icon]}
       </span>
       <span className="flex min-w-0 grow flex-col gap-0.5 leading-snug">
-        <span className="font-medium">{topic.title}</span>
+        <span className="text-sm font-medium">{topic.title}</span>
         <span className="text-xs text-fg-secondary">{topic.summary}</span>
       </span>
       <span className="flex text-fg-tertiary">
@@ -317,16 +336,24 @@ function PhoneArticle({
   phone,
   headingRef,
   onOpen,
+  onBack,
 }: {
   topic: Topic;
   phone: Topic[];
   headingRef: RefObject<HTMLHeadingElement | null>;
   onOpen: (id: string) => void;
+  onBack: () => void;
 }) {
   const related = topic.relatedTopics.flatMap((id) => phone.filter((t) => t.id === id));
   const screen = topic.related[0];
   return (
     <article className="flex flex-col gap-3">
+      {/* Between lg and xl there is no phone bar to go back with. */}
+      <span className="max-lg:hidden">
+        <Button variant="ghost" icon={<IconArrowLeft />} onClick={onBack}>
+          All topics
+        </Button>
+      </span>
       <div className="flex flex-col gap-1.5">
         <span className={CAPS}>{topic.group.toUpperCase()}</span>
         <h2
@@ -336,14 +363,15 @@ function PhoneArticle({
         >
           {topic.title}
         </h2>
-        <span className="text-xs text-fg-secondary">
-          For {forText(topic.roles).replace('Everyone', 'everyone')}
+        <span className="flex items-center gap-1.5 text-xs text-fg-secondary">
+          <IconUsers size="sm" />
+          <span>For {forText(topic.roles).replace('Everyone', 'everyone')}</span>
         </span>
       </div>
       <p className="m-0 text-sm leading-relaxed">{topic.lede}</p>
-      <ArticleBody topic={topic} />
+      <ArticleBody topic={topic} phone />
       {screen && (
-        <Button variant="secondary" icon={<IconArrowUpRight />} href={screen.href} fullWidth>
+        <Button variant="secondary" icon={<IconArrowUpRight />} href={screen.href} fullWidth touchHeight>
           {`Open ${screen.label}`}
         </Button>
       )}

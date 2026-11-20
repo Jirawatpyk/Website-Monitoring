@@ -14,12 +14,29 @@ export function PhoneBar({
   back,
   actions,
   mono = false,
-}: PhoneBarSpec & { actions?: ReactNode; mono?: boolean }) {
+  onBack,
+}: PhoneBarSpec & {
+  actions?: ReactNode;
+  mono?: boolean;
+  /**
+   * A page that keeps its sub-view in the URL on the client (the User guide's `?topic=`) goes back
+   * without a navigation; the link still works without JavaScript. Client callers only.
+   */
+  onBack?: () => void;
+}) {
   return (
     <>
       {back && (
         <Link
           href={back.href}
+          onClick={
+            onBack
+              ? (e) => {
+                  e.preventDefault();
+                  onBack();
+                }
+              : undefined
+          }
           aria-label={back.label}
           // A back-arrow page drops AppShell's ☰ (AURA 5.41, request 19): the tabs keep it for the drawer (D-018).
           data-aura-hide-menubutton

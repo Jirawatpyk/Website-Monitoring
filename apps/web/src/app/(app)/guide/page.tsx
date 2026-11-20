@@ -38,7 +38,8 @@ export default async function GuideRoute() {
   const data = await getGuidePage({ id: access.profile.id, role: access.profile.role });
   return (
     <Container>
-      <div className="flex flex-col gap-6">
+      {/* Below lg the header is empty (the bar has the title): no gap above the search (MGuide). */}
+      <div className="flex flex-col gap-6 max-lg:gap-0">
         {header}
         <GuidePage
           desktop={guideTopics(data.facts, 'desktop')}

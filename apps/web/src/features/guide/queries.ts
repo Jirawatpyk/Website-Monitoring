@@ -75,7 +75,7 @@ export async function getGuidePage(me: { id: string; role: Role }, now = new Dat
   });
   // Postgres writes "+00:00", not "Z": compare instants, not strings.
   const live = rows.find((r) => Date.parse(r.starts_at) <= now.getTime());
-  const next = rows.filter((r) => r !== live).slice(0, SHIFTS_AHEAD - 1);
+  const next = rows.filter((r) => r !== live).slice(0, SHIFTS_AHEAD);
 
   return {
     role: me.role,

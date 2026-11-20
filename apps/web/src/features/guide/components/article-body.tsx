@@ -1,6 +1,5 @@
-import Link from 'next/link';
-import type { ReactNode } from 'react';
-import { Alert, Badge, Table, TBody, Td, Th, THead, Tr } from '@jirawatpyk/aura-react';
+import type { ReactElement, ReactNode } from 'react';
+import { Alert, Badge, Button, Table, TBody, Td, Th, THead, Tr } from '@jirawatpyk/aura-react';
 import {
   IconArrowRight,
   IconArrowUpRight,
@@ -17,18 +16,20 @@ import {
   IconMail,
   IconMonitor,
   IconPencil,
+  IconRotateCcw,
   IconSettings,
   IconUser,
   IconUsers,
 } from '@jirawatpyk/aura-react/icons';
 import { MATRIX_ROLES, ROLE_LABELS, ROLE_MATRIX } from '@dxt/shared';
 import { RoleMark } from '@/components/role-mark';
+import { RoleMatrixPicker } from '@/components/role-matrix';
 import { GLYPH_LEGEND, GLYPHS } from '@/components/site-cells';
 import { SeverityBadge, SiteStatusBadge, WorkflowBadge } from '@/components/status-badges';
 import type { Block, GuideIcon, RelatedLink, Step, Topic } from '../content';
 
 /** The icon of a topic or a related screen. */
-export const GUIDE_ICONS: Record<GuideIcon, ReactNode> = {
+export const GUIDE_ICONS: Record<GuideIcon, ReactElement> = {
   lock: <IconLock />,
   bell: <IconBell />,
   'circle-check': <IconCircleCheck />,
@@ -105,20 +106,19 @@ function StepItem({ step, n }: { step: Step; n: number }) {
         {step.flow && <Flow states={step.flow} />}
         {step.mono && !step.gates && <Mono>{step.mono}</Mono>}
         {step.toast && (
-          // A picture of the held-action toast, not a live one (Guide board).
-          <div
-            aria-hidden
-            className="flex w-full max-w-130 items-center gap-3.5 rounded-aura-lg bg-bg-surface-strong py-3 pr-3 pl-4.5 text-fg-inverted"
-          >
+          // A picture of the held-action toast, not a live one (Guide board): read as text, not a button.
+          <figure className="m-0 flex w-full max-w-130 items-center gap-3.5 rounded-aura-lg bg-bg-surface-strong py-3 pr-3 pl-4.5 text-fg-inverted">
+            <figcaption className="sr-only">Example of the undo bar:</figcaption>
             <IconCheck size="sm" />
             <span className="flex grow flex-col text-sm leading-snug">
               <span className="font-semibold">{step.toast.title}</span>
-              <span className="text-xs opacity-75">{step.toast.line}</span>
+              <span className="text-xs">{step.toast.line}</span>
             </span>
-            <span className="flex h-9 shrink-0 items-center rounded-aura-full border border-current px-4 text-sm font-medium">
+            <span className="flex h-9 shrink-0 items-center gap-1.5 rounded-aura-full border border-current px-4 text-sm font-medium">
+              <IconRotateCcw size="sm" />
               {step.toast.undo}
             </span>
-          </div>
+          </figure>
         )}
         {step.gates && (
           <>
@@ -153,29 +153,31 @@ function Rows<T>({ rows, render }: { rows: readonly T[]; render: (row: T, last: 
 
 const line = (last: boolean) => (last ? '' : 'border-b border-border-subtle');
 
-function BlockView({ block }: { block: Block }) {
+function BlockView({ block, phone }: { block: Block; phone: boolean }) {
   switch (block.kind) {
     case 'bullets':
       return (
-        <div className="flex flex-col gap-3">
+        <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {block.items.map((b) => (
-            <div key={b.lead} className="flex gap-3 leading-relaxed">
+            <li key={b.lead} className="flex gap-3 leading-relaxed">
               <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-aura-full bg-fg-tertiary" />
               <span>
                 <span className="font-semibold">{b.lead}</span>{' '}
                 <span className="text-fg-secondary">{b.text}</span>
               </span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       );
     case 'steps':
       return (
-        <div className="flex flex-col gap-5">
+        <ol className="m-0 flex list-none flex-col gap-5 p-0">
           {block.items.map((s, i) => (
-            <StepItem key={s.title} step={s} n={i + 1} />
+            <li key={s.title}>
+              <StepItem step={s} n={i + 1} />
+            </li>
           ))}
-        </div>
+        </ol>
       );
     case 'checklist':
       return (
@@ -219,7 +221,7 @@ function BlockView({ block }: { block: Block }) {
                   <span className="w-14 shrink-0 text-sm font-semibold">{l.when}</span>
                   <span className="min-w-0 grow basis-48 text-fg-secondary">{l.who}</span>
                   <span
-                    className={`shrink-0 md:w-36 md:text-right ${l.fyi ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}
+                    className={`shrink-0 max-md:pl-10 md:w-48 md:text-right md:whitespace-nowrap ${l.fyi ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}
                   >
                     {l.ack}
                   </span>
@@ -243,40 +245,57 @@ function BlockView({ block }: { block: Block }) {
     case 'lifecycle':
       return (
         <div className="flex flex-col gap-3 rounded-aura-md border border-dashed border-border-default p-4">
-          <span className={CAPS}>THE LIFECYCLE</span>
+          <span className={CAPS}>THE LIFECYCLE · DOWN AND PROBLEM</span>
           <Flow states={block.states} />
           <span className="text-xs leading-normal text-fg-secondary">{block.note}</span>
         </div>
       );
-    case 'compare':
+    case 'compare': {
+      const cols =
+        'grid grid-cols-[calc(var(--spacing)*33)_1fr_1fr] gap-4 px-4 py-2.5 max-md:grid-cols-[calc(var(--spacing)*22)_1fr_1fr] max-md:gap-2';
       return (
-        <div className={`${BOX} overflow-hidden`}>
-          <div className="grid grid-cols-[calc(var(--spacing)*33)_1fr_1fr] items-center gap-4 border-b border-border-default bg-bg-canvas px-4 py-2.5 max-md:grid-cols-[calc(var(--spacing)*22)_1fr_1fr] max-md:gap-2">
-            <span />
-            <span className="flex items-center gap-2 font-semibold">
+        <div role="table" aria-label="Mute and maintenance compared" className={`${BOX} overflow-hidden`}>
+          <div role="row" className={`${cols} items-center border-b border-border-default bg-bg-canvas`}>
+            <span role="columnheader" />
+            <span role="columnheader" className="flex items-center gap-2 font-semibold">
               <IconEyeOff size="sm" />
               Mute
             </span>
-            <span className="flex items-center gap-2 font-semibold">
+            <span role="columnheader" className="flex items-center gap-2 font-semibold">
               <IconCalendar size="sm" />
               Maintenance
             </span>
           </div>
-          <Rows
-            rows={block.rows}
-            render={(m, last) => (
-              <div
-                key={m.k}
-                className={`grid grid-cols-[calc(var(--spacing)*33)_1fr_1fr] gap-4 px-4 py-2.5 text-sm leading-snug max-md:grid-cols-[calc(var(--spacing)*22)_1fr_1fr] max-md:gap-2 max-md:text-xs ${line(last)}`}
-              >
-                <span className="text-fg-secondary">{m.k}</span>
-                <span>{m.mute}</span>
-                <span>{m.maint}</span>
-              </div>
-            )}
-          />
+          <div role="row" className={`${cols} items-center border-b border-border-subtle text-sm`}>
+            <span role="rowheader" className="text-fg-secondary">
+              What you see
+            </span>
+            <span role="cell" className="flex flex-wrap items-center gap-1.5 leading-none">
+              <SiteStatusBadge status="ok" />
+              <Badge tone="neutral" variant="outline" icon={<IconEyeOff />}>
+                Muted · until 14:30
+              </Badge>
+            </span>
+            <span role="cell" className="flex leading-none">
+              <SiteStatusBadge status="maintenance" />
+            </span>
+          </div>
+          {block.rows.map((m) => (
+            <div
+              key={m.k}
+              role="row"
+              className={`${cols} border-b border-border-subtle text-sm leading-snug last:border-b-0 max-md:text-xs`}
+            >
+              <span role="rowheader" className="text-fg-secondary">
+                {m.k}
+              </span>
+              <span role="cell">{m.mute}</span>
+              <span role="cell">{m.maint}</span>
+            </div>
+          ))}
         </div>
       );
+    }
     case 'siteStates':
       return (
         <div className="flex flex-col gap-2.5">
@@ -293,7 +312,7 @@ function BlockView({ block }: { block: Block }) {
                     <SiteStatusBadge status={s.status} />
                     {s.muted && (
                       <Badge tone="neutral" variant="outline" icon={<IconEyeOff />}>
-                        Muted · until 18:00
+                        Muted · until 14:30
                       </Badge>
                     )}
                   </span>
@@ -344,53 +363,67 @@ function BlockView({ block }: { block: Block }) {
         </div>
       );
     case 'matrix':
-      return <Matrix />;
+      return phone ? <RoleMatrixPicker rows={GUIDE_MATRIX} roles={STAFF} /> : <Matrix />;
   }
 }
 
-/** The role matrix, the client column left out (Phase 3): the same rows Settings › Users shows. */
+/** Rows for features not built yet (S20, S22) stay on Settings › Users but not in the guide (D-070 item 3). */
+const NOT_BUILT = new Set([
+  'Download uptime reports',
+  'Send client reports / edit AM note',
+  'Approve incident review',
+]);
+const GUIDE_MATRIX = ROLE_MATRIX.filter((r) => !NOT_BUILT.has(r.label));
+const STAFF = MATRIX_ROLES.filter((r) => r !== 'client');
+const COL: Record<(typeof STAFF)[number], string> = {
+  admin: 'w-18',
+  responder: 'w-50',
+  stakeholder: 'w-28 whitespace-nowrap',
+  viewer: 'w-18',
+};
+
+/** The role matrix, the client column left out (Phase 3): Settings › Users' rows for what is built. */
 function Matrix() {
-  const roles = MATRIX_ROLES.filter((r) => r !== 'client');
   return (
-    <div className="overflow-x-auto">
-      <Table aria-label="What each role can do">
-        <THead>
-          <Tr>
-            <Th>Can…</Th>
-            {roles.map((r) => (
-              <Th key={r}>{ROLE_LABELS[r]}</Th>
+    <Table aria-label="What each role can do">
+      <THead>
+        <Tr>
+          <Th>Can…</Th>
+          {STAFF.map((r) => (
+            <Th key={r} className={COL[r]}>
+              {ROLE_LABELS[r]}
+            </Th>
+          ))}
+        </Tr>
+      </THead>
+      <TBody>
+        {GUIDE_MATRIX.map((row) => (
+          <Tr key={row.label}>
+            <Td>{row.label}</Td>
+            {STAFF.map((r) => (
+              <Td key={r} className={COL[r]}>
+                <RoleMark cell={row.cells[MATRIX_ROLES.indexOf(r)]!} />
+              </Td>
             ))}
           </Tr>
-        </THead>
-        <TBody>
-          {ROLE_MATRIX.map((row) => (
-            <Tr key={row.label}>
-              <Td>{row.label}</Td>
-              {roles.map((r, i) => (
-                <Td key={r}>
-                  <RoleMark cell={row.cells[i]!} />
-                </Td>
-              ))}
-            </Tr>
-          ))}
-        </TBody>
-      </Table>
-    </div>
+        ))}
+      </TBody>
+    </Table>
   );
 }
 
 /** A topic's body: its blocks in order. */
-export function ArticleBody({ topic }: { topic: Topic }) {
+export function ArticleBody({ topic, phone = false }: { topic: Topic; phone?: boolean }) {
   return (
     <div className="flex flex-col gap-5">
       {topic.blocks.map((b, i) => (
-        <BlockView key={`${b.kind}-${i}`} block={b} />
+        <BlockView key={`${b.kind}-${i}`} block={b} phone={phone} />
       ))}
     </div>
   );
 }
 
-/** "Related screens" — pills on desktop. */
+/** "Related screens" on desktop. */
 export function RelatedScreens({ links }: { links: readonly RelatedLink[] }) {
   if (!links.length) return null;
   return (
@@ -398,14 +431,16 @@ export function RelatedScreens({ links }: { links: readonly RelatedLink[] }) {
       <span className={CAPS}>RELATED SCREENS</span>
       <div className="flex flex-wrap gap-2">
         {links.map((r) => (
-          <Link
+          <Button
             key={r.href}
+            variant="secondary"
+            size="sm"
             href={r.href}
-            className="inline-flex h-9 items-center gap-2 rounded-aura-full border border-border-default bg-bg-surface pr-3.5 pl-3 text-sm font-medium whitespace-nowrap text-fg-primary no-underline hover:border-border-control focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus-ring pointer-coarse:h-11"
+            icon={GUIDE_ICONS[r.icon]}
+            touchHeight
           >
-            <span className="flex text-fg-secondary [&_svg]:size-4">{GUIDE_ICONS[r.icon]}</span>
             {r.label}
-          </Link>
+          </Button>
         ))}
       </div>
     </div>
