@@ -3,7 +3,7 @@
 -- short-word cases are the same as `phraseRefusal` in packages/shared/src/forbidden.test.ts.
 begin;
 \ir _helpers.psql
-select plan(31);
+select plan(43);
 
 -- ── Who may call them ───────────────────────────────────────────────────────────────────────────
 select ok(not has_function_privilege('anon', 'public.add_forbidden_phrase(text,text,text)', 'execute'), 'anon can’t add');
@@ -18,6 +18,9 @@ select is(private.phrase_is_short('ufa365'), false, 'a 6-letter brand passes');
 select is(private.phrase_is_short('พนัน'), true, '“พนัน” is 3 Thai characters (the vowel mark doesn’t count)');
 select is(private.phrase_is_short('สล็อต'), false, '“สล็อต” is 4');
 select is(private.phrase_is_short('time slot'), false, 'a phrase with a space passes');
+select is(private.phrase_is_short('casino'), false, 'a 6-letter word passes');
+select is(private.phrase_is_short('หวย'), true, '“หวย” is 3 Thai characters');
+select is(private.phrase_clean(E'\t รับเครดิตฟรี\n'), 'รับเครดิตฟรี', 'a tab or newline at either end is trimmed');
 select is((select count(*)::int from public.forbidden_phrases where private.phrase_is_short(phrase)), 0,
           'no seeded phrase is short');
 
@@ -56,6 +59,9 @@ select throws_ok($$ select public.add_forbidden_phrase('brands', 'newbrand365', 
                  'a Responder can’t add');
 select throws_ok($$ select public.check_forbidden_phrase('anything here') $$, '42501', null,
                  'nor check');
+select throws_ok(format($$ select public.remove_forbidden_phrase(%L, 'n') $$,
+                   (select id from public.forbidden_phrases order by created_at limit 1)),
+                 '42501', null, 'nor remove');
 
 -- ── An Admin ────────────────────────────────────────────────────────────────────────────────────
 select tests.authenticate_as(pg_temp.uid('tao'));
@@ -73,8 +79,32 @@ select is(pg_temp.hint_of($$ select public.add_forbidden_phrase('gambling_en', '
           'a phrase already in the list, as the matcher sees it, is refused');
 select is(pg_temp.hint_of($$ select public.add_forbidden_phrase('gambling_th', 'รับเครดิตฟรี', 'n') $$), 'phrase_found',
           'a phrase on a live site’s clean page is refused');
+select is(pg_temp.hint_of($$ select public.add_forbidden_phrase('gambling_en', 'of&nbsp;the', 'n') $$), 'phrase_markup',
+          'an entity is refused: the matcher would read it as a space (security review)');
+select is(pg_temp.hint_of($$ select public.add_forbidden_phrase('gambling_en', '<script src', 'n') $$), 'phrase_markup',
+          'markup is refused');
+select is(pg_temp.hint_of(format($$ select public.add_forbidden_phrase('gambling_en', %L, 'n') $$,
+            'slot' || chr(160) || 'online')), 'phrase_taken',
+          'a no-break space folds like the matcher’s, so the duplicate is caught');
+select is(pg_temp.hint_of(format($$ select public.check_forbidden_phrase(%L) $$, repeat('a', 201))), 'phrase_too_long',
+          'check takes no more than the dialog sends');
 select is(pg_temp.hint_of(format($$ select public.add_forbidden_phrase('brands', %L, 'n') $$, repeat('ab ', 21))),
           'phrase_too_long', 'at most 60 characters');
+
+select is(pg_temp.hint_of($$ select public.add_forbidden_phrase('gambling_th', E'\tรับเครดิตฟรี', 'n') $$), 'phrase_found',
+          'a tab in front doesn’t get a phrase past the page check (db-reviewer)');
+select is(pg_temp.hint_of(format($$ select public.add_forbidden_phrase('brands', 'new brand phrase', %L) $$, repeat('n', 501))),
+          'note_too_long', 'a note of at most 500 characters');
+select is((public.check_forbidden_phrase('time slot') ->> 'found')::int, 1, 'check counts the sites it was found on');
+
+-- A page at the monitor's old URL isn't searched.
+reset role;
+update public.crawler_clean_pages set url = 'https://old.example.test/';
+select tests.authenticate_as(pg_temp.uid('tao'));
+select is(public.check_forbidden_phrase('time slot') -> 'hits', '[]'::jsonb, 'a page of an old URL isn’t searched');
+reset role;
+update public.crawler_clean_pages c set url = m.url from public.monitors m where m.id = c.monitor_id;
+select tests.authenticate_as(pg_temp.uid('tao'));
 
 create temp table added (id uuid) on commit drop;
 grant all on added to authenticated;

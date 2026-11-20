@@ -192,7 +192,7 @@ export const RETENTION: readonly TierFact[] = [
   { k: 'Daily roll-ups', v: '2 years' },
   { k: 'Crawler checks, verifier screenshots', v: '30 days' },
   // S17 PR 3c (D-069): what "Check phrase" searches; replaced each run, pruned when a site stops.
-  { k: 'Newest clean page per site', v: 'Until replaced' },
+  { k: 'Newest clean page per site', v: 'Replaced each crawler run · removed when a site stops' },
   { k: 'Incidents and the audit log', v: 'Kept' },
 ];
 

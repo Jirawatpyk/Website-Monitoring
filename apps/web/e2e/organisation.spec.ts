@@ -126,7 +126,7 @@ test.describe('organisation (local Supabase)', () => {
     const leftover = page.getByRole('button', { name: /^Remove e2e slot vip room / });
     while ((await leftover.count()) > 0) {
       await leftover.first().click();
-      const dialog = page.getByRole('dialog');
+      const dialog = page.getByRole('alertdialog');
       await dialog.getByRole('textbox', { name: /Change note/ }).fill('E2E clean-up');
       await dialog.getByRole('button', { name: 'Remove and log' }).click();
       await expect(page.getByText(/^Removed “e2e slot vip room” /)).toBeFocused();
@@ -148,7 +148,7 @@ test.describe('organisation (local Supabase)', () => {
 
     await openGroup();
     await page.getByRole('button', { name: 'Remove e2e slot vip room from Gambling · English' }).click();
-    const remove = page.getByRole('dialog', { name: 'Remove “e2e slot vip room”?' });
+    const remove = page.getByRole('alertdialog', { name: 'Remove “e2e slot vip room”?' });
     await remove.getByRole('textbox', { name: /Change note/ }).fill('E2E clean-up');
     await remove.getByRole('button', { name: 'Remove and log' }).click();
     await expect(

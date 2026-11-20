@@ -94,12 +94,13 @@ const THAI_MARKS = /[ัิ-ฺ็-๎]/gu;
  * "time slot"; brands like "ufabet" pass. `private.phrase_is_short` is the same rule in SQL.
  */
 export function isShortPhrase(phrase: string): boolean {
-  const p = normalizeForMatch(cleanPhrase(phrase));
+  const p = normalizeForMatch(cleanPhrase(phrase)).trim();
   if (p.includes(' ')) return false;
-  return THAI.test(p) ? p.replace(THAI_MARKS, '').length < 4 : p.length < 6;
+  // Characters, as SQL's char_length counts them (an emoji is one).
+  return THAI.test(p) ? [...p.replace(THAI_MARKS, '')].length < 4 : [...p].length < 6;
 }
 
-export type PhraseRefusal = 'empty' | 'too_long' | 'short' | 'taken';
+export type PhraseRefusal = 'empty' | 'too_long' | 'markup' | 'short' | 'taken';
 
 /** Why a new phrase can't join the list, before any site is checked; null when it may be checked. */
 export function phraseRefusal(phrase: string, list: readonly string[]): PhraseRefusal | null {
@@ -107,6 +108,8 @@ export function phraseRefusal(phrase: string, list: readonly string[]): PhraseRe
   if (p === '') return 'empty';
   // Characters, as the table counts them (char_length), not UTF-16 units.
   if ([...p].length > MAX_PHRASE_LENGTH) return 'too_long';
+  // Words only: "of&nbsp;the" would be "of the" to the matcher (security review, D-069).
+  if (/[&<>]/u.test(p)) return 'markup';
   if (isShortPhrase(p)) return 'short';
   const needle = normalizeForMatch(p);
   if (list.some((q) => normalizeForMatch(cleanPhrase(q)) === needle)) return 'taken';

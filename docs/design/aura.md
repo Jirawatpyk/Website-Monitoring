@@ -55,6 +55,10 @@ A new request goes in the doc (template at its foot) and here.
 
 Open (stand-in in DxT until AURA ships):
 
+- **Request 26 — a removable `Tag` that is 44 px to touch** (5.76, 20 Nov 2026, S17 PR 3c).
+  - A removable Tag ignores `touchHeight`, so its × is 28 px.
+  - Settings › Organisation's forbidden phrases are removable from md, and an 820 tablet is a touch device.
+  - The stand-in is the drawn 28 px × (D-069). Use the request once it ships.
 - **Request 24 — BottomNav `hideOnScroll`: a tap leaves focus on the tab, so the bar never hides on the next page** (5.76, 30 Oct 2026).
   - AURA keeps the bar while focus is in it, which is right for a keyboard. But a tap on Chrome / Android also focuses the tab, and the BottomNav stays mounted across client-side navigation, so the bar stayed put on the new page however far you scrolled. Long pages like On-call showed it most.
   - **Stand-in:** `components/app-shell/phone-nav.tsx` wraps BottomNav in a `display: contents` div that blurs the tab on a pointer click (`event.detail > 0`). A keyboard's Enter is `detail` 0, so keyboard focus stays (test `phone-nav.test.tsx`).

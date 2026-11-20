@@ -194,7 +194,7 @@ describe('shared forbidden words (S17 PR 3c)', () => {
   });
 
   it('check reads the counts and hits; a bad answer or a refusal says so', async () => {
-    const answer = { sites: 2, checked: 1, unchecked: ['B'], hits: [] };
+    const answer = { sites: 2, checked: 1, unchecked: ['B'], found: 0, hits: [] };
     const ok = {
       deps: {
         db: { rpc: vi.fn().mockResolvedValue({ data: answer, error: null }) },

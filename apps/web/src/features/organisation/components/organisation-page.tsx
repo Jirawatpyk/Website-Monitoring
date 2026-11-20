@@ -166,7 +166,7 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
       <ClientsSection rows={clientRows(data.clients)} />
 
       <HolidaysSection holidays={data.holidays} hours={data.hoursNow} now={new Date(data.now)} />
-      <ForbiddenSection phrases={data.phrases} />
+      <ForbiddenSection phrases={data.phrases} liveSites={data.sites.length} />
 
       <div id="data-kept" className="grid scroll-mt-18 lg:scroll-mt-4 gap-4 md:grid-cols-2">
         <DataKept bytes={data.storageBytes} />

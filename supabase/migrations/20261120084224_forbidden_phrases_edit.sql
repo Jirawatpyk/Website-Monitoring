@@ -16,14 +16,26 @@
 
 set local lock_timeout = '5s';
 
--- What the matcher looks for: lower case, runs of whitespace as one space.
+-- A phrase with its spaces as the matcher folds them (JS \s, which Postgres \s may not cover: the
+-- no-break and other Unicode spaces, U+FEFF), trimmed. Entities never reach here: a phrase with & < >
+-- is refused (security review: "of&nbsp;the" would be "of the" to the matcher).
+create function private.phrase_clean(p_phrase text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select btrim(regexp_replace(coalesce(p_phrase, ''), '[\s\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+', ' ', 'g'));
+$$;
+
+-- What the matcher looks for: the clean phrase in lower case.
 create function private.phrase_needle(p_phrase text)
 returns text
 language sql
 immutable
 set search_path = ''
 as $$
-  select lower(regexp_replace(btrim(coalesce(p_phrase, '')), '\s+', ' ', 'g'));
+  select lower(private.phrase_clean(p_phrase));
 $$;
 
 -- A single short word (spec §41 item 5): no space, and under 6 letters — or, with any Thai in it,
@@ -49,6 +61,8 @@ language sql
 stable
 set search_path = ''
 as $$
+  -- Each page is searched once (db-reviewer: a late match walked it three times); the snippet is cut
+  -- only for the five hits returned, and the counts never carry a body.
   with live as (
     select m.id, m.url, s.id as site_id, s.name
     from public.monitors m
@@ -56,26 +70,37 @@ as $$
     where m.is_primary and m.enabled and m.removed_at is null and s.is_active
   ),
   pages as (
-    select l.site_id, l.name, c.view, c.checked_at, c.body
+    select l.site_id, l.name, c.monitor_id, c.view, c.checked_at
     from live l
     join public.crawler_clean_pages c on c.monitor_id = l.id and c.url = l.url
   ),
+  found as (
+    select p.site_id, p.name, p.monitor_id, p.view, p.checked_at, x.pos
+    from pages p
+    join public.crawler_clean_pages c on c.monitor_id = p.monitor_id and c.view = p.view
+    cross join lateral (select position(p_needle in c.body) as pos) x
+    where p_needle <> '' and x.pos > 0
+  ),
   hits as (
-    select distinct on (site_id) site_id, name, view, checked_at,
-      substring(body from greatest(position(p_needle in body) - 80, 1)
-                for char_length(p_needle) + 160) as snippet
-    from pages
-    where p_needle <> '' and position(p_needle in body) > 0
-    order by site_id, checked_at desc
+    select h.* from (
+      select distinct on (site_id) * from found order by site_id, checked_at desc
+    ) h
+    order by name
+    limit 5
   )
   select jsonb_build_object(
     'sites', (select count(*) from live),
     'checked', (select count(distinct site_id) from pages),
     'unchecked', coalesce((select jsonb_agg(name order by name) from live
                            where site_id not in (select site_id from pages)), '[]'::jsonb),
-    'hits', coalesce((select jsonb_agg(jsonb_build_object('site', name, 'view', view,
-                       'checkedAt', checked_at, 'snippet', snippet) order by name)
-                      from (select * from hits order by name limit 5) h), '[]'::jsonb)
+    'found', (select count(distinct site_id) from found),
+    'hits', coalesce((
+      select jsonb_agg(jsonb_build_object('site', h.name, 'view', h.view, 'checkedAt', h.checked_at,
+        'snippet', substring(c.body from greatest(h.pos - 80, 1) for char_length(p_needle) + 160))
+        order by h.name)
+      from hits h
+      join public.crawler_clean_pages c on c.monitor_id = h.monitor_id and c.view = h.view
+    ), '[]'::jsonb)
   );
 $$;
 
@@ -88,6 +113,9 @@ set search_path = ''
 as $$
 begin
   perform private.require_admin('Only an Admin can check a forbidden phrase');
+  if char_length(coalesce(p_phrase, '')) > 200 then
+    raise exception 'Up to 60 characters' using errcode = '22023', hint = 'phrase_too_long';
+  end if;
   return private.phrase_hits(private.phrase_needle(p_phrase));
 end;
 $$;
@@ -117,9 +145,10 @@ returns uuid
 language plpgsql
 security definer
 set search_path = ''
+set lock_timeout = '5s'
 as $$
 declare
-  v_phrase text := btrim(regexp_replace(coalesce(p_phrase, ''), '\s+', ' ', 'g'));
+  v_phrase text := private.phrase_clean(p_phrase);
   v_needle text := private.phrase_needle(p_phrase);
   v_note text;
   v_hits jsonb;
@@ -136,6 +165,9 @@ begin
   if char_length(v_phrase) > 60 then
     raise exception 'Up to 60 characters' using errcode = '22023', hint = 'phrase_too_long';
   end if;
+  if v_phrase ~ '[&<>]' then
+    raise exception 'Use words only — no &, < or >' using errcode = '22023', hint = 'phrase_markup';
+  end if;
   if private.phrase_is_short(v_phrase) then
     raise exception 'Use a phrase — a single short word is refused'
       using errcode = '22023', hint = 'phrase_short';
@@ -144,7 +176,8 @@ begin
   if (select count(*) from public.forbidden_phrases) >= 300 then
     raise exception 'The list holds at most 300 phrases' using errcode = '22023', hint = 'phrases_full';
   end if;
-  if exists (select 1 from public.forbidden_phrases where private.phrase_needle(phrase) = v_needle) then
+  if exists (select 1 from public.forbidden_phrases
+             where lower(regexp_replace(phrase, '\s+', ' ', 'g')) = v_needle) then
     raise exception 'Already in the list' using errcode = '23505', hint = 'phrase_taken';
   end if;
   v_hits := private.phrase_hits(v_needle);
@@ -167,6 +200,7 @@ returns void
 language plpgsql
 security definer
 set search_path = ''
+set lock_timeout = '5s'
 as $$
 declare
   v_note text;
@@ -190,6 +224,7 @@ begin
 end;
 $$;
 
+revoke execute on function private.phrase_clean(text) from public, anon, authenticated;
 revoke execute on function private.phrase_needle(text) from public, anon, authenticated;
 revoke execute on function private.phrase_is_short(text) from public, anon, authenticated;
 revoke execute on function private.phrase_hits(text) from public, anon, authenticated;

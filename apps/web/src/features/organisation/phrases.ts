@@ -27,6 +27,9 @@ export interface PhraseGroup {
 
 export { MAX_PHRASE_LENGTH };
 
+/** The most phrases the list holds (add_forbidden_phrase's cap, D-069). */
+export const MAX_PHRASES = 300;
+
 export const GROUP_OPTIONS = FORBIDDEN_GROUP_IDS.map((id) => ({
   value: id,
   label: FORBIDDEN_GROUP_LABELS[id],
@@ -55,6 +58,7 @@ export function phraseGroups(phrases: readonly Phrase[]): PhraseGroup[] {
 export const REFUSAL_WORDS: Record<PhraseRefusal, string> = {
   empty: 'Type the phrase to check.',
   too_long: `Up to ${MAX_PHRASE_LENGTH} characters.`,
+  markup: 'Use words only — no &, < or >.',
   short:
     'Use a phrase — a single short word is refused: “slot” would also match “time slot” on a booking page.',
   taken: 'Already in the list.',
@@ -65,6 +69,8 @@ export interface PhraseCheck {
   sites: number;
   checked: number;
   unchecked: string[];
+  /** The sites it was found on (`hits` holds at most five). */
+  found: number;
   hits: { site: string; view: string; checkedAt: string; snippet: string }[];
 }
 
@@ -107,9 +113,22 @@ const when = (iso: string) => {
   return `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
 };
 
+/**
+ * `clear`: checked on every live site. `partial`: not found, but some sites (or all) had no clean page to
+ * check — it can still be added, said in the warning tone (spec-checker; D-069 settles the words).
+ */
 export type CheckWords =
   | { kind: 'found'; title: string; snippet: Snippet; line: string }
-  | { kind: 'clear'; title: string; lines: string[] };
+  | { kind: 'clear' | 'partial'; title: string; lines: string[] };
+
+/** The Add dialog's footer line for each state (board OrganisationLists). */
+export function checkFoot(words: CheckWords | null): string {
+  if (!words) return 'Checked against every live site before it’s saved.';
+  if (words.kind === 'found') return 'Not saved — change the phrase and check again.';
+  return words.kind === 'clear'
+    ? 'Checked · ready to add'
+    : 'Not checked against every site — it can still be added';
+}
 
 /** The Add dialog's box after "Check phrase" (board OrganisationLists, D-069: counts what was checked). */
 export function checkWords(check: PhraseCheck, phrase: string): CheckWords {
@@ -117,7 +136,9 @@ export function checkWords(check: PhraseCheck, phrase: string): CheckWords {
   if (hit) {
     return {
       kind: 'found',
-      title: `Found on ${hit.site}’s home page — this would open a PROBLEM on a healthy site`,
+      title: `Found on ${hit.site}’s home page${
+        check.found > 1 ? ` and ${plural(check.found - 1, 'more site')}` : ''
+      } — this would open a PROBLEM on a healthy site`,
       snippet: snippetOf(hit.snippet, phrase),
       line: `Last clean fetch of ${plural(check.checked, 'site')} · ${hit.site}, ${when(hit.checkedAt)}. Make the phrase longer so it only matches spam.`,
     };
@@ -126,7 +147,7 @@ export function checkWords(check: PhraseCheck, phrase: string): CheckWords {
     'Every site is checked for it from the next round (about 1–5 min); the Googlebot and Google-search views from the next crawler run (within 30 min). A site that has it then opens PROBLEM · Keyword.';
   if (check.checked === 0) {
     return {
-      kind: 'clear',
+      kind: 'partial',
       title: 'No site has a clean fetch yet — nothing was checked',
       lines: [next],
     };
@@ -136,7 +157,7 @@ export function checkWords(check: PhraseCheck, phrase: string): CheckWords {
       ? `Not found on ${check.sites === 1 ? 'the site’s' : `any of the ${check.sites} sites’`} last clean fetch`
       : `Not found on the ${check.checked} of ${plural(check.sites, 'site')} with a clean fetch`;
   return {
-    kind: 'clear',
+    kind: check.checked === check.sites ? 'clear' : 'partial',
     title,
     lines: [
       ...(check.unchecked.length ? [`Not checked (no clean fetch yet): ${check.unchecked.join(', ')}.`] : []),
@@ -157,4 +178,4 @@ export function removeWords(group: ForbiddenGroup) {
 export const addedLine = (phrase: string, group: ForbiddenGroup) =>
   `Added “${phrase}” to ${FORBIDDEN_GROUP_LABELS[group]} · logged · sites are checked for it from the next round`;
 export const removedLine = (phrase: string, group: ForbiddenGroup) =>
-  `Removed “${phrase}” from ${FORBIDDEN_GROUP_LABELS[group]} · logged · sites stop being checked for it from the next round`;
+  `Removed “${phrase}” from ${FORBIDDEN_GROUP_LABELS[group]} · logged`;

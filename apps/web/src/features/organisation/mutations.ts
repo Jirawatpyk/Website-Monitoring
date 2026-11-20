@@ -118,6 +118,7 @@ function phraseRefusalWords(error: RpcError): SaveHoursResult {
   if (error.code === '42501')
     return { ok: false, message: 'Only an Admin can change the shared forbidden words.' };
   if (error.hint === 'phrase_short') return { ok: false, message: REFUSAL_WORDS.short };
+  if (error.hint === 'phrase_markup') return { ok: false, message: REFUSAL_WORDS.markup };
   if (error.hint === 'phrase_taken' || error.code === '23505')
     return { ok: false, message: REFUSAL_WORDS.taken };
   if (error.hint === 'phrase_found')
@@ -136,6 +137,7 @@ const phraseCheckSchema = z.object({
   sites: z.number().int(),
   checked: z.number().int(),
   unchecked: z.array(z.string()),
+  found: z.number().int(),
   hits: z.array(z.object({ site: z.string(), view: z.string(), checkedAt: z.string(), snippet: z.string() })),
 });
 

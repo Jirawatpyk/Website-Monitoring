@@ -26,6 +26,7 @@ const check = (over: Partial<PhraseCheck> = {}): PhraseCheck => ({
   sites: 17,
   checked: 17,
   unchecked: [],
+  found: 0,
   hits: [],
   ...over,
 });
@@ -53,6 +54,13 @@ describe('the check’s words (D-069: it counts what was checked)', () => {
     });
   });
 
+  it('found on several sites says how many more', () => {
+    const hit = { site: 'MuvMi', view: 'plain', checkedAt: '2026-09-25T02:30:00Z', snippet: 'x y' };
+    expect(checkWords(check({ found: 3, hits: [hit] }), 'x y')).toMatchObject({
+      title: 'Found on MuvMi’s home page and 2 more sites — this would open a PROBLEM on a healthy site',
+    });
+  });
+
   it('clear on every site', () => {
     expect(checkWords(check(), 'slot vip room')).toMatchObject({
       kind: 'clear',
@@ -63,7 +71,7 @@ describe('the check’s words (D-069: it counts what was checked)', () => {
   it('clear on the sites it could check, naming the ones it couldn’t', () => {
     const words = checkWords(check({ checked: 15, unchecked: ['BA China', 'Cando Asia'] }), 'slot vip room');
     expect(words).toMatchObject({
-      kind: 'clear',
+      kind: 'partial',
       title: 'Not found on the 15 of 17 sites with a clean fetch',
       lines: [
         expect.stringMatching(/^Not checked \(no clean fetch yet\): BA China, Cando Asia\.$/),
@@ -73,7 +81,7 @@ describe('the check’s words (D-069: it counts what was checked)', () => {
   });
 
   it('nothing to check yet says so', () => {
-    expect(checkWords(check({ checked: 0 }), 'x y').kind).toBe('clear');
+    expect(checkWords(check({ checked: 0 }), 'x y').kind).toBe('partial');
     expect((checkWords(check({ checked: 0 }), 'x y') as { title: string }).title).toBe(
       'No site has a clean fetch yet — nothing was checked',
     );

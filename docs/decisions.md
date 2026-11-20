@@ -173,6 +173,32 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - **The board's footer line** ("Checked · ready to add", …) sits above the buttons, not beside them. At the dialog's width it would wrap the primary button onto its own row.
 - **The chips** are AURA `Tag` with `onRemove` (28 px ×, as drawn) from md. Phones show plain tags. A removable Tag ignores `touchHeight`, so on a touch tablet (820) the × is under 44 px. That is an AURA request; until it ships, the × stays as drawn.
 - **Schema lag:** the new functions answer `PGRST202` during the deploy and the page says "Forbidden words can't be changed for a minute — try again shortly". The 3b table exists by then.
+- **From the reviews (20 Nov):**
+  - **Words only.** A phrase with `&`, `<` or `>` is refused in TS and SQL (security review: `of&nbsp;the` passed every check and would have matched "of the" on every site).
+    - SQL folds every space the matcher folds (`private.phrase_clean`): the Unicode spaces and U+FEFF, collapsed before trimming.
+    - "Check phrase" takes at most 200 characters.
+    - Each change waits at most 5 s for the lock.
+  - **The tone follows the coverage.**
+    - Success only when every live site had a page.
+    - Some or none checked: the warning tone, with the footer "Not checked against every site — it can still be added".
+    - Found on several sites: "Found on X's home page and N more sites".
+  - **No dead controls (§14.16).**
+    - A group's last phrase shows no ×.
+    - At 300 phrases "Add phrase" is off with "The list holds 300 phrases — remove one first."
+    - A refusal at save sends the dialog back to "Check phrase".
+  - **Focus and announcement.** The check's result is in one live region that is always mounted, and it takes focus: the pressed button may now be off.
+  - **Language marks.** Only the phrase carries `lang`, never the × button's English name. That covers the snippet and the Remove title.
+  - **Dialogs.**
+    - Both phrase dialogs ignore a click on the scrim, so a typed note isn't lost.
+    - Remove is an `alertdialog`.
+    - The Remove result line is the board's ("Removed “…” from Gambling · Thai · logged").
+  - **Phone.** The heading is "SHARED FORBIDDEN WORDS · 36" and the line is "Checked on every site on top of its own list. Groups stay closed until you open one." (MOrganisationLists).
+  - **Groups.** Group names are `h3`, as the holiday years are. Show and Hide carry the eye icons. After an add, the group that was changed is opened.
+  - **The short-word rule with mixed Thai and Latin** counts every character, not every Thai one, once any Thai is present ("pgสล" passes). That is the intended rule.
+  - **Left for later:**
+    - the Organisation loading skeleton's blocks for the two lists, shared with 3a;
+    - the whole phone row as the tap target;
+    - the response-hours dialog's scrim.
 
 **Impact.** S17 PR 1: migration `organisation_hours` (`save_response_hours`, `organisation_storage`), `features/organisation`, `/settings/organisation`, the Settings select, the hours copy on Sites, "Edit in Organisation" on Escalation and Profile, the audit words. PR 2: Alert channels (read-only routing, the test alert, the delivery log). PR 3a: migration `company_holidays_edit` (`kind`, `add_company_holiday` / `rename_company_holiday` / `remove_company_holiday`, audited by the row trigger) and the holiday section. PR 3b: the forbidden-word list. Plan: S17 Done-when 4–5; backlog lines for D-059 and D-046.
 
