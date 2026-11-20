@@ -216,7 +216,7 @@ describe('the ladder in words', () => {
         level: 'L0',
         when: '0 min',
         who: 'Owner inside response hours, on-call outside · Chat @mention + Alerts Space + email',
-        ack: 'Sent at once',
+        ack: 'Chat at once, email after 5 min',
         fyi: false,
       },
       {

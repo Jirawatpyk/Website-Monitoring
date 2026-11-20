@@ -90,6 +90,38 @@ describe('GuidePage (Guide, MGuide)', () => {
     expect(headings.some((h) => h === document.activeElement)).toBe(true);
   });
 
+  it('typing in search after a pick keeps focus in the field (code review)', async () => {
+    const user = userEvent.setup();
+    renderGuide();
+    await user.click(within(desktopNav()).getByRole('button', { name: /Mute vs maintenance/ }));
+    const field = screen.getAllByRole('textbox', { name: 'Search the guide' })[0]!;
+    await user.click(field);
+    await user.type(field, 'root cause');
+    expect(field).toHaveFocus();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Recover, root cause & resolve' }),
+    ).toBeInTheDocument();
+  });
+
+  it('back from a phone topic puts focus on its row', async () => {
+    const user = userEvent.setup();
+    const view = () => (
+      <GuidePage
+        desktop={guideTopics(FACTS, 'desktop')}
+        phone={guideTopics(FACTS, 'phone')}
+        mine="Responder"
+      />
+    );
+    const { rerender, container } = render(view());
+    const list = screen.getByRole('group', { name: 'Filter by role' }).parentElement!;
+    await user.click(within(list).getByRole('button', { name: /Client updates/ }));
+    nav.topic = 'client';
+    rerender(view());
+    nav.topic = null;
+    rerender(view());
+    expect(container.querySelector('[data-topic="client"]')).toHaveFocus();
+  });
+
   it('a Responder isn’t offered Admin-only screens', () => {
     nav.topic = 'mute';
     renderGuide();

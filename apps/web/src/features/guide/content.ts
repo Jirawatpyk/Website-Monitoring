@@ -9,7 +9,7 @@ import {
   type IncidentState,
   type SiteStatus,
 } from '@dxt/shared';
-import { GUIDE_ROLES, type GuideGroup, type GuideLayout, type GuideRole, type TopicLike } from './model';
+import { GUIDE_ROLES, type GuideLayout, type TopicLike } from './model';
 
 /**
  * The User guide's topics (boards Guide, MGuide; spec §18), written from the decisions rather than
@@ -176,7 +176,12 @@ export function ladderRows(steps: readonly EscalationStep[]): LadderRow[] {
     level: `L${s.level}`,
     when: whenOf(s),
     who: `${cap(whoOf(s, 'owner inside response hours, on-call outside'))} · ${channelsOf(s)}`,
-    ack: s.level === 0 ? 'Sent at once' : s.fyi ? 'Also after an ack: FYI, no call' : 'Stopped by ack',
+    ack:
+      s.level === 0
+        ? 'Chat at once, email after 5 min'
+        : s.fyi
+          ? 'Also after an ack: FYI, no call'
+          : 'Stopped by ack',
     fyi: !!s.fyi,
   }));
 }
@@ -304,7 +309,6 @@ function drafts(f: GuideFacts): Draft[] {
         { title: 'Tier 2 DOWN', steps: f.policies.t2 },
         { title: 'Tier 3 DOWN', steps: f.policies.t3 },
       ];
-  const problemL1 = f.policies.problem.find((s) => s.level === 1);
 
   const signin: Draft = {
     id: 'signin',
@@ -525,7 +529,7 @@ function drafts(f: GuideFacts): Draft[] {
           })),
           {
             title: 'PROBLEM · all tiers',
-            text: `L0 owner + Alerts Space · a reminder every ${f.problemReminderMin} min${problemL1 ? ` · L1 +${problemL1.delayMin} min ${whoOf(problemL1)}` : ''}. Tier 1 outside response hours goes to on-call; Tier 2–3 outside response hours is held until the next opening.`,
+            text: `${policyLine(f.policies.problem)} · a reminder every ${f.problemReminderMin} min. Tier 1 outside response hours goes to on-call; Tier 2–3 outside response hours is held until the next opening.`,
           },
           {
             title: 'Until someone acknowledges',
@@ -852,7 +856,7 @@ function drafts(f: GuideFacts): Draft[] {
     'Used-in check:',
     'before you change a role or deactivate someone, the dialog lists where they’re used — site owner or backup, client AM, on-call shifts — and you reassign each first. Nobody changes their own role, and the last active Admin can’t be demoted.',
   );
-  const adminCallout = oneAdminCallout(f, 'Sign-offs and monitor-fault emails');
+  const adminCallout = oneAdminCallout(f, 'Monitor-fault emails');
 
   const admin: Draft = {
     id: 'admin',
@@ -928,6 +932,3 @@ export function guideTopics(f: GuideFacts, layout: GuideLayout): Topic[] {
     .filter((d) => (layout === 'phone' ? d.id !== 'admin' : !PHONE_ONLY.has(d.id)))
     .map((d) => finish({ ...d, related: d.related.filter((r) => f.isAdmin || !ADMIN_ONLY.has(r.href)) }));
 }
-
-/** The group a topic sits under (both layouts). */
-export type { GuideGroup, GuideRole };

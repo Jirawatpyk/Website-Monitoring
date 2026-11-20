@@ -55,19 +55,30 @@ export function GuidePage({
     return nextSelection(desktop, mine, '', wanted) ?? wanted;
   });
 
-  // Focus follows a pick (desktop) or an open (phone) — after React rendered the target.
+  // Focus follows a pick (desktop) or an open (phone) — after React rendered the target. A pick
+  // moves focus once; a selection the search or a chip changes leaves it in the field (code review).
   const articleHeading = useRef<HTMLHeadingElement>(null);
   const phoneHeading = useRef<HTMLHeadingElement>(null);
+  const phoneList = useRef<HTMLDivElement>(null);
   const picked = useRef(false);
   useEffect(() => {
-    if (picked.current) articleHeading.current?.focus();
+    if (!picked.current) return;
+    picked.current = false;
+    articleHeading.current?.focus();
   }, [sel]);
-  const opened = useRef(false);
+  // The topic the phone last opened: Back returns focus to its row.
+  const opened = useRef<string | null>(null);
   useEffect(() => {
-    if (opened.current && openId) phoneHeading.current?.focus();
+    if (!opened.current) return;
+    if (openId) phoneHeading.current?.focus();
+    else {
+      phoneList.current?.querySelector<HTMLElement>(`[data-topic="${opened.current}"]`)?.focus();
+      opened.current = null;
+    }
   }, [openId]);
 
   const refilter = (nextChip: Chip, nextQ: string) => {
+    picked.current = false;
     setChip(nextChip);
     setQ(nextQ);
     const id = nextSelection(desktop, nextChip, nextQ, sel);
@@ -79,7 +90,7 @@ export function GuidePage({
     setSel(id);
   };
   const open = (id: string) => {
-    opened.current = true;
+    opened.current = id;
     router.push(`${pathname}?topic=${id}`);
   };
 
@@ -230,7 +241,7 @@ export function GuidePage({
       </div>
 
       {/* ── Phone (MGuide) ────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 lg:hidden">
+      <div ref={phoneList} className="flex flex-col gap-3 lg:hidden">
         {phoneTopic ? (
           <PhoneArticle topic={phoneTopic} phone={phone} headingRef={phoneHeading} onOpen={open} />
         ) : (
@@ -284,6 +295,7 @@ function TopicRow({ topic, onOpen }: { topic: Topic; onOpen: (id: string) => voi
     <button
       type="button"
       onClick={() => onOpen(topic.id)}
+      data-topic={topic.id}
       className="flex min-h-15 w-full cursor-pointer items-center gap-3 border-0 border-b border-border-subtle bg-transparent py-2.5 pr-2.5 pl-3.5 text-left text-fg-primary last:border-b-0 hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
     >
       <span className="flex size-8 shrink-0 items-center justify-center rounded-aura-md bg-bg-canvas text-fg-secondary [&_svg]:size-4">
