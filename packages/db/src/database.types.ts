@@ -1014,6 +1014,9 @@ isOneToOne: false
 "add_company_holiday":
 { Args: { "p_day": string,"p_kind": string,"p_name": string }; Returns: string
                            },
+"add_forbidden_phrase":
+{ Args: { "p_group": string,"p_note": string,"p_phrase": string }; Returns: string
+                           },
 "add_incident_note":
 { Args: { "p_incident_id": string,"p_text": string }; Returns: string
                            },
@@ -1028,6 +1031,9 @@ isOneToOne: false
                            },
 "change_user_role":
 { Args: { "p_reassign"?: Json,"p_role": Database["public"]['Enums']["app_role"],"p_user_id": string }; Returns: undefined
+                           },
+"check_forbidden_phrase":
+{ Args: { "p_phrase": string }; Returns: Json
                            },
 "claim_notifications":
 { Args: { "p_account"?: boolean,"p_channel": Database["public"]['Enums']["notification_channel"],"p_incident_id"?: string,"p_limit"?: number,"p_oncall"?: boolean,"p_reports"?: boolean,"p_series"?: boolean }; Returns: {
@@ -1446,6 +1452,9 @@ isOneToOne: false
                            },
 "remove_company_holiday":
 { Args: { "p_id": string }; Returns: undefined
+                           },
+"remove_forbidden_phrase":
+{ Args: { "p_id": string,"p_note": string }; Returns: undefined
                            },
 "rename_company_holiday":
 { Args: { "p_id": string,"p_name": string }; Returns: undefined

@@ -79,6 +79,39 @@ export function normalizeForMatch(text: string): string {
 
 const NORMALIZED = new Map(FORBIDDEN_PHRASES.map((p) => [p, normalizeForMatch(p)]));
 
+/** A phrase as the list stores it: trimmed, runs of whitespace as one space (the table's rule). */
+export function cleanPhrase(phrase: string): string {
+  return phrase.replace(/\s+/gu, ' ').trim();
+}
+
+const THAI = /[฀-๿]/u;
+/** Thai vowel and tone marks that sit on a consonant: they don't count as characters (D-069). */
+const THAI_MARKS = /[ัิ-ฺ็-๎]/gu;
+
+/**
+ * S17 PR 3c (spec §41 item 5): a single short word is refused — no space, and under 6 letters, or
+ * (with Thai in it) under 4 Thai characters not counting vowel and tone marks. "slot" would match
+ * "time slot"; brands like "ufabet" pass. `private.phrase_is_short` is the same rule in SQL.
+ */
+export function isShortPhrase(phrase: string): boolean {
+  const p = normalizeForMatch(cleanPhrase(phrase));
+  if (p.includes(' ')) return false;
+  return THAI.test(p) ? p.replace(THAI_MARKS, '').length < 4 : p.length < 6;
+}
+
+export type PhraseRefusal = 'empty' | 'too_long' | 'short' | 'taken';
+
+/** Why a new phrase can't join the list, before any site is checked; null when it may be checked. */
+export function phraseRefusal(phrase: string, list: readonly string[]): PhraseRefusal | null {
+  const p = cleanPhrase(phrase);
+  if (p === '') return 'empty';
+  if (p.length > MAX_PHRASE_LENGTH) return 'too_long';
+  if (isShortPhrase(p)) return 'short';
+  const needle = normalizeForMatch(p);
+  if (list.some((q) => normalizeForMatch(cleanPhrase(q)) === needle)) return 'taken';
+  return null;
+}
+
 /** The longest entry of a list, so a streaming reader keeps enough overlap between chunks. */
 export function longestPhrase(phrases: readonly string[]): number {
   return phrases.reduce((n, p) => Math.max(n, p.length), 0);

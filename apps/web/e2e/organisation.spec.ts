@@ -115,7 +115,9 @@ test.describe('organisation (local Supabase)', () => {
     // Holidays are listed without their buttons (§41 item 7).
     await expect(page.getByRole('heading', { name: 'Company holidays' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add holiday' })).toBeHidden();
-    await expect(page.getByText('Holidays change on a larger screen.', { exact: false })).toBeVisible();
+    await expect(
+      page.getByText('Holidays and phrases change on a larger screen.', { exact: false }),
+    ).toBeVisible();
     // The Settings pages are a select on a phone (§35.1).
     await page.locator('select.aura-select__native').first().selectOption({ label: 'Users & roles' });
     await expect(page).toHaveURL(/\/settings\/users$/);

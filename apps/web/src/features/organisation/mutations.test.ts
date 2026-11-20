@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { addHoliday, removeHoliday, renameHoliday, saveHours, type OrganisationDeps } from './mutations';
+import {
+  addHoliday,
+  addPhrase,
+  checkPhrase,
+  removeHoliday,
+  removePhrase,
+  renameHoliday,
+  saveHours,
+  type OrganisationDeps,
+} from './mutations';
 
 function db(error: { code?: string; hint?: string; message: string; details?: string } | null = null) {
   const rpc = vi.fn().mockResolvedValue({ data: null, error });
@@ -119,5 +128,91 @@ describe('company holidays (S17 PR 3a)', () => {
       message: 'Give the day a name.',
     });
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('shared forbidden words (S17 PR 3c)', () => {
+  const PID = '00000000-0000-4000-8000-000000000009';
+  const add = {
+    group: 'gambling_th' as const,
+    phrase: 'สล็อตเว็บตรง แตกง่าย',
+    note: 'Seen on a client site',
+  };
+
+  it('adds through the audited function with the note', async () => {
+    const { deps, rpc } = db();
+    expect(await addPhrase(add, deps)).toEqual({ ok: true });
+    expect(rpc).toHaveBeenCalledWith('add_forbidden_phrase', {
+      p_group: 'gambling_th',
+      p_phrase: 'สล็อตเว็บตรง แตกง่าย',
+      p_note: 'Seen on a client site',
+    });
+  });
+
+  it.each([
+    [{ code: '42501', message: 'x' }, 'Only an Admin can change the shared forbidden words.'],
+    [{ code: '22023', hint: 'phrase_short', message: 'x' }, /a single short word is refused/],
+    [{ code: '23505', hint: 'phrase_taken', message: 'x' }, 'Already in the list.'],
+    [{ code: '23505', message: 'duplicate key' }, 'Already in the list.'],
+    [
+      { code: '22023', hint: 'phrase_found', message: 'x', details: 'MuvMi' },
+      'Found on MuvMi’s home page — change the phrase and check again.',
+    ],
+    [
+      { code: '22023', hint: 'phrases_full', message: 'The list holds at most 300 phrases' },
+      'The list holds at most 300 phrases.',
+    ],
+    [
+      { code: '22023', hint: 'group_last', message: 'A group keeps at least one phrase' },
+      'A group keeps at least one phrase.',
+    ],
+    [
+      { code: 'PGRST202', message: 'x' },
+      'Forbidden words can’t be changed for a minute — try again shortly.',
+    ],
+    [{ code: '57014', message: 'timeout' }, 'Couldn’t save. Check your connection and try again.'],
+  ])('a refusal %o reads as words', async (error, words) => {
+    const r = await addPhrase(add, db(error).deps);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.message).toMatch(words);
+  });
+
+  it('refuses a missing note or a bad id before the database', async () => {
+    const { deps, rpc } = db();
+    expect(await addPhrase({ ...add, note: ' ' }, deps)).toEqual({
+      ok: false,
+      message: 'Add a short note — it goes in the audit log with the change.',
+    });
+    expect(await removePhrase({ id: 'nope', note: 'n' }, deps)).toMatchObject({ ok: false });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('removes with the note', async () => {
+    const { deps, rpc } = db();
+    expect(await removePhrase({ id: PID, note: 'Added by mistake' }, deps)).toEqual({ ok: true });
+    expect(rpc).toHaveBeenCalledWith('remove_forbidden_phrase', { p_id: PID, p_note: 'Added by mistake' });
+  });
+
+  it('check reads the counts and hits; a bad answer or a refusal says so', async () => {
+    const answer = { sites: 2, checked: 1, unchecked: ['B'], newest: null, hits: [] };
+    const ok = {
+      deps: {
+        db: { rpc: vi.fn().mockResolvedValue({ data: answer, error: null }) },
+      } as unknown as OrganisationDeps,
+    };
+    expect(await checkPhrase('slot vip room', ok.deps)).toEqual({ ok: true, check: answer });
+    const odd = {
+      deps: {
+        db: { rpc: vi.fn().mockResolvedValue({ data: { sites: 'x' }, error: null }) },
+      } as unknown as OrganisationDeps,
+    };
+    expect(await checkPhrase('slot vip room', odd.deps)).toEqual({
+      ok: false,
+      message: 'Couldn’t check. Try again.',
+    });
+    expect(await checkPhrase('slot vip room', db({ code: '57014', message: 't' }).deps)).toEqual({
+      ok: false,
+      message: 'Couldn’t check. Check your connection and try again.',
+    });
   });
 });

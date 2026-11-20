@@ -10,7 +10,7 @@ import {
   Select,
   TextField,
 } from '@jirawatpyk/aura-react';
-import { IconCheck, IconEye, IconInfo, IconPencil, IconPlus, IconTrash2 } from '@jirawatpyk/aura-react/icons';
+import { IconCheck, IconInfo, IconPencil, IconPlus, IconTrash2 } from '@jirawatpyk/aura-react/icons';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { FOCUS_TARGET } from '@/components/focus-target';
@@ -174,12 +174,6 @@ export function HolidaysSection({ holidays, hours, now }: { holidays: Holiday[];
       <span className="hidden text-xs text-fg-secondary md:inline">
         Past days aren’t listed and can’t be added or changed. The audit log keeps every add, rename and
         remove.
-      </span>
-      <span className="flex items-center gap-2 text-xs text-fg-secondary md:hidden">
-        <span className="flex" aria-hidden>
-          <IconEye size="sm" />
-        </span>
-        Holidays change on a larger screen.
       </span>
 
       {last?.kind === 'add' && (

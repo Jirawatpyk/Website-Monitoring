@@ -1,3 +1,4 @@
+import { FORBIDDEN_GROUP_LABELS } from '@dxt/shared';
 import {
   ESCALATION_CHANNEL_LABELS,
   ESCALATION_TARGET_LABELS,
@@ -172,6 +173,8 @@ export const ACTION_WORDS: Record<string, string> = {
   'holiday.create': 'Added holiday',
   'holiday.update': 'Changed holiday',
   'holiday.delete': 'Removed holiday',
+  'forbidden_phrase.create': 'Added forbidden phrase',
+  'forbidden_phrase.delete': 'Removed forbidden phrase',
   'escalation.update': 'Changed escalation',
   'organisation.response_hours': 'Changed response hours',
   'page_baseline.accept': 'Accepted page change',
@@ -234,6 +237,7 @@ const CONFIG_PREFIXES = [
   'monitor.',
   'client.',
   'holiday.',
+  'forbidden_phrase.',
   'escalation.',
   'organisation.',
   'page_baseline.',
@@ -707,7 +711,7 @@ export function sidesOf(action: string, before: Json | null, after: Json | null,
 }
 
 function nameOf(row: { [key: string]: Json }): string {
-  for (const key of ['name', 'path', 'url', 'day']) {
+  for (const key of ['name', 'path', 'url', 'day', 'phrase']) {
     const v = row[key];
     if (typeof v === 'string' && v)
       return key === 'day' && DATE_ONLY.test(v) ? (valueWords(key, v, { people: new Map() }) ?? v) : v;
@@ -726,6 +730,8 @@ export const SYSTEM_ALERT_WORDS: Record<string, string> = {
 };
 
 /** What an entity is called when nothing else names it ("Escalation policies", "On-call rotation"). */
+const GROUP_LABELS: Record<string, string> = FORBIDDEN_GROUP_LABELS;
+
 export function entityFallback(entity: string, before: Json | null, after: Json | null): string {
   const side = isObject(after) ? after : isObject(before) ? before : null;
   if (entity === 'system_alert' && side && typeof side.kind === 'string') {
@@ -735,6 +741,13 @@ export function entityFallback(entity: string, before: Json | null, after: Json 
   }
   if (entity === 'escalation') return 'Escalation policies';
   if (entity === 'organisation') return 'Response hours';
+  // S17 PR 3c: a phrase by its group (the phrase itself is in Before / After, not the Entity column).
+  if (entity === 'forbidden_phrase') {
+    const sides = [after, before].filter(isObject);
+    const group = sides.map((s) => s.group).find((v) => typeof v === 'string');
+    const label = typeof group === 'string' ? GROUP_LABELS[group] : undefined;
+    return label ? `Forbidden words · ${label}` : 'Forbidden words';
+  }
   if (entity === 'oncall_rotation') return 'On-call rotation';
   // An invite or a refused sign-in has no person yet: its address, or the domain (D-062 item 7).
   // A revoke keeps the address only on the before side, so both sides are read.
