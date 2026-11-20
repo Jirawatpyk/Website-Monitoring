@@ -139,7 +139,10 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
   - **Order:** the page is stored after the `crawler_checks` row, so monitoring never waits on it.
   - **Pruning:** after each run `crawler_prune_clean_pages` deletes every page the crawler no longer reads: a stopped site, a removed, disabled or no-longer-primary monitor, or a page of the monitor's old URL (each row keeps the URL it was fetched from). A soft removal never deletes the monitor row, so the cascade alone would keep them.
   - **The run's time:** the store and the prune are skipped once the run is past its 95 s fetch budget, so the margin stays for the log, the Healthchecks ping and the beat. A fetch's text is dropped from memory once it is stored.
-  - **Rewrite cost:** a page with a per-request token changes its hash every run and is rewritten whole each time. The rate is measured on staging and production after 3b; if it is high, fewer views are kept.
+  - **Rewrite cost:** a page with a per-request token changes its hash every run and is rewritten whole each time.
+    - Each crawler summary counts `cleanPages: { written, moved, late }`, so the rate is read from the production log after 3b, with no database read.
+    - If the rate is high, fewer views are kept.
+  - **The Data kept card** gets a row for the stored pages in 3c, with the editor that uses them: "Newest clean page per site · replaced each crawler run · removed when a site stops".
 - **Guards 3c must add** (reviews of 3b):
   - "Already in the list" compares phrases through `normalizeForMatch`, not only through the table's unique key. The key folds `\s` runs, but the matcher also folds `&nbsp;` and U+00A0.
   - A cap on the number of phrases, well under PostgREST's 1,000 rows and the agent's `.max(1000)` (proposed 300). It also bounds the crawler's CPU per fetch.

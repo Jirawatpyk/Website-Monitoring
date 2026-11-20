@@ -231,6 +231,15 @@ async function fetchFollowing(
 }
 
 /** The monitor's own origin, or its http → https upgrade on the default ports; never a downgrade. */
+/**
+ * The end of the text read so far that the next chunk's scan must see. No overlap (an empty list and no
+ * own words) keeps nothing: `slice(-0)` would keep the whole text and every chunk would re-scan it all
+ * (engine-reviewer, D-069).
+ */
+export function tailOf(text: string, overlap: number): string {
+  return overlap > 0 ? text.slice(-overlap) : '';
+}
+
 export function sameSite(url: URL, first: URL): boolean {
   if (url.origin === first.origin) return true;
   return (
@@ -319,8 +328,7 @@ async function readBody(
     if (scanForbidden) {
       const window = scanTail + text;
       for (const k of forbiddenIn(window, scanForbidden, shared)) found.add(k);
-      // An empty list with no own words has no overlap; slice(-0) would keep the whole text (engine-reviewer).
-      scanTail = scanOverlap > 0 ? window.slice(-scanOverlap) : '';
+      scanTail = tailOf(window, scanOverlap);
     }
   };
   // The sample: a read error here is the page failing to load, as before.

@@ -191,8 +191,9 @@ export async function runCrawler({
       !m.mustNotContain.some((k) => text.includes(k)) &&
       !endedOffSite(result, m.url, m.allowedRedirectDomains);
     // Past the fetch budget the run keeps its margin for the log and the pings (engine-reviewer).
-    const cleanError =
-      clean && typeof hashes !== 'string' && clock() - started <= CRAWLER_BUDGET_MS
+    const inBudget = clock() - started <= CRAWLER_BUDGET_MS;
+    const stored =
+      clean && typeof hashes !== 'string' && inBudget
         ? await storeCleanPage(db, hashes, {
             monitorId: m.id,
             view,
@@ -201,6 +202,7 @@ export async function runCrawler({
             text,
           })
         : null;
+    const cleanError = stored?.error ?? null;
     // The page text isn't kept past its store: a run holds no 3 MB strings until it ends (db-reviewer).
     delete result.text;
     return {
@@ -212,7 +214,16 @@ export async function runCrawler({
       stored: error?.message ?? null,
       baseline,
       baselineSet,
-      clean: clean && cleanError === null,
+      // What the store did, so the rewrite rate can be read off the log (D-069).
+      cleanStore: !stored
+        ? clean && typeof hashes !== 'string'
+          ? ('late' as const)
+          : null
+        : stored.error
+          ? null
+          : stored.written
+            ? ('written' as const)
+            : ('moved' as const),
       cleanError,
     };
   });
@@ -245,7 +256,11 @@ export async function runCrawler({
     ok: true,
     fetched: done.length,
     unusable: done.filter((r) => !r.usable).length,
-    cleanPages: done.filter((r) => r.clean).length,
+    cleanPages: {
+      written: done.filter((r) => r.cleanStore === 'written').length,
+      moved: done.filter((r) => r.cleanStore === 'moved').length,
+      late: done.filter((r) => r.cleanStore === 'late').length,
+    },
     ...(cleanErrors.length ? { cleanPagesFailed: cleanErrors } : {}),
     ...(baselinesSet.length ? { baselinesSet } : {}),
     ...(ran.length > done.length ? { skipped: ran.length - done.length } : {}),

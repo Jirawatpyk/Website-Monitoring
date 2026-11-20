@@ -1007,7 +1007,7 @@ ChatAlert starts in S02a and EmailAlert in S02b; both gain rows in every slice t
 | maintenance_windows | S09 |
 | oncall_shifts | S10 |
 
-Tables the plan adds beyond PRD §11: organisation settings and company holidays (S08), API keys and webhooks (S24), `private.allowed_email_domains` (done, migration 0002), `private.allowed_emails` (S01, D-007), `account_events` (S16, D-062 item 13), `site_expiry` (S13, D-066).
+Tables the plan adds beyond PRD §11: organisation settings and company holidays (S08), API keys and webhooks (S24), `private.allowed_email_domains` (done, migration 0002), `private.allowed_emails` (S01, D-007), `account_events` (S16, D-062 item 13), `site_expiry` (S13, D-066), `forbidden_phrases` and `crawler_clean_pages` (S17 PR 3b, D-069).
 
 ### Go-live test plan (PRD §12)
 

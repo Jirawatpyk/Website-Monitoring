@@ -37,13 +37,13 @@ export async function pruneCleanPages(db: DbClient): Promise<string | null> {
 /**
  * S17 PR 3b (D-069): keep a clean fetch as the site's newest clean page for that view — the text as the
  * matcher reads it, for 3c's "Check phrase". Unchanged text from the same URL only moves `checked_at`.
- * Returns the error message, or null.
+ * Says whether the text was written or only moved, or the error.
  */
 export async function storeCleanPage(
   db: DbClient,
   hashes: Map<string, string>,
   page: CleanPage,
-): Promise<string | null> {
+): Promise<{ error: string | null; written: boolean }> {
   const body = normalizeForMatch(page.text).slice(0, CLEAN_PAGE_MAX_CHARS);
   const hash = createHash('sha256').update(body).digest('hex');
   const key = keyOf(page.monitorId, page.view, page.url);
@@ -53,7 +53,7 @@ export async function storeCleanPage(
       .update({ checked_at: page.checkedAt })
       .eq('monitor_id', page.monitorId)
       .eq('view', page.view);
-    return error?.message ?? null;
+    return { error: error?.message ?? null, written: false };
   }
   const { error } = await db.from('crawler_clean_pages').upsert({
     monitor_id: page.monitorId,
@@ -64,5 +64,5 @@ export async function storeCleanPage(
     body,
   });
   if (!error) hashes.set(key, hash);
-  return error?.message ?? null;
+  return { error: error?.message ?? null, written: true };
 }

@@ -4,7 +4,7 @@ import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CRAWLER_CLIENTS, PROBE_USER_AGENT } from '@dxt/shared';
-import { runHttpCheck, sameSite } from './http-check';
+import { runHttpCheck, sameSite, tailOf } from './http-check';
 
 // A local server that answers per path, so every outcome is tested over real HTTP.
 let server: Server;
@@ -36,6 +36,18 @@ beforeAll(async () => {
       case '/too-deep':
         res.writeHead(200).end(`${'x'.repeat(4_000_000)}<title>VOCA</title>`);
         break;
+      case '/small-chunks': {
+        // 1 MB in 4 KB writes with a pause between: the reader gets many small chunks.
+        res.writeHead(200);
+        let left = 256;
+        const next = () => {
+          if (left-- === 0) return void res.end('</html>');
+          res.write('y'.repeat(4096));
+          setImmediate(next);
+        };
+        next();
+        break;
+      }
       case '/stall-tail':
         // The sample arrives, then the rest never does (the brand isn't in it).
         res.writeHead(200);
@@ -410,7 +422,7 @@ describe('runHttpCheck', () => {
       const t0 = performance.now();
       const result = await runHttpCheck({
         allowPrivateTargets: true,
-        url: `${base}/too-deep`,
+        url: `${base}/small-chunks`,
         scanWholeBody: true,
         sharedForbidden: [],
       });
@@ -650,6 +662,13 @@ describe('runHttpCheck', () => {
       lookup: () => new Promise(() => {}),
     });
     expect(result).toMatchObject({ outcome: 'fail', error: 'Timeout' });
+  });
+});
+
+describe('tailOf (the scan window carried to the next chunk)', () => {
+  it('keeps the overlap; with none (an empty list, no own words) keeps nothing, never the whole text', () => {
+    expect(tailOf('abcdef', 2)).toBe('ef');
+    expect(tailOf('abcdef', 0)).toBe('');
   });
 });
 

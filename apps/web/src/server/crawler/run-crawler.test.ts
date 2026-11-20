@@ -211,7 +211,7 @@ describe('runCrawler', () => {
       ok: true,
       fetched: 3,
       unusable: 0,
-      cleanPages: 0,
+      cleanPages: { written: 0, moved: 0, late: 0 },
       hits: [{ site: 'Site A', view: 'googlebot', forbidden: ['บาคาร่า'] }],
     });
   });
@@ -231,7 +231,12 @@ describe('runCrawler', () => {
     ]);
     // No baseline from a page that wasn't read.
     expect(fake.rpcCalls).toEqual([]);
-    expect(summary).toEqual({ ok: true, fetched: 3, unusable: 3, cleanPages: 0 });
+    expect(summary).toEqual({
+      ok: true,
+      fetched: 3,
+      unusable: 3,
+      cleanPages: { written: 0, moved: 0, late: 0 },
+    });
   });
 
   it('starts no fetch past its budget, keeping the rows it stored', async () => {
@@ -282,7 +287,7 @@ describe('runCrawler', () => {
       ok: true,
       fetched: 0,
       unusable: 0,
-      cleanPages: 0,
+      cleanPages: { written: 0, moved: 0, late: 0 },
     });
     expect(empty.calls.some((c) => c.table === 'crawler_checks')).toBe(false);
 
@@ -321,7 +326,7 @@ describe('the clean-page store (S17 PR 3b, D-069)', () => {
         body_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
       }),
     ]);
-    expect(summary).toMatchObject({ cleanPages: 1 });
+    expect(summary).toMatchObject({ cleanPages: { written: 1, moved: 0, late: 0 } });
   });
 
   it('a page sent off the site is no clean page of it', async () => {
@@ -387,7 +392,11 @@ describe('the clean-page store (S17 PR 3b, D-069)', () => {
       'crawler_clean_pages.upsert': { error: { message: 'too big' } },
     });
     const summary = await cleanRun(fake, () => result({ text: page }));
-    expect(summary).toMatchObject({ ok: true, cleanPages: 0, cleanPagesFailed: ['too big'] });
+    expect(summary).toMatchObject({
+      ok: true,
+      cleanPages: { written: 0, moved: 0, late: 0 },
+      cleanPagesFailed: ['too big'],
+    });
   });
 
   it('a page with the site’s own forbidden word is no clean page, in the plain view too', async () => {
@@ -416,7 +425,7 @@ describe('the clean-page store (S17 PR 3b, D-069)', () => {
   it('past the fetch budget, stores and prunes nothing: the margin is the log’s and the pings’', async () => {
     let t = 0;
     const { fake } = setup(() => result());
-    await runCrawler({
+    const summary = await runCrawler({
       db: fake.db,
       check: vi.fn(async () => {
         t += 96_000; // the fetch ends past the 95 s budget
@@ -426,6 +435,7 @@ describe('the clean-page store (S17 PR 3b, D-069)', () => {
     });
     expect(upserts(fake)).toEqual([]);
     expect(fake.readCalls.map((c) => c.name)).not.toContain('crawler_prune_clean_pages');
+    expect(summary.cleanPages).toEqual({ written: 0, moved: 0, late: 1 });
   });
 
   it('frees each page’s text once it is stored', async () => {

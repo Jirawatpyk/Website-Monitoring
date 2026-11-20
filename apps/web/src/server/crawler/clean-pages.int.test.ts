@@ -56,14 +56,20 @@ describe('the clean-page store (D-069)', () => {
       storeCleanPage(db, hashes, { monitorId: m.id, view, url, checkedAt, text });
 
     let hashes = await loadCleanHashes(db);
-    expect(await page('plain', '<P>Hello  World</P>')).toBeNull();
-    expect(await page('googlebot', 'old host', 'https://old.example.test/')).toBeNull();
+    expect(await page('plain', '<P>Hello  World</P>')).toEqual({ error: null, written: true });
+    expect(await page('googlebot', 'old host', 'https://old.example.test/')).toEqual({
+      error: null,
+      written: true,
+    });
 
     // The same text again only moves checked_at; new text overwrites the row.
     hashes = await loadCleanHashes(db);
-    expect(await page('plain', '<p>hello world</p>', m.url, at('30:00'))).toBeNull();
+    expect(await page('plain', '<p>hello world</p>', m.url, at('30:00'))).toEqual({
+      error: null,
+      written: false,
+    });
     expect((await rows()).find((r) => r.view === 'plain')).toMatchObject({ body: '<p>hello world</p>' });
-    expect(await page('plain', '<p>Changed</p>', m.url, at('59:00'))).toBeNull();
+    expect(await page('plain', '<p>Changed</p>', m.url, at('59:00'))).toEqual({ error: null, written: true });
     const plain = (await rows()).find((r) => r.view === 'plain')!;
     expect(plain.body).toBe('<p>changed</p>');
     expect(Date.parse(plain.checked_at)).toBe(Date.parse(at('59:00')));
@@ -91,7 +97,7 @@ describe('the clean-page store (D-069)', () => {
         checkedAt: at('00:00'),
         text: 'key page',
       }),
-    ).toBeNull();
+    ).toEqual({ error: null, written: true });
     expect(await pruneCleanPages(db)).toBeNull();
     expect(await rows()).toEqual([]);
   });
