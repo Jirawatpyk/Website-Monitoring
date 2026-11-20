@@ -65,17 +65,20 @@ export interface ResponseHours {
 }
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
-const hhmm = (m: number) =>
+/** Minutes of the day as "09:00". */
+export const minutesToClock = (m: number) =>
   `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+/** The response-hours days: "Mon–Fri" (a run) or "Mon, Wed". */
+export function formatResponseDays(days: readonly number[]): string {
+  const d = [...days].sort((a, b) => a - b);
+  const run = d.length > 1 && d.every((x, i) => i === 0 || x === d[i - 1]! + 1);
+  return run ? `${WEEKDAYS[d[0]! - 1]}–${WEEKDAYS[d.at(-1)! - 1]}` : d.map((x) => WEEKDAYS[x - 1]).join(', ');
+}
 
 /** "Mon–Fri 09:00–18:00" (a run of days) or "Mon, Wed 09:00–18:00" — the Escalation and Organisation pages. */
 export function formatResponseHours(h: Pick<ResponseHours, 'startMin' | 'endMin' | 'days'>): string {
-  const days = [...h.days].sort((a, b) => a - b);
-  const run = days.length > 1 && days.every((d, i) => i === 0 || d === days[i - 1]! + 1);
-  const dayText = run
-    ? `${WEEKDAYS[days[0]! - 1]}–${WEEKDAYS[days.at(-1)! - 1]}`
-    : days.map((d) => WEEKDAYS[d - 1]).join(', ');
-  return `${dayText} ${hhmm(h.startMin)}–${hhmm(h.endMin)}`;
+  return `${formatResponseDays(h.days)} ${minutesToClock(h.startMin)}–${minutesToClock(h.endMin)}`;
 }
 
 /** "09:00" / "09:00:00" (a Postgres `time`) → minutes of the day. */

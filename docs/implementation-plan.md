@@ -746,16 +746,17 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - **Boards:** AlertChannels, Organisation ; OrganisationLists, OrganisationListsDark, MOrganisationLists, MOrganisationListsDark (spec §41, drawn 19 Nov from the brief `docs/design/briefs/Organisation-holidays-forbidden.md`)
 - **PRs:**
   1. Organisation: `save_response_hours` (+ `organisation_storage`), `/settings/organisation`, the Settings select on phones, the hours copy on Sites / Site detail, "Edit in Organisation" on Escalation and Profile. Merged #214 (19 Nov, `/verify` PASS on staging: INC-0071 held until the new opening).
-  2. Alert channels: read-only routing, the test alert (`send_channel_test`; also Profile's test for Stakeholders and Viewers, D-062 item 12), the delivery log.
-  3. Holidays and the editable shared forbidden-word list, after their board (probes, crawler and the VPS agent read it; deploy `dxt-agent`).
+  2. Alert channels: read-only routing, the test alert (`send_channel_test`; also Profile's test for Stakeholders and Viewers, D-062 item 12), the delivery log. Merged #215 (20 Nov, `/verify` PASS on staging: the test card and email reached Tao, both Delivered in the log).
+  3. a. Company holidays: `add_company_holiday` / `rename_company_holiday` / `remove_company_holiday` (audited by the row trigger), `company_holidays.kind`, the holiday section and "On this page" (board OrganisationLists, §41).
+     b. The editable shared forbidden-word list (probes, crawler and the VPS agent read it; "Check phrase" reads each live site's last clean fetch, stored by the crawler; deploy `dxt-agent`).
 - **Moved out (D-069):** a per-site uptime target (D-059) and the editable tracking allowlist (D-046) — backlog, no slice yet.
 - **Depends on:** S10, S11
 - **Done when:**
   1. Changing Tier 2–3 response hours needs a note, shows "Affects N sites", and the engine uses the new hours on the next sweep (test).
   2. A test alert posts in a "TEST — no action" thread mentioning only the tester.
   3. spec-checker passes both boards.
-  4. (D-069, proposed) Adding a company holiday is audited, and the next engine run treats that day as outside response hours (test).
-  5. (D-069, proposed) A forbidden phrase an Admin saves is used by the probes, the crawler and the VPS agent on their next run; a single word, or a phrase found on a live site's last clean fetch, is refused (test).
+  4. (D-069) Adding a company holiday is audited, and the next engine run treats that day as outside response hours (test).
+  5. (D-069) A forbidden phrase an Admin saves is used by the probes, the crawler and the VPS agent on their next run; a single word, or a phrase found on a live site's last clean fetch, is refused (test).
 - **Review:** spec-checker, message-checker, security-reviewer.
 
 ### S18 · User guide

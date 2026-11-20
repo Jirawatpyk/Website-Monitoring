@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { UnsavedBar } from '@/components/unsaved-bar';
 import { SECTION_HEADING, SettingsHeader, ViewOnlyLine } from '@/features/settings';
 import { saveResponseHours } from '../actions';
+import { HolidaysSection } from './holidays-section';
 import {
   BUDGET,
   changedFields,
@@ -86,8 +87,13 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
     <div className="flex flex-col gap-6">
       <SettingsHeader current="organisation" />
       <ViewOnlyLine />
+      <OnThisPage />
 
-      <section className="flex flex-col gap-3" aria-labelledby="tiers-h">
+      <section
+        id="tiers"
+        className="flex scroll-mt-18 lg:scroll-mt-4 flex-col gap-3"
+        aria-labelledby="tiers-h"
+      >
         <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:justify-between md:gap-4">
           <h2 id="tiers-h" className={HEADING}>
             <span className="md:hidden">TIERS</span>
@@ -158,7 +164,9 @@ export function OrganisationPageView({ data }: { data: OrganisationData }) {
 
       <ClientsSection rows={clientRows(data.clients)} />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <HolidaysSection holidays={data.holidays} hours={data.hoursNow} now={new Date(data.now)} />
+
+      <div id="data-kept" className="grid scroll-mt-18 lg:scroll-mt-4 gap-4 md:grid-cols-2">
         <DataKept bytes={data.storageBytes} />
         <Budget />
       </div>
@@ -395,7 +403,11 @@ function ClientsSection({ rows }: { rows: ClientRow[] }) {
     },
   ];
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="clients-h">
+    <section
+      id="clients"
+      className="flex scroll-mt-18 lg:scroll-mt-4 flex-col gap-3"
+      aria-labelledby="clients-h"
+    >
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:gap-3">
           <h2 id="clients-h" className={HEADING}>
@@ -436,6 +448,34 @@ function ClientsSection({ rows }: { rows: ClientRow[] }) {
   );
 }
 
+/**
+ * "On this page" (§41 item 1) so the long page stays navigable. It lists the sections that exist:
+ * Shared forbidden words joins with PR 3b (D-069).
+ */
+const ON_THIS_PAGE = [
+  { href: '#tiers', label: 'Tiers' },
+  { href: '#clients', label: 'Clients' },
+  { href: '#holidays', label: 'Company holidays' },
+  { href: '#data-kept', label: 'Data kept' },
+  { href: '#monthly-cost', label: 'Monthly cost' },
+] as const;
+
+function OnThisPage() {
+  return (
+    <nav aria-label="On this page" className="text-sm text-fg-secondary">
+      <span>On this page: </span>
+      {ON_THIS_PAGE.map((s, i) => (
+        <span key={s.label}>
+          {i > 0 && <span aria-hidden> · </span>}
+          <a href={s.href} className="inline-flex min-h-11 items-center text-fg-accent">
+            {s.label}
+          </a>
+        </span>
+      ))}
+    </nav>
+  );
+}
+
 function DataKept({ bytes }: { bytes: number | null }) {
   return (
     <Card
@@ -472,6 +512,8 @@ function DataKept({ bytes }: { bytes: number | null }) {
 function Budget() {
   return (
     <Card
+      id="monthly-cost"
+      className="scroll-mt-18 lg:scroll-mt-4"
       title="Monthly cost"
       headingLevel={2}
       actions={

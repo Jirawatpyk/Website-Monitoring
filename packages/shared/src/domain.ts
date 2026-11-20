@@ -13,6 +13,10 @@ export type SiteStatus = (typeof SITE_STATUSES)[number];
 export const SEVERITIES = ['problem', 'down'] as const;
 export type Severity = (typeof SEVERITIES)[number];
 
+/** `company_holidays.kind` (S17 PR 3a): a Thai public holiday or a company day off. */
+export const HOLIDAY_KINDS = ['public', 'company'] as const;
+export type HolidayKind = (typeof HOLIDAY_KINDS)[number];
+
 /** Incident lifecycle (spec §15.4). PROBLEM ends at `resolved`; only DOWN reaches `in_review` / `closed`. */
 export const INCIDENT_STATES = [
   'unacked',

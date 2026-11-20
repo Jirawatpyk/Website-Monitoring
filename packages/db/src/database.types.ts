@@ -183,14 +183,14 @@ isOneToOne: false
                   ]
                 },"company_holidays": {
                   Row: {
-                    "created_at": string,"day": string,"id": string,"name": string,"updated_at": string
+                    "created_at": string,"day": string,"id": string,"kind": string,"name": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"day": string,"id"?: string,"name": string,"updated_at"?: string
+                    "created_at"?: string,"day": string,"id"?: string,"kind"?: string,"name": string,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"day"?: string,"id"?: string,"name"?: string,"updated_at"?: string
+                    "created_at"?: string,"day"?: string,"id"?: string,"kind"?: string,"name"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -971,6 +971,9 @@ isOneToOne: false
 "ack_incident":
 { Args: { "p_incident_id": string }; Returns: string
                            },
+"add_company_holiday":
+{ Args: { "p_day": string,"p_kind": string,"p_name": string }; Returns: string
+                           },
 "add_incident_note":
 { Args: { "p_incident_id": string,"p_text": string }; Returns: string
                            },
@@ -1397,6 +1400,12 @@ isOneToOne: false
                            },
 "record_hand_check":
 { Args: { "p_site_id": string }; Returns: string
+                           },
+"remove_company_holiday":
+{ Args: { "p_id": string }; Returns: undefined
+                           },
+"rename_company_holiday":
+{ Args: { "p_id": string,"p_name": string }; Returns: undefined
                            },
 "report_down_by_hand":
 { Args: { "p_incident_id": string,"p_note": string,"p_outside_hours": boolean }; Returns: string

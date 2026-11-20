@@ -105,7 +105,22 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 - Below xl both tables are row cards with the same content (their fixed columns scroll sideways at 820 and 1024).
 - **The test's result line** says when it was queued and where ("Posted 10:08 in “TEST — no action” · mentions only you", "Sent to you 10:08 · “TEST — no action”"), without the board's "delivered in 2.1 s": the message leaves after the response, so the delivery time is in the delivery log, not known to the button. The button then waits the minute the SQL enforces. The test email has its own footer (every role gets it, so not the on-call one).
 
-**Impact.** S17 PR 1: migration `organisation_hours` (`save_response_hours`, `organisation_storage`), `features/organisation`, `/settings/organisation`, the Settings select, the hours copy on Sites, "Edit in Organisation" on Escalation and Profile, the audit words. PR 2: Alert channels (read-only routing, the test alert, the delivery log). PR 3 after the board: holidays and the forbidden-word list. Plan: S17 Done-when 4–5 proposed; backlog lines for D-059 and D-046.
+**PR 3 (holidays and the forbidden-word list, boards OrganisationLists / MOrganisationLists, spec §41), settled the same way (20 Nov):**
+
+- **Two PRs.** 3a is the holidays; 3b is the editable forbidden-word list. 3b touches the probes, the crawler, the engine's defacement gate and the VPS agent, which needs its own deploy. The holidays need none of that.
+- **Removing a holiday applies at once, like the hours (item 2 extended).** The engine reads the calendar live, so open incidents use the new one from the next run; a PROBLEM already held keeps its `hold_until`. The Remove dialog says so instead of the board's "Incidents already open keep the timers they started with", in the hours dialog's words. A day outside the response-hours days says it "stays a day off" and changes no timer.
+- **Kind.** The board shows Public holiday / Company day off, and its 2027 note asks Admins to add the Buddhist public holidays themselves. So the Add dialog gets a Kind select (default Company day off) that the board doesn't draw, stored as `company_holidays.kind`. Rows from before have no kind and are public holidays (the seed).
+- **The words follow the setting.** "Weekend — no effect on Mon–Fri hours", "N on weekdays" and "timers run 09:00–18:00" use the stored hours; with Mon–Sat a Saturday counts.
+- **Range.** From today (Bangkok) to 31 Dec next year: the list shows this year and next.
+- **"On this page"** lists only the sections that exist. Shared forbidden words joins it in 3b. It shows on phones too (MOrganisationLists doesn't draw it; the phone page is just as long). Below lg a jump is a scroll down, so the top bar and the BottomNav slide away as on any scroll down (`headerHideOnScroll`, `hideOnScroll`; AURA requests 13–14) and come back on the way up; the heading keeps `scroll-mt-18`, so it clears the bar if the bar is still showing (`/verify`, 20 Nov).
+- **The result line.** It sits inline under the section heading, not in the board's floating toast, as the hours save on the same page does. Nothing here can be undone, so it isn't `UndoLine`. It goes there, not under the list, so focusing it doesn't jump to the foot of about 24 rows.
+- **The lunar note** under next year is always shown in v1: matching the Buddhist days by name would be fragile.
+- **The kind** can't be changed after a day is added: remove the day and add it again, as Rename's description says for the date.
+- **A day outside the response-hours days.** Its line says "Weekend — no effect on …" only for a Saturday or Sunday; any other day says "Not a response-hours day". Removing it is an information note ("Nothing changes on …"), not a warning.
+- **Phrase rules for 3b:** the spec's proposal (one word under 6 letters, or under 4 Thai characters, is refused) plus "Already in the list".
+  - "Check phrase" reads each live site's last clean fetch, which the crawler stores from 3b on (Tao, 20 Nov: option A — store, not fetch on press).
+
+**Impact.** S17 PR 1: migration `organisation_hours` (`save_response_hours`, `organisation_storage`), `features/organisation`, `/settings/organisation`, the Settings select, the hours copy on Sites, "Edit in Organisation" on Escalation and Profile, the audit words. PR 2: Alert channels (read-only routing, the test alert, the delivery log). PR 3a: migration `company_holidays_edit` (`kind`, `add_company_holiday` / `rename_company_holiday` / `remove_company_holiday`, audited by the row trigger) and the holiday section. PR 3b: the forbidden-word list. Plan: S17 Done-when 4–5; backlog lines for D-059 and D-046.
 
 ## D-068 — S13 PR 4: back up but still expiring, and who the set-aside ack names
 

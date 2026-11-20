@@ -101,6 +101,8 @@ select json_build_object(
 
 Typing into a field in the browser pane: read the field's value (`find` / `read_page`) before typing again. A screenshot can show a field empty after the first `type` landed (INC-0035, INC-0060, the S12b hand-check note: a doubled note was saved).
 
+Below lg the phone top bar and the BottomNav slide away on any scroll down (an anchor jump too) and come back on the way up — intended (`headerHideOnScroll`, `hideOnScroll`), not a bug (S17 PR 3a `/verify`). With the pane hidden (`tabs_context`), layout numbers read in the page can be stale; trust screenshots.
+
 - **Database** — the Supabase SQL editor of the staging project (browser pane, signed in by Tao): https://supabase.com/dashboard/project/ctxmmrhvrjbkpodpgkqd/sql/new. Find the editor with `find "Editor content"`, then select-all, type, `ctrl+Return`, `get_page_text`. Return one JSON value so the result isn't cut off, e.g.:
 
   ```sql
