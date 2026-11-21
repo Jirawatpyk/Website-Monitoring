@@ -13,7 +13,7 @@ PRD §2 and §12, plan S19 Done-when 2 and D-071: the staging Test target is tak
 1. **Wake staging.** `pnpm staging:resume`. The Test target must be on `ok`, with no open incident (`supabase/staging/reset-test-incident.sql`) and Tier 1.
 2. **Take the site down.** Flip the Test target to `error` from a script at a recorded second (`verifier-staging` → Drive). Write the UTC time down.
 3. **Wait for the alert.** Wait for the DOWN card in the staging Alerts Space. Then open the incident from the card's link on a 390 px phone view (browser pane) and press **Acknowledge**. Let the 10 s Undo run out.
-4. **Bring it back.** Flip the target back to `ok`. Once it shows Needs root cause, resolve it: root cause "Other", "Game day (S19)".
+4. **Bring it back.** Flip the target back to `ok`. Once it shows Needs root cause, resolve it: root cause "Hosting / server", What happened "Game day (S19): Test target set to error".
 5. **Read the times** (staging SQL) and fill in the table below. Then `pnpm staging:pause`.
 
 ```sql

@@ -448,7 +448,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - DOWN จำลองแล้ว alert ถึงภายใน 3 นาที — on staging, against the test target (Tier 1), run by Claude (D-048). **Done 29 Oct 2026:** mode `error` at 05:10:21 UTC, first failed check 05:10:46, INC-0048 DOWN posted to Chat 05:11:35.96 (`notification_attempts.ok`, provider message id) — 49 s.
 - A second Admin is active, with their 2-Step Verification page confirmed per D-007 (PRD §9: "ต้องมี admin คนที่ 2 ก่อน Phase 2"), and Healthchecks alerts go to both Admins. No second code reviewer: Tao works solo with Claude (D-048 — no CODEOWNERS line).
 - `docs/runbook.md` v1 exists and the second Admin has walked through it once: what each heartbeat / Healthchecks alert means, restarting the VPS agent, checking Vercel Cron and function logs, pausing alerts with maintenance, rotating `CRON_SECRET` / `INGEST_TOKEN` / webhook URLs, and who to call (PRD §13 bus-factor mitigation).
-- From here every production deploy happens inside a maintenance window, and the parallel run with the CEO's hourly monitor starts; S19 keeps its log.
+- From here the parallel run with the CEO's hourly monitor starts; S19 keeps its log. (The maintenance window for every production deploy was dropped, D-071 item 6.)
 
 ## Phase 2 — Team go-live, P1
 

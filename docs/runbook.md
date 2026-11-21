@@ -58,7 +58,7 @@ Who each check tells, as set on production on 4 Nov 2026 (D-053):
 - **Email only:** `notifier`, `browser-verifier` and `vps-watchdog`.
 - **Dashboard only:** the three `probe-*` checks. A missing location is reported by our own PROBE MISSING email instead, which stays quiet during an engine fault and reports the location once.
 
-The emails go to every active Admin from S19 (D-054). Each Admin is an Email integration on the production project and has confirmed a test email, as listed in `docs/test-plan-results.md` → Healthchecks. When an Admin joins or leaves, add or remove their integration on the same day.
+Until S19 closes the emails go to Tao only (D-054); S19 adds every active Admin (`docs/test-plan-results.md` → Healthchecks).
 
 | Check | Expected | When it goes down | First look | Section |
 | --- | --- | --- | --- | --- |
@@ -135,7 +135,7 @@ From the app as an Admin: **/maintenance** → **Schedule maintenance or mute**,
 
 - **Planned work on a client site** (hosting move, deploy): **maintenance** for the window. While it runs nothing opens; if the site is still down at the end, an incident opens from the window's end. Over 24 h needs an Admin's approval (Admins' own windows are approved on create).
 - **Something is already wrong and you're on it:** **mute** for up to 24 h. New alerts for that site stop, but an open incident keeps escalating until someone acknowledges it. End it early with **End now**.
-- **Our own production deploys after G1:** every production deploy happens inside a maintenance window (G1 rule). Open it before `pnpm pr:merge` and end it once the deploy is live and the next round looks right.
+- **Our own production deploys** need no maintenance window (D-071 item 6): Vercel swaps versions with no downtime. Watch the next rounds after the deploy is live.
 - **There is no global "stop all alerts" switch.** If DxT Monitor itself is sending false alerts for many sites at once, mute the affected sites and fix the cause. Turning off Vercel Cron Jobs stops monitoring entirely, so do it only with the other Admin's agreement.
 
 ## Rotate a secret
@@ -334,7 +334,7 @@ S13 (D-066–D-068). The Expiry page is `/expiry`.
   It opens only inside response hours and follows the PROBLEM ladder.
 
 - **Renew it** (the client or the hosting provider), then press **Check now** on `/expiry`. Check now is refused for 60 s after the last read.
-- **The incident recovers** on the next read under the line. A failed read never opens or clears one. The dates come from `/api/cron/expiry` (hourly; every site at 06:00 Bangkok).
+- **The incident recovers** on the next good read that is no longer under the line. A failed read never opens or clears one. The dates come from `/api/cron/expiry` (hourly; every site at 06:00 Bangkok).
 - **A read keeps failing** (the site's row shows no date): read `"job":"expiry"` in the logs. Hosting subdomains have no domain half; that is not a failure.
 
 ## Page change: accept a new baseline
@@ -376,7 +376,7 @@ S17 (D-069). Admins only; view only on phones.
   - The probes, the crawler and the VPS agent use the list on their next run.
 - **Alert channels** (Settings › Alert channels):
   - It shows each channel's state and the delivery log.
-  - **Send test** posts a TEST card or email (once a minute per channel). Use it after rotating a webhook URL.
+  - **Send test card** / **Send test email** posts a TEST card or email (once a minute per channel). Use it after rotating a webhook URL.
 
 ## Who changed what (audit log)
 
@@ -404,16 +404,16 @@ D-005: Supabase Pro daily backups, kept 7 days, no PITR.
 
 ## Drill (S19)
 
-On **staging**, with the Test target on `ok` and no open incident. Run `pnpm staging:resume` first. This shows the fault path end to end.
+On **staging**, with the Test target on `ok` (so the engine, still run by Bangkok batches, opens nothing itself) and no open incident. Run `pnpm staging:resume` first. Turning the crons off and on, and stopping the agent, follow `verifier-staging` → Monitor fault. Ask Tao before turning the crons off.
 
-| #   | Step                                                                                   | Expect                                                                                                                              |
-| --- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Vercel → `dxt-monitor-staging` → Cron Jobs → disable `/api/cron/engine` (or all crons) | —                                                                                                                                   |
-| 2   | Wait 3 min                                                                             | Healthchecks staging `engine` down; the staging VPS watchdog posts MONITOR FAULT; the Overview fault banner and the hand-check card |
-| 3   | Test target mode `error`; on the Overview press **Down — open incident** for it        | A manual incident; L0 posted in the Alerts Space from the request; Trigger "Manual (hand check)"                                    |
-| 4   | On the incident, **Escalate now** once                                                 | `ESCALATED · L1` posted; one `step_fired` event                                                                                     |
-| 5   | Re-enable the cron; Test target back to `ok`                                           | "Status engine back …" on the timeline; the incident recovers on the next OK rounds                                                 |
-| 6   | Close it: root cause + Resolve; `pnpm staging:pause`                                   | Resolved; staging asleep                                                                                                            |
+| # | Step | Expect |
+| --- | --- | --- |
+| 1 | Turn the staging crons off | — |
+| 2 | Wait 3 min | Healthchecks staging `engine` down; the staging VPS watchdog posts MONITOR FAULT once; the Overview shows the fault banner and the hand-check card |
+| 3 | Hand check: **Loads OK** on the Test target, then **Down — open incident** with a note | "Checked OK · …", then a manual incident (Trigger "Manual (hand check)"), its L0 posted from the request |
+| 4 | `sudo systemctl stop dxt-agent@staging`, wait 3 min (no engine run of any kind, D-055) → the incident → **Escalate now** | `ESCALATED · L1 … sent by hand` in the thread; one `step_fired` (`byHand`) |
+| 5 | Start the agent; turn the crons on | "Status engine back — automatic escalation running again" on the timeline; the incident recovers on the next OK rounds |
+| 6 | Root cause (False alarm (monitor), "S19 drill") + Resolve; `pnpm staging:pause` | Resolved; staging asleep |
 
 ## Walk-through (G1)
 
