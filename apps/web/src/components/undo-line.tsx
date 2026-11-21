@@ -25,11 +25,17 @@ export function UndoLine({
 }) {
   const seconds = useSecondsLeft(postsAt);
   const [undoing, setUndoing] = useState(false);
-  if (seconds <= 0) return <span>{words?.done ?? `Posted to ${channels}.`}</span>;
+  // An Undo pressed in the last second can still be on its way when the count reaches 0. The server
+  // decides whether it was in time, so the line waits for its answer rather than saying it posted
+  // (S19 UAT round 1: the mute came back, the toast said "Posted to Chat.").
+  if (seconds <= 0 && !undoing) return <span>{words?.done ?? `Posted to ${channels}.`}</span>;
   return (
     <span className="flex flex-wrap items-center gap-3">
       <span>
-        {words?.pending(seconds) ?? `Posting to ${channels} in ${seconds} s — nothing is sent until then`}
+        {seconds <= 0
+          ? 'Undoing…'
+          : (words?.pending(seconds) ??
+            `Posting to ${channels} in ${seconds} s — nothing is sent until then`)}
       </span>
       <Button
         variant="secondary"
