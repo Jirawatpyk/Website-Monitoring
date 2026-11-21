@@ -21,7 +21,7 @@ select i.number, i.started_at, i.detected_at, i.acked_at,
   extract(epoch from i.detected_at - i.started_at)::int as mttd_s,
   extract(epoch from i.acked_at - i.detected_at)::int as mtta_s,
   (select min(n.sent_at) from notifications n
-    where n.incident_id = i.id and n.template = 'down' and n.channel = 'chat') as down_post
+    where n.incident_id = i.id and n.template = 'down' and n.channel = 'google_chat') as down_post
 from incidents i join sites s on s.id = i.site_id
 where s.name = 'Test target' order by i.created_at desc limit 1;
 ```
@@ -30,4 +30,4 @@ where s.name = 'Test target' order by i.created_at desc limit 1;
 
 | Date (UTC) | Incident | Taken down | First failed check | Confirmed down | DOWN posted | Acked | MTTD | MTTA | Pass |
 | ---------- | -------- | ---------- | ------------------ | -------------- | ----------- | ----- | ---- | ---- | ---- |
-|            |          |            |                    |                |             |       |      |      |      |
+| Sat 21 Nov 2026 | INC-0077 | 08:31:00 | 08:31:01 | 08:31:32 | 08:31:37 | 08:33:21 | 32 s | 1 min 49 s | ✓ |
