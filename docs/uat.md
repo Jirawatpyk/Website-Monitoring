@@ -1,6 +1,6 @@
 # UAT (T06)
 
-PRD §12 and plan S19 Done-when 1: two rounds of ack, mute and maintenance on a phone.
+PRD §12 and plan S19 Done-when 1: two rounds of ack, mute and maintenance at 390 px in the browser pane (D-071).
 
 - **Where and who (D-071):** staging, run by Claude in the browser pane at 390 × 844, light and then dark, signed in as Tao (Admin).
 - **Other roles:** their limits are proved by the integration and e2e tests named in each slice (Responder own sites, Stakeholder no ack).

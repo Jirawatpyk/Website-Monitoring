@@ -68,7 +68,7 @@ Every slice also meets the [Definition of Done](workflow.md#definition-of-done) 
 
 The dates skip the Thai public holidays on Tue 13 Oct and Fri 23 Oct. The order, dependencies and gates don't change. Fixed waits that the pace doesn't shorten:
 - **G1:** all 17 sites entered on production through the UI (S05 Done-when 1). This needs the Site Registration Checklist completed by owners and AMs, and is G1's long pole. G1 also needs a second Admin and the runbook.
-- **G2:** UAT with owners on phones, the game day and the restore drill (S19), then the 2-week parallel run against the CEO's checks, which can't be compressed.
+- **G2:** UAT at 390 px on staging, the game day and the restore drill (S19, D-071), then the 2-week parallel run against the CEO's checks, which can't be compressed.
 - **G3:** P2 scope is confirmed with the CEO at G2. A smaller P2 lands earlier.
 
 Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if screen slices run longer than 1.5 days.
@@ -1022,7 +1022,7 @@ Tables the plan adds beyond PRD §11: organisation settings and company holidays
 | T03 | Verifier off → hard fail still DOWN; blocked → PROBLEM (unverified) | S03 |
 | T04 | Vercel Cron off → Healthchecks alerts 2 people, VPS watchdog alerts | S12a |
 | T05 | No ack → L0–L3 on time | S10 |
-| T06 | UAT with owners twice on mobile | S19 |
+| T06 | UAT twice at 390 px on staging (D-071) | S19 |
 | T07 | Game day, MTTD / MTTA measured | S19 |
 | T08 | Ack → Undo within 10 s → nothing sent | S02b |
 | T09 | Mute with open incident → escalation, L3 FYI, client update continue | S09 |
