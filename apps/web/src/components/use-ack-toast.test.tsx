@@ -33,3 +33,37 @@ describe('useAckToast — the toast says what the ack stopped (D-034)', () => {
     expect(await screen.findByText(title)).toBeInTheDocument();
   });
 });
+
+describe('useAckToast — an Undo still in flight when the 10 s end (S19 UAT F1)', () => {
+  it('never says "Posted" while the Undo waits for the server', async () => {
+    let answer: (v: { ok: true }) => void = () => {};
+    const slowUndo: UndoAction = () => new Promise((resolve) => (answer = resolve));
+    const shortAck: AckAction = async () => ({
+      ok: true,
+      postsAt: new Date(Date.now() + 1500).toISOString(),
+    });
+    function SlowProbe() {
+      const { acknowledge } = useAckToast({ ack: shortAck, undo: slowUndo });
+      return (
+        <button type="button" onClick={() => acknowledge('i1', 142, 'down')}>
+          Acknowledge
+        </button>
+      );
+    }
+    render(
+      <>
+        <SlowProbe />
+        <Toaster />
+      </>,
+    );
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' })));
+    const undoButton = await screen.findByRole('button', { name: /Undo/ });
+    await act(async () => fireEvent.click(undoButton));
+    // The window ends while the request is still out.
+    await act(async () => new Promise((r) => setTimeout(r, 2200)));
+    expect(screen.queryByText('Posted to Chat and email.')).not.toBeInTheDocument();
+    expect(screen.getByText('Undoing…')).toBeInTheDocument();
+    await act(async () => answer({ ok: true }));
+    expect(await screen.findByText('Acknowledgement of INC-0142 undone')).toBeInTheDocument();
+  });
+});
