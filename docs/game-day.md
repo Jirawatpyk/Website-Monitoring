@@ -26,6 +26,8 @@ from incidents i join sites s on s.id = i.site_id
 where s.name = 'Test target' order by i.created_at desc limit 1;
 ```
 
+**How it ran (21 Nov).** Claude didn't watch the Chat card. After the flip it polled the staging database on a timer, saw the DOWN and its Chat post, then opened the incident page in the browser pane (it had dropped to 660 px; the 390 emulation was lost) and pressed Acknowledge. So the MTTA below includes that polling delay, and isn't a measure of how fast a person reacts to the card.
+
 ## Results
 
 | Date (UTC) | Incident | Taken down | First failed check | Confirmed down | DOWN posted | Acked | MTTD | MTTA | Pass |

@@ -8,7 +8,14 @@ PRD §12 and plan S19 Done-when 1: two rounds of ack, mute and maintenance on a 
 
 ## Script
 
-The Test target starts on `ok`, with no open incident. Each step is driven by tapping, never by URL. Undo is pressed inside its 10 s: in the browser pane the press goes in the same batch as the action (a slower driver misses the window — round 1).
+The Test target starts on `ok`, with no open incident. Undo is pressed inside its 10 s: in the browser pane the press goes in the same batch as the action (a slower driver misses the window — round 1).
+
+**How the rounds were driven (21 Nov).** Neither round was a finger on a phone.
+
+- **Round 1:** pointer clicks on the elements (the pane's `ref` clicks) at 390 × 844, so hit-testing ran. Pages were opened by URL or by in-page links, not from the Chat card.
+- **Round 2:** the pane reported the page hidden and pointer clicks missed, so every control was reached by keyboard: focus, then Enter or Space; list options were picked by script. That proves the actions and their results, not that each target takes a tap.
+- **Tap sizes:** checked by measuring (no target under 44 px), in both rounds.
+- **A hand pass on a real phone** is Tao's call; it isn't part of this record.
 
 | #   | Do                                                                                                               | Expect                                                                                                         |
 | --- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -31,14 +38,14 @@ Sat 21 Nov 2026, staging (build `7cfebbd`, S18), 390 × 844 light, as Tao. Incid
 | 2 | ✓ | INC-0079: Acknowledge → Undo → back to Unacked, focus on Acknowledge; both `acknowledged` rows `cancelled` (T08) |
 | 3 | ✓ | INC-0078: ACKNOWLEDGED Chat `sent` 08:40:30Z, email `sent` |
 | 4 | ✓ | "Muted · until 16:42" on the site; toast "INC-0078 stays open" |
-| 5 | ✓ with F1 | Undo → "— undone · Nothing was posted.", the mute back; End now again → MUTE ENDED EARLY posted |
+| 5 | ✓ with F1 | First try: Undo pressed with ~0.4 s left (F1). Second: Undo → "— undone · Nothing was posted.", the mute back; End now again → MUTE ENDED EARLY posted |
 | 6 | ✓ (Undo not driven) | Resolved 08:47:35Z with False alarm; RESOLVED Chat + email `sent`. The resolve's Undo was pressed too late by the driver; Undo on Acknowledge and maintenance covers the same `UndoLine` |
 | 7 | ✓ | Scheduled 17:00–18:00; Cancel → Undo → back, rows `cancelled` "Undone"; Cancel → CANCELLED in thread `mw-eae98614…` (Chat 08:50:30Z, owner + backup emails) |
 | 8 | ✓ | /, /incidents, /sites, /oncall, /guide: scroll width 390, no tap target under 44 px |
 
 | Date | Theme | Step | Finding | Severity | Fixed in / reason |
 | ---- | ----- | ---- | ------- | -------- | ----------------- |
-| 21 Nov | light | 5 | F1 · An Undo pressed in the last second: the server undid it (rows "Undone", mute back), but the toast said "Posted to Chat." and the list dropped the mute until a reload | Medium | `fix/undo-line-in-flight`: `UndoLine` shows "Undoing…" until the answer |
+| 21 Nov | light | 5 | F1 · An Undo pressed with ~0.4 s left: the server undid it in time (row `cancelled` "Undone" at 08:43:02.45Z, before `posts_at` 08:43:02.80Z; the mute back), but ~2 s after the press the toast read "Posted to Chat." and the list showed nothing active; a reload showed the mute. Whether the toast would have corrected itself when the answer landed wasn't observed | Medium | PR #222: `UndoLine` shows "Undoing…" (new copy, the spec has none for this state) until the answer; the Overview ack toast now waits too |
 | 21 Nov | light | 7 | A typed start time looked unused ("Ends" kept 22:00) | — | Not a bug: the driver's triple-click opened the list; typing + Tab re-checked, "Ends" follows |
 | 21 Nov | light | 1 | No link from the phone incident page to Site detail | — | As drawn (MIncident has none); Back → Sites |
 
