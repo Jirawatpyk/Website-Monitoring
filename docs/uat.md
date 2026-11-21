@@ -44,6 +44,17 @@ Sat 21 Nov 2026, staging (build `7cfebbd`, S18), 390 × 844 light, as Tao. Incid
 
 ## Round 2
 
-| Date | Theme | Step | Finding | Severity | Fixed in / reason |
-| ---- | ----- | ---- | ------- | -------- | ----------------- |
-|      |       |      |         |          |                   |
+Sat 21 Nov 2026, staging on the fixed build (`edc197f`, `fix/undo-line-in-flight`, PR #222), 390 × 844 dark, as Tao. Incident INC-0086.
+
+| Step | Result | Evidence |
+| ---- | ------ | -------- |
+| 1 | ✓ | Dark theme (body rgb(8, 8, 10)); Acknowledge in the bar at 724 px, 44 px high |
+| 2 | ✓ | Acknowledge → Undo → Unacked, focus on Acknowledge; both `acknowledged` rows `cancelled` |
+| 3 | ✓ | Acknowledge again → ACKNOWLEDGED Chat `sent` 11:27:59Z |
+| 4 | ✓ | "Muted · until 19:28" |
+| 5 | ✓ | End now → Undo → "— undone · Nothing was posted.", mute back; End now again → MUTE ENDED EARLY `sent` 11:29:14Z |
+| 6 | ✓ | Resolve → Undo (`resolve_undone`, both `resolved` rows `cancelled`, focus back on Resolve, the dialog kept the root cause); Resolve again → RESOLVED Chat + email `sent` 11:34:28Z |
+| 7 | ✓ | Scheduled 21:00–22:00 (time typed); Cancel → Undo → back ("Undone"); Cancel → CANCELLED `sent` 11:30:31Z |
+| 8 | ✓ | /, /incidents, /sites, /oncall, /guide, /maintenance: scroll width 390, no tap target under 44 px |
+
+No new findings. F1's last-second race isn't reachable by hand in the pane (the Undo landed at 5 s left); `undo-line.test.tsx` and `use-ack-toast.test.tsx` hold it.
