@@ -40,8 +40,8 @@
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Done |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Done |
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Done |
-| S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | Todo |
-| G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov) | Todo |
+| S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | In progress |
+| G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov; re-baselined 21 Nov: ≈ Fri 27 Nov, D-071) | Todo |
 | S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 | 6 | Todo |
 | S21 | Client status page | 3 · P2 | L | FR-16 | S20 | 7 | Todo |
 | S22 | Post-incident review | 3 · P2 | M | FR-18 | G2 | 8 | Todo |
@@ -776,12 +776,13 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - **Test plan:** T06, T07
 - **Depends on:** S10–S18
 - **Done when:**
-  1. **T06:** two UAT rounds with owners on phones (ack, mute, maintenance), findings fixed or logged.
-  2. **T07:** game day — a real test site taken down; MTTD ≤ 3 min (Tier 1) and MTTA ≤ 15 min recorded (PRD §2).
+  1. **T06:** two UAT rounds at 390 px (ack, mute, maintenance), findings fixed or logged in `docs/uat.md` — on staging, run by Claude (D-071).
+  2. **T07:** game day — the staging Test target taken down; MTTD ≤ 3 min (Tier 1) and MTTA ≤ 15 min recorded in `docs/game-day.md` (PRD §2; MTTA is Claude's, D-071).
   3. All 12 test-plan items (T01–T12) re-run and ticked in `docs/test-plan-results.md`.
   4. `docs/parallel-run-log.md` covers two weeks and shows no incident seen by the hourly monitor that DxT Monitor missed.
-  5. The second Admin has run the updated runbook in a drill (engine heartbeat stopped → fault mode → hand check), and a restore from backup into a scratch project succeeded.
+  5. The updated runbook has been run in a drill on staging (engine heartbeat stopped → fault mode → hand check; Claude, D-071), and a restore from backup into a scratch project succeeded (Tao).
   6. (D-054, from S12a) Every active Admin is an Email integration on the production Healthchecks `engine` check (and the other checks D-053 has emailing the Admins), and each confirmed it by receiving a test notification.
+- **Decisions:** D-071
 - **Review:** slice-verifier, Tao sign-off.
 
 ### G2 · Team go-live gate (PRD §12 Phase 2 exit)
