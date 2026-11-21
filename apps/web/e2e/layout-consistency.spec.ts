@@ -301,6 +301,8 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
     // The nav links Settings to its first tab; the other tabs and My profile (account footer, avatar) are
     // reached from there (S16 PR 3, S17).
     pages.push('/settings/alert-channels', '/settings/security', '/settings/organisation', '/profile');
+    // A guide topic opened on a phone, and the one with the role matrix (S18).
+    pages.push('/guide?topic=alert', '/guide?topic=users');
 
     for (const width of WIDTHS) {
       const page = await signedInAt(browser, baseURL!, width);

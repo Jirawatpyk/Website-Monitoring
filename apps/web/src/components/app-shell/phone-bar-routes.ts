@@ -15,6 +15,7 @@ export interface PhoneBarSpec {
 const TO_OVERVIEW: PhoneBarBack = { href: '/', label: 'Back to overview' };
 const TO_SITES: PhoneBarBack = { href: '/sites', label: 'Back to sites' };
 const TO_INCIDENTS: PhoneBarBack = { href: '/incidents', label: 'Back to incidents' };
+const TO_GUIDE: PhoneBarBack = { href: '/guide', label: 'Back to all topics' };
 
 /** Back from a site's sub-page to the Site detail page that opened it (Edit site, Edit monitors). */
 export const toSite = (siteId: string): PhoneBarBack => ({ href: `/sites/${siteId}`, label: 'Back to site' });
@@ -23,8 +24,10 @@ export const toSite = (siteId: string): PhoneBarBack => ({ href: `/sites/${siteI
  * The bar for a path whose title needs no data. Site detail and Incident name their own (the site, the
  * INC number); this gives their fallback when the record isn't readable. A bottom-nav tab has no back arrow.
  */
-export function phoneBarFor(pathname: string): PhoneBarSpec {
+export function phoneBarFor(pathname: string, query: { topic?: string | null } = {}): PhoneBarSpec {
   const path = pathname.replace(/\/+$/, '') || '/';
+  // An open guide topic goes back to the topic list (MGuide), the list to the Overview.
+  if (path === '/guide') return { title: 'User guide', back: query.topic ? TO_GUIDE : TO_OVERVIEW };
   if (path === '/') return { title: null };
   const tab = BOTTOM_NAV_ITEMS.find((item) => item.href === path);
   if (tab) return { title: tab.label };

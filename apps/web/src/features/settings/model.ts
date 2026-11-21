@@ -1,6 +1,4 @@
-import { formatDay, formatWhen, MATRIX_ROLES, ROLE_LABELS, ROLE_MATRIX, type Role } from '@dxt/shared';
-
-const col = (r: Role) => MATRIX_ROLES.indexOf(r as (typeof MATRIX_ROLES)[number]);
+import { formatDay, formatWhen, ROLE_LABELS, type Role } from '@dxt/shared';
 
 /**
  * Users & roles (S16, D-062, spec §14.9, §35): the pure rules behind the page — the role matrix and its
@@ -16,19 +14,7 @@ export const isStaffRole = (r: string): r is StaffRole => (STAFF_ROLES as readon
 
 // ── The role matrix (Users / MUsers boards): rows and diff in @dxt/shared (D-062 item 13) ─────────
 
-export { gainsLoses, MATRIX_ROLES, ROLE_MATRIX, type Cell } from '@dxt/shared';
-
-/** One role's rows (MUsers' Role select) and its foot: "Responder: 6 of 10 allowed." */
-export function roleRows(role: Role) {
-  const i = col(role);
-  const rows = ROLE_MATRIX.map((r) => ({ label: r.label, cell: r.cells[i] ?? 'N' }));
-  const allowed = rows.filter((r) => r.cell !== 'N').length;
-  const name = role === 'client' ? 'Client · Phase 3' : ROLE_LABELS[role];
-  return {
-    rows,
-    foot: `${name}: ${allowed} of ${rows.length} allowed. “Own” = only where they are owner, backup or Site AM.`,
-  };
-}
+export { gainsLoses, MATRIX_ROLES, ROLE_MATRIX, roleRows, type Cell } from '@dxt/shared';
 
 // ── The page's data ────────────────────────────────────────────────────────────────────────────────
 

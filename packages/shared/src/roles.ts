@@ -1,4 +1,4 @@
-import type { Role } from './domain';
+import { ROLE_LABELS, type Role } from './domain';
 
 /**
  * The role matrix (Users / MUsers boards, spec §14.9) and what a role change adds and takes away —
@@ -250,4 +250,19 @@ export function roleDiff(from: Role, to: Role, opts: { managesClients: boolean }
   }
   const keep = kept.length ? `${kept.join(', ')}`.replace(/^./, (c) => c.toUpperCase()) : null;
   return { now, noLonger: [...noLonger, ...narrowed], keep };
+}
+
+/**
+ * One role's rows (MUsers' Role select, the User guide's phone matrix) and its foot: "Responder: 6 of
+ * 10 allowed." `rows` narrows the matrix (the guide leaves out rows for features not built, D-070).
+ */
+export function roleRows(role: Role, rows: readonly MatrixRow[] = ROLE_MATRIX) {
+  const i = MATRIX_ROLES.indexOf(role as (typeof MATRIX_ROLES)[number]);
+  const cells = rows.map((r) => ({ label: r.label, cell: r.cells[i] ?? 'N' }));
+  const allowed = cells.filter((c) => c.cell !== 'N').length;
+  const name = role === 'client' ? 'Client · Phase 3' : ROLE_LABELS[role];
+  return {
+    rows: cells,
+    foot: `${name}: ${allowed} of ${cells.length} allowed. “Own” = only where they are owner, backup or Site AM.`,
+  };
 }

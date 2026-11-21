@@ -9,7 +9,6 @@ import {
   Dialog,
   DropdownMenu,
   IconButton,
-  Select,
   Table,
   TBody,
   Td,
@@ -19,17 +18,12 @@ import {
   type DataTableColumn,
   type MenuItem,
 } from '@jirawatpyk/aura-react';
-import {
-  IconCheck,
-  IconChevronRight,
-  IconEllipsis,
-  IconEye,
-  IconMinus,
-  IconPlus,
-} from '@jirawatpyk/aura-react/icons';
-import { ROLE_LABELS, type Role } from '@dxt/shared';
+import { IconChevronRight, IconEllipsis, IconEye, IconPlus } from '@jirawatpyk/aura-react/icons';
+import { ROLE_LABELS } from '@dxt/shared';
 import { useEffect, useRef, useState } from 'react';
 import { HandOverDialog, type OncallData } from '@/features/oncall';
+import { RoleMark } from '@/components/role-mark';
+import { RoleMatrixPicker } from '@/components/role-matrix';
 import {
   changeBlockedWhy,
   countLine,
@@ -37,7 +31,6 @@ import {
   MATRIX_ROLES,
   oneAdminBanner,
   ROLE_MATRIX,
-  roleRows,
   sheetFacts,
   userRows,
   type Person,
@@ -297,7 +290,7 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
         <div className="hidden md:block">
           <MatrixTable />
         </div>
-        <PhoneMatrix />
+        <RoleMatrixPicker className="md:hidden" />
       </section>
 
       <InviteDialog open={open?.kind === 'invite'} onClose={close} onDone={finish} />
@@ -358,86 +351,13 @@ function MatrixTable() {
               <Td>{row.label}</Td>
               {row.cells.map((c, i) => (
                 <Td key={i} className="text-center">
-                  <Mark cell={c} />
+                  <RoleMark cell={c} />
                 </Td>
               ))}
             </Tr>
           ))}
         </TBody>
       </Table>
-    </div>
-  );
-}
-
-function Mark({ cell }: { cell: string }) {
-  if (cell === 'Y')
-    return (
-      <span className="text-fg-positive">
-        <IconCheck size="sm" aria-label="Allowed" />
-      </span>
-    );
-  if (cell === 'N')
-    return (
-      <span className="text-fg-tertiary">
-        <IconMinus size="sm" aria-label="Not allowed" />
-      </span>
-    );
-  return (
-    <span className="inline-flex items-start gap-1.5 text-left">
-      <span className="text-fg-secondary">
-        <IconCheck size="sm" aria-label="Allowed with limits" />
-      </span>
-      <span className="text-xs leading-snug text-fg-secondary">{cell}</span>
-    </span>
-  );
-}
-
-/** MUsers' matrix (§35.4): a Role select over one role's ten rows. */
-function PhoneMatrix() {
-  const [role, setRole] = useState<Role>('responder');
-  const { rows, foot } = roleRows(role);
-  return (
-    <div className="flex flex-col gap-3 md:hidden">
-      <Select
-        label="Role"
-        options={MATRIX_ROLES.map((r) => ({
-          value: r,
-          label: r === 'client' ? 'Client · Phase 3' : ROLE_LABELS[r],
-        }))}
-        value={role}
-        onChange={(e) => setRole(e.target.value as Role)}
-      />
-      <div className="rounded-aura-lg border border-border-default bg-bg-surface px-3.5 py-1">
-        {rows.map((r) => (
-          <div
-            key={r.label}
-            className="flex gap-2.5 border-b border-border-subtle py-2.5 text-sm leading-snug last:border-b-0"
-          >
-            <span
-              className={
-                r.cell === 'Y'
-                  ? 'text-fg-positive'
-                  : r.cell === 'N'
-                    ? 'text-fg-tertiary'
-                    : 'text-fg-secondary'
-              }
-            >
-              {r.cell === 'N' ? (
-                <IconMinus size="sm" aria-label="Not allowed" />
-              ) : (
-                <IconCheck size="sm" aria-label={r.cell === 'Y' ? 'Allowed' : 'Allowed with limits'} />
-              )}
-            </span>
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className={r.cell === 'N' ? 'text-fg-secondary' : ''}>{r.label}</span>
-              {r.cell !== 'Y' && r.cell !== 'N' && (
-                <span className="text-xs text-fg-secondary">{r.cell}</span>
-              )}
-            </span>
-          </div>
-        ))}
-        <span className="block py-2 text-xs text-fg-secondary">{foot}</span>
-      </div>
     </div>
   );
 }

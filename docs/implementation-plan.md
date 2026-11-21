@@ -39,7 +39,7 @@
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Done |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Done |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Done |
-| S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Todo |
+| S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | In review |
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | Todo |
 | G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov) | Todo |
 | S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 | 6 | Todo |
@@ -762,7 +762,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
 ### S18 · User guide
 
-- **Scope:** FR-22. Guide with search, role chips (default to the viewer's role, or On-call while on duty), topics per spec §18; mobile guide.
+- **Scope:** FR-22. Guide with search, role chips (default to the viewer's role, or On-call while on duty), topics per spec §18; mobile guide. Copy from the decisions, values read live (D-070).
 - **Boards:** Guide, MGuide
 - **Depends on:** S16
 - **Done when:**
@@ -800,6 +800,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   1. September sample figures on the page and PDF match spec §5 (BA 11 min, MuvMi 101 min, Cando 12, ORCA 8) and internal-only PROBLEMs are absent (test).
   2. The PDF renders at A4 with no clipped content (file attached to the PR).
   3. spec-checker passes both boards; nav "Uptime reports" live.
+- **Guide (D-070):** update the "Reports & client status page" topic in `features/guide/content.ts` for the Reports page and the PDF.
 - **Review:** spec-checker, security-reviewer (client data isolation).
 
 ### S21 · Client status page
@@ -811,6 +812,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   1. Each §12 mapping row renders as specified (component test per row); data older than 5 min shows the neutral message and no green banner.
   2. One client's page can't return another client's sites (test); more than 60 requests / min from one IP get HTTP 429 (test).
   3. spec-checker passes both boards.
+- **Guide (D-070):** update the "Reports & client status page" topic for the status page (Outage / Degraded / Planned maintenance, the internal-only rules).
 - **Review:** security-reviewer, spec-checker.
 
 ### S22 · Post-incident review
@@ -821,6 +823,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - **Done when:**
   1. Submitting a review moves the incident to In review; Tao's sign-off moves it to Closed; a PROBLEM can't enter review (tests).
   2. spec-checker passes PostIncident.
+- **Guide (D-070):** add In review / Closed and the review step to "Statuses & badges" and "Recover, root cause & resolve".
 - **Review:** spec-checker, engine-reviewer.
 
 ### S23 · Synthetic transactions
