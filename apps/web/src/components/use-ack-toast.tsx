@@ -51,16 +51,17 @@ export function useAckToast({ ack, undo }: { ack: AckAction; undo: UndoAction })
           router.refresh();
           return;
         }
-        const onUndo = () =>
-          startTransition(async () => {
-            const undone = await undo(incidentId).catch(() => ({ ok: false as const, message: FAILED }));
-            if (undone.ok) {
-              toast({ id: toastId, title: `Acknowledgement of ${id} undone`, duration: 4000 });
-            } else {
-              toast.error(`Couldn't undo ${id}`, { id: toastId, description: undone.message });
-            }
-            router.refresh();
-          });
+        // Returns the request's promise: UndoLine waits on it, so an Undo still in flight when the
+        // 10 s end never reads as "Posted" (S19 UAT F1).
+        const onUndo = async () => {
+          const undone = await undo(incidentId).catch(() => ({ ok: false as const, message: FAILED }));
+          if (undone.ok) {
+            toast({ id: toastId, title: `Acknowledgement of ${id} undone`, duration: 4000 });
+          } else {
+            toast.error(`Couldn't undo ${id}`, { id: toastId, description: undone.message });
+          }
+          router.refresh();
+        };
         const left = new Date(result.postsAt).getTime() - Date.now();
         toast.success(`Acknowledged ${id}${stopped}`, {
           id: toastId,
