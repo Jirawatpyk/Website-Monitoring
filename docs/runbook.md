@@ -396,7 +396,7 @@ D-005: Supabase Pro daily backups, kept 7 days, no PITR.
   2. **At once, in the new project:** disable `pg_cron` jobs (`select cron.unschedule(jobid) from cron.job;`) and leave `pg_net` unused. The copy has the same jobs as production, and nothing in it may run against the real world.
   3. Check the copy, read-only, in its SQL editor:
      ```sql
-     select (select count(*) filter (where is_active) from sites) live_sites, (select max(number) from incidents) last_incident, (select max(created_at) from audit_log) last_audit, (select max(checked_at) from check_results) last_check;
+     select (select count(*) filter (where is_active) from sites) live_sites, (select max(number) from incidents) last_incident, (select max(at) from audit_log) last_audit, (select max(checked_at) from check_results) last_check;
      ```
      The figures should match production as of the backup's time. Storage files (screenshots) aren't in a backup, as expected.
   4. **Delete the scratch project** (Settings → General → Delete project). Write the date, the backup's time and the four figures in `docs/test-plan-results.md` → Restore drill, never a key or URL.
@@ -411,9 +411,9 @@ On **staging**, with the Test target on `ok` (so the engine, still run by Bangko
 | 1 | Turn the staging crons off | — |
 | 2 | Wait 3 min | Healthchecks staging `engine` down; the staging VPS watchdog posts MONITOR FAULT once; the Overview shows the fault banner and the hand-check card |
 | 3 | Hand check: **Loads OK** on the Test target, then **Down — open incident** with a note | "Checked OK · …", then a manual incident (Trigger "Manual (hand check)"), its L0 posted from the request |
-| 4 | `sudo systemctl stop dxt-agent@staging`, wait 3 min (no engine run of any kind, D-055) → the incident → **Escalate now** | `ESCALATED · L1 … sent by hand` in the thread; one `step_fired` (`byHand`) |
+| 4 | Stop `dxt-agent@staging` on the VPS (as root over SSH, `verifier-staging` → Monitor fault), wait 3 min (no engine run of any kind, D-055) → the incident → **Escalate now** | `ESCALATED · L1 … sent by hand` in the thread; one `step_fired` (`byHand`) |
 | 5 | Start the agent; turn the crons on | "Status engine back — automatic escalation running again" on the timeline; the incident recovers on the next OK rounds |
-| 6 | Root cause (False alarm (monitor), "S19 drill") + Resolve; `pnpm staging:pause` | Resolved; staging asleep |
+| 6 | If the Client update card fired (the manual incident counts as Tier 1 DOWN, so it does after 15 min): **Not needed…** with a reason ("drill"). Then root cause (False alarm (monitor), "S19 drill") + Resolve; `pnpm staging:pause` | Resolved; staging asleep |
 
 ## Walk-through (G1)
 
