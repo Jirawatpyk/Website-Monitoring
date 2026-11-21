@@ -39,7 +39,7 @@
 | S15 | Audit log | 2 · P1 | S | FR-13 | S09 | 5 | Done |
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Done |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Done |
-| S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | In progress |
+| S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | In review |
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | Todo |
 | G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov) | Todo |
 | S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 | 6 | Todo |
