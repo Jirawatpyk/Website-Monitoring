@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import { Button, EmptyState, SegmentedControl, Tag, TextField, linkClass } from '@jirawatpyk/aura-react';
 import {
   IconArrowLeft,
@@ -39,7 +39,14 @@ const FIRST_TOPIC = 'alert';
 export function setGuideTopic(pathname: string, id: string | null, how: 'push' | 'replace' = 'push') {
   const url = id ? `${pathname}?topic=${id}` : pathname;
   if (how === 'push') window.history.pushState({ guide: true }, '', url);
-  else window.history.replaceState(window.history.state, '', url);
+  // A fresh object, never `history.state`: Next skips syncing `useSearchParams` for a state that
+  // already carries its internal `__NA` key, so the page would keep the old topic (/verify, S18).
+  else window.history.replaceState({ guide: isGuideEntry() }, '', url);
+}
+
+/** Whether the current history entry is one the guide pushed. */
+function isGuideEntry() {
+  return Boolean((window.history.state as { guide?: boolean } | null)?.guide);
 }
 
 /**
@@ -47,7 +54,7 @@ export function setGuideTopic(pathname: string, id: string | null, how: 'push' |
  * guide instead of reopening the topic); a topic loaded from a link is replaced (spec-checker, S18).
  */
 export function guideBackToList(pathname: string) {
-  if ((window.history.state as { guide?: boolean } | null)?.guide) window.history.back();
+  if (isGuideEntry()) window.history.back();
   else setGuideTopic(pathname, null, 'replace');
 }
 
@@ -120,7 +127,11 @@ export function GuidePage({
     const id = nextSelection(desktop, nextChip, nextQ, sel);
     if (id) setSel(id);
   };
-  const clear = () => refilter('All', '');
+  /** Clear goes away with the empty state, so focus moves to that layout's search field (/verify, S18). */
+  const clear = (e: MouseEvent<HTMLElement>) => {
+    e.currentTarget.closest('[data-guide-tree]')?.querySelector<HTMLInputElement>('input')?.focus();
+    refilter('All', '');
+  };
   const pick = (id: string) => {
     picked.current = true;
     setSel(id);
@@ -203,7 +214,7 @@ export function GuidePage({
   return (
     <>
       {/* ── Desktop (Guide) ───────────────────────────────────────────── */}
-      <div className="flex flex-col gap-6 max-xl:hidden">
+      <div data-guide-tree className="flex flex-col gap-6 max-xl:hidden">
         <div className="flex items-end justify-between gap-6">
           <div className="flex w-95 flex-col">{search}</div>
           <div className="flex flex-col gap-1">
@@ -285,7 +296,7 @@ export function GuidePage({
       </div>
 
       {/* ── Phone and tablet (MGuide) ─────────────────────────────────── */}
-      <div ref={phoneList} className="flex flex-col gap-3 xl:hidden">
+      <div ref={phoneList} data-guide-tree className="flex flex-col gap-3 xl:hidden">
         {phoneTopic ? (
           <PhoneArticle
             topic={phoneTopic}

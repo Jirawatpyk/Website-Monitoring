@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { guideTopics, type GuideFacts } from '../content';
-import { GuidePage } from './guide-page';
+import { GuidePage, guideBackToList } from './guide-page';
 
 const nav = vi.hoisted(() => ({ topic: null as string | null }));
 vi.mock('next/navigation', () => ({
@@ -69,6 +69,8 @@ describe('GuidePage (Guide, MGuide)', () => {
     expect(within(desktopNav()).getByText('No topics match “zzz” for Viewer')).toBeInTheDocument();
     await user.click(within(desktopNav()).getByRole('button', { name: 'Clear search and filters' }));
     expect(within(desktopNav()).getByText('11 topics')).toBeInTheDocument();
+    // The button left with the empty state; focus is back in the search, not on the page.
+    expect(screen.getAllByRole('textbox', { name: 'Search the guide' })[0]).toHaveFocus();
   });
 
   it('on the phone a topic opens through ?topic= without a navigation, and takes focus', async () => {
@@ -125,8 +127,11 @@ describe('GuidePage (Guide, MGuide)', () => {
 
   it('a Related topic replaces the open one; Back focuses the row the list opened', async () => {
     const user = userEvent.setup();
-    const push = vi.spyOn(window.history, 'pushState').mockImplementation(() => {});
-    const replace = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+    // Next tags its own history entries with `__NA` and doesn't sync useSearchParams for a state that
+    // carries it, so the replace must pass a fresh object (/verify on staging, S18).
+    const push = vi.spyOn(window.history, 'pushState').mockImplementation(() => {
+      window.history.replaceState({ guide: true, __NA: true }, '');
+    });
     const view = () => (
       <GuidePage desktop={guideTopics(FACTS, 'desktop')} phone={guideTopics(FACTS, 'phone')} mine="Viewer" />
     );
@@ -136,15 +141,25 @@ describe('GuidePage (Guide, MGuide)', () => {
     expect(push).toHaveBeenCalledTimes(1);
     nav.topic = 'statuses';
     rerender(view());
+    const replace = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
     // Statuses → Related "When an alert arrives", which the Viewer chip hides in the list.
     await user.click(within(list).getByRole('button', { name: /When an alert arrives/ }));
-    expect(replace).toHaveBeenLastCalledWith(window.history.state, '', '/guide?topic=alert');
+    expect(replace).toHaveBeenLastCalledWith({ guide: true }, '', '/guide?topic=alert');
     nav.topic = 'alert';
     rerender(view());
     nav.topic = null;
     rerender(view());
     // Back lands on the row the list opened (Statuses), not the hidden Related topic.
     expect(list.querySelector('[data-topic="statuses"]')).toHaveFocus();
+  });
+
+  it('back from a topic opened by a link replaces the entry with a state Next will sync', () => {
+    window.history.replaceState({ __NA: true }, '', '/guide?topic=mute');
+    const replace = vi.spyOn(window.history, 'replaceState');
+    const back = vi.spyOn(window.history, 'back');
+    guideBackToList('/guide');
+    expect(back).not.toHaveBeenCalled();
+    expect(replace).toHaveBeenLastCalledWith({ guide: false }, '', '/guide');
   });
 
   it('a Responder isn’t offered Admin-only screens', () => {

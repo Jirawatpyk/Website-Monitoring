@@ -60,5 +60,33 @@ test.describe('User guide (local Supabase)', () => {
     await page.getByRole('link', { name: 'Back to all topics' }).click();
     await expect(page).toHaveURL(/\/guide$/);
     await expect(page.getByRole('group', { name: 'Filter by role' })).toBeVisible();
+
+    // A Related topic replaces the open one, and the page follows (/verify on staging, S18: a replace
+    // that kept Next's history state changed the URL only).
+    await page
+      .getByRole('button', { name: /Statuses & badges/ })
+      .locator('visible=true')
+      .click();
+    await page
+      .getByRole('button', { name: /When an alert arrives/ })
+      .locator('visible=true')
+      .click();
+    await expect(page).toHaveURL(/\/guide\?topic=alert$/);
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'When an alert arrives' }).locator('visible=true'),
+    ).toBeVisible();
+  });
+
+  test('a topic opened from a link goes back to the list', async ({ page, context, baseURL }, info) => {
+    test.skip(info.project.name !== 'mobile', 'the phone layout');
+    await ensureUser('arm@example.test');
+    await signIn(context, baseURL!, 'arm@example.test');
+    await page.goto('/guide?topic=mute');
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Mute vs maintenance' }).locator('visible=true'),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Back to all topics' }).click();
+    await expect(page).toHaveURL(/\/guide$/);
+    await expect(page.getByRole('group', { name: 'Filter by role' })).toBeVisible();
   });
 });
