@@ -20,8 +20,19 @@ export const DRAFTS_FROM_MS = 6 * 3_600_000;
 
 export const draftPath = (clientId: string, monthKey: string) => `${clientId}/${monthKey}.pdf`;
 
+/** JSON with every object's keys sorted, so the stored copy (jsonb reorders keys) compares equal. */
+export function stableJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`;
+  if (v && typeof v === 'object')
+    return `{${Object.keys(v)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stableJson((v as Record<string, unknown>)[k])}`)
+      .join(',')}}`;
+  return JSON.stringify(v ?? null);
+}
+
 /** The figures without the moment they were worked out: what decides whether a draft changed. */
-const comparable = (f: ReportFigures) => JSON.stringify({ ...f, generatedAt: null });
+const comparable = (f: ReportFigures) => stableJson({ ...f, generatedAt: null });
 
 export type DraftsResult = {
   ok: boolean;

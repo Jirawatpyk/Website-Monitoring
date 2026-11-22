@@ -5,7 +5,7 @@ import { formatDuration, formatPercent } from '@dxt/shared';
 import type { ReportFigures } from './figures';
 import { monthLabel, reportMonths } from './month';
 import { liveFigures, loadDrafts, loadReportClients } from './queries';
-import { incidentNote, rowWords, type ReportRowWords } from './words';
+import { incidentNote, rowWords, type ReportRowWords, type ReportStatus } from './words';
 
 /**
  * The Reports page's data (board Reports, spec §14.12, D-072, D-073 item 13): a closed month reads
@@ -13,7 +13,7 @@ import { incidentNote, rowWords, type ReportRowWords } from './words';
  * now. RLS as the signed-in staff member.
  */
 
-export type ReportStatus = 'draft' | 'not_drafted' | 'running' | 'unreadable';
+export type { ReportStatus } from './words';
 
 export interface ReportRow extends ReportRowWords {
   clientId: string;

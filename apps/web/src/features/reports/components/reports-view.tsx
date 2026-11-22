@@ -17,7 +17,6 @@ import {
   Th,
   THead,
   Tr,
-  type StatusTone,
 } from '@jirawatpyk/aura-react';
 import {
   IconBell,
@@ -31,6 +30,7 @@ import {
   IconPencil,
 } from '@jirawatpyk/aura-react/icons';
 import { monthLabel } from '../month';
+import { incidentsShort, REPORT_STATUS as STATUS, statusNote } from '../words';
 import type { ReportRow, ReportsPage } from '../page-data';
 
 const STAT_ICONS = [<IconChartColumn key="u" />, <IconClock key="d" />, <IconBell key="i" />];
@@ -43,25 +43,6 @@ const VIEW_ONLY = 'Viewers see the figures; opening the PDF is for Admins, Respo
 
 const RULE =
   'Tier 1 clients first. Incidents = what the client sees: Outage (a DOWN) and Degraded (a slow, key-page, regional or intermittent PROBLEM). SSL, domain, keyword and blocked-check PROBLEMs stay internal and aren’t counted. A report can’t go out while one of its incidents has no root cause.';
-
-/** The report status (spec §42 item 8): words and a tone, so the pill carries its icon too (§11). */
-const STATUS: Record<ReportRow['status'], { words: string; tone: StatusTone }> = {
-  draft: { words: 'Draft ready', tone: 'ready' },
-  not_drafted: { words: 'No draft yet', tone: 'neutral' },
-  running: { words: 'Month running', tone: 'neutral' },
-  unreadable: { words: 'Draft out of date', tone: 'warning' },
-};
-
-/** The sheet's line under the status, where it helps (MReports). */
-function statusNote(r: ReportRow, nextMonth: string): string | null {
-  if (r.status === 'running')
-    return `Generated on demand from live figures — nothing is stored or sent until the 1 ${nextMonth} draft.`;
-  if (r.status === 'unreadable')
-    return 'The stored draft is being made again — it refreshes on its own within a few minutes.';
-  if (r.status === 'not_drafted')
-    return 'Figures worked out now; the draft is made on its own within a few minutes.';
-  return null;
-}
 
 function ReportCell({ r }: { r: ReportRow }) {
   return (
@@ -77,7 +58,6 @@ function ReportCell({ r }: { r: ReportRow }) {
 }
 
 const pdfHref = (r: ReportRow, month: string) => `/api/reports/${r.clientId}/${month}`;
-const incidentsShort = (n: string) => `${n} incident${n === '1' ? '' : 's'}`;
 
 /** The reason Send is off, said in words wherever Send is (never only in a tooltip, §42 item 6). */
 function SendOff() {
@@ -144,9 +124,6 @@ export function ReportsView({
   const running = monthLabel(data.runningMonth, { short: true });
   const preview = data.running ? 'Preview draft' : 'Preview';
   const openWords = data.running ? 'Open preview draft' : 'Open PDF';
-  const nextMonth = monthLabel(data.runningMonth === data.month ? nextKey(data.month) : data.runningMonth, {
-    short: true,
-  }).split(' ')[0]!;
   const [sheet, setSheet] = useState<ReportRow | null>(null);
   // the last one opened stays in the sheet while it animates closed (no blank title), as MAuditLog
   const [last, setLast] = useState<ReportRow | null>(null);
@@ -381,8 +358,8 @@ export function ReportsView({
         {shown && (
           <div className="flex flex-col gap-3">
             <ReportCell r={shown} />
-            {statusNote(shown, nextMonth) && (
-              <p className="m-0 text-sm text-fg-secondary">{statusNote(shown, nextMonth)}</p>
+            {statusNote(shown.status, data.month) && (
+              <p className="m-0 text-sm text-fg-secondary">{statusNote(shown.status, data.month)}</p>
             )}
             <dl className="m-0 flex flex-col text-sm">
               {[
@@ -433,10 +410,4 @@ export function ReportsView({
       </Dialog>
     </div>
   );
-}
-
-/** The month after `key` (`YYYY-MM`). */
-function nextKey(key: string): string {
-  const [y, m] = key.split('-').map(Number) as [number, number];
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
 }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BANGKOK_OFFSET_MS } from '@dxt/shared';
+import { BANGKOK_OFFSET_MS, formatMonth } from '@dxt/shared';
 
 /**
  * Report months (S20, D-072): a Bangkok calendar month as `YYYY-MM`. The page shows two — the last
@@ -7,21 +7,6 @@ import { BANGKOK_OFFSET_MS } from '@dxt/shared';
  */
 
 export const reportMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
-
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-] as const;
 
 /** The Bangkok month `at` falls in. */
 export function monthKeyOf(at: Date): string {
@@ -35,6 +20,12 @@ export function previousMonth(key: string): string {
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
+/** The month after `key`. */
+export function nextMonth(key: string): string {
+  const [y, m] = key.split('-').map(Number) as [number, number];
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
 /** The two months the page offers: the last complete one first, then the running one. */
 export function reportMonths(now: Date): { closed: string; running: string } {
   const running = monthKeyOf(now);
@@ -44,7 +35,8 @@ export function reportMonths(now: Date): { closed: string; running: string } {
 /** "August 2026"; `short` → "Aug 2026". */
 export function monthLabel(key: string, options: { short?: boolean } = {}): string {
   const [y, m] = key.split('-').map(Number) as [number, number];
-  const name = MONTHS[m - 1]!;
+  // the middle of the month, so no time zone can move it to another one
+  const name = formatMonth(new Date(Date.UTC(y, m - 1, 15)));
   return `${options.short ? name.slice(0, 3) : name} ${y}`;
 }
 

@@ -50,12 +50,13 @@ async function launch() {
   return chromium.launch({ headless: true });
 }
 
-/** The PDF bytes for one report. */
-export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
+type Browser = Awaited<ReturnType<typeof launch>>;
+
+/** One report printed in an open browser: its own context, JavaScript off, every request but data: refused. */
+async function printIn(browser: Browser, model: PdfModel): Promise<Buffer> {
   const html = reportDocument(model, await head());
-  const browser = await launch();
+  const context = await browser.newContext({ javaScriptEnabled: false, colorScheme: 'light' });
   try {
-    const context = await browser.newContext({ javaScriptEnabled: false, colorScheme: 'light' });
     await context.route('**/*', (route) =>
       route.request().url().startsWith('data:') ? route.continue() : route.abort(),
     );
@@ -76,6 +77,30 @@ export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
       margin: { top: '18mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });
   } finally {
+    await context.close();
+  }
+}
+
+/** The PDF bytes for one report (the route: one browser per request). */
+export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
+  const browser = await launch();
+  try {
+    return await printIn(browser, model);
+  } finally {
     await browser.close();
   }
+}
+
+/**
+ * For many reports in one run (the drafts cron): Chromium starts on the first print, not before — a run
+ * where nothing changed launches nothing — and every print reuses it until `close`.
+ */
+export function pdfPrinter(): { render: (model: PdfModel) => Promise<Buffer>; close: () => Promise<void> } {
+  let browser: Promise<Browser> | null = null;
+  return {
+    render: async (model) => printIn(await (browser ??= launch()), model),
+    close: async () => {
+      if (browser) await (await browser.catch(() => null))?.close();
+    },
+  };
 }

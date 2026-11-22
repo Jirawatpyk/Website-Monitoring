@@ -10,7 +10,7 @@ import {
   type Trigger,
 } from '@dxt/shared';
 import { needsRootCause, type ReportFigures, type ReportFiguresIncident } from './figures';
-import { monthLabel } from './month';
+import { monthLabel, nextMonth } from './month';
 
 /**
  * The words of the Reports page and the monthly PDF (boards Reports, ReportPDF; spec §5, §12, §13,
@@ -166,7 +166,7 @@ export function pdfModel(f: ReportFigures): PdfModel {
       {
         label: 'Incidents',
         value: String(f.outages + f.degraded),
-        caption: incidentNote(f).replace(', ', ' · ') || 'None',
+        caption: incidentNote(f).split(', ').join(' · ') || 'None',
       },
       {
         label: 'Typical response',
@@ -227,3 +227,30 @@ export function pdfModel(f: ReportFigures): PdfModel {
     header: `${f.client.name} · ${label}`,
   };
 }
+
+// ---- the Reports page (spec §42 item 8)
+
+/** The report's state on the page (page-data.ts). */
+export type ReportStatus = 'draft' | 'not_drafted' | 'running' | 'unreadable';
+
+/** The report status (spec §42 item 8): words and a tone, so the pill carries its icon too (§11). */
+export const REPORT_STATUS: Record<ReportStatus, { words: string; tone: 'ready' | 'neutral' | 'warning' }> = {
+  draft: { words: 'Draft ready', tone: 'ready' },
+  not_drafted: { words: 'No draft yet', tone: 'neutral' },
+  running: { words: 'Month running', tone: 'neutral' },
+  unreadable: { words: 'Draft out of date', tone: 'warning' },
+};
+
+/** The sheet's line under the status, where it helps (MReports). */
+export function statusNote(status: ReportStatus, month: string): string | null {
+  if (status === 'running')
+    return `Generated on demand from live figures — nothing is stored or sent until the 1 ${monthLabel(nextMonth(month), { short: true }).split(' ')[0]} draft.`;
+  if (status === 'unreadable')
+    return 'The stored draft is being made again — it refreshes on its own within a few minutes.';
+  if (status === 'not_drafted')
+    return 'Figures worked out now; the draft is made on its own within a few minutes.';
+  return null;
+}
+
+/** "1 incident", "3 incidents" (MReports card). */
+export const incidentsShort = (n: string) => `${n} incident${n === '1' ? '' : 's'}`;

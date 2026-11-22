@@ -1,4 +1,4 @@
-import { renderReportPdf, runReportDrafts } from '@/features/reports/server';
+import { pdfPrinter, runReportDrafts } from '@/features/reports/server';
 import { cronHandler } from '@/lib/auth/cron';
 import { serverEnv } from '@/lib/env';
 import { runCronJob } from '@/server/cron-job';
@@ -12,6 +12,14 @@ export const maxDuration = 300;
 // changed (a root cause added, a false alarm marked).
 export const GET = cronHandler(() =>
   runCronJob('report-drafts', serverEnv().HEALTHCHECKS_PING_URL_REPORT_DRAFTS, () =>
-    runReportDrafts(serviceDb(), new Date(), renderReportPdf),
+    (async () => {
+      // one Chromium for every changed client, started only if one changed (code review S20)
+      const printer = pdfPrinter();
+      try {
+        return await runReportDrafts(serviceDb(), new Date(), printer.render);
+      } finally {
+        await printer.close();
+      }
+    })(),
   ),
 );
