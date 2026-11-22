@@ -2,7 +2,7 @@ import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { PdfModel } from '../words';
-import { esc, reportDocument } from './document';
+import { reportDocument } from './document';
 
 /**
  * Prints the monthly report to an A4 PDF with headless Chromium (D-073 item 1). On Vercel the binary
@@ -20,10 +20,10 @@ const FONTS = [
   ['Noto Sans Thai', 'noto-sans-thai-thai-wght-normal.woff2', '100 900'],
 ] as const;
 
-let headCache: Promise<{ css: string; faces: string }> | null = null;
+let headCache: Promise<string> | null = null;
 
 /** AURA's light tokens and the fonts as `data:` URLs — read once per instance. */
-function head(): Promise<{ css: string; faces: string }> {
+function head(): Promise<string> {
   headCache ??= (async () => {
     const css = await readFile(path.join(AURA_DIR, 'aura.css'), 'utf8');
     const faces = await Promise.all(
@@ -33,7 +33,7 @@ function head(): Promise<{ css: string; faces: string }> {
       }),
     );
     // the dark block only applies under prefers-color-scheme: dark, which print never emulates
-    return { css, faces: faces.join('\n') };
+    return `${css}\n${faces.join('\n')}`;
   })().catch((err) => {
     headCache = null;
     throw err;
@@ -52,8 +52,7 @@ async function launch() {
 
 /** The PDF bytes for one report. */
 export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
-  const { css, faces } = await head();
-  const html = reportDocument(model, `${css}\n${faces}`);
+  const html = reportDocument(model, await head());
   const browser = await launch();
   try {
     const context = await browser.newContext({ javaScriptEnabled: false, colorScheme: 'light' });
@@ -66,13 +65,13 @@ export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
     // variables; #52525b = zinc-600 = --aura-fg-secondary
     // eslint-disable-next-line aura/no-hardcoded-color -- see above
     const muted = '#52525b';
-    const small = `font-family:Inter,"Noto Sans Thai",sans-serif;font-size:8px;color:${muted};width:100%;padding:0 15mm;`;
+    const small = `font-family:Inter,sans-serif;font-size:8px;color:${muted};width:100%;padding:0 15mm;`;
     return await page.pdf({
       format: 'A4',
       printBackground: true,
       displayHeaderFooter: true,
-      // a separate document: it gets the fonts again, or a Thai client name prints as nothing (S20 staging)
-      headerTemplate: `<style>${faces}</style><div style="${small}display:flex;justify-content:space-between"><span>${esc(model.header)}</span><span>DxT</span></div>`,
+      // the header strip is in the page (document.ts); the footer template holds only digits and words in Latin
+      headerTemplate: '<span></span>',
       footerTemplate: `<div style="${small}text-align:right">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
       margin: { top: '18mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });

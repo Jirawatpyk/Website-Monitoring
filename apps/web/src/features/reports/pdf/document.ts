@@ -9,8 +9,9 @@ import type { PdfModel } from '../words';
  *
  * (Next 16 refuses `react-dom/server` in app code, so this is a template, not a React tree.)
  *
- * Page breaks (ReportPDF spec note): the header strip and page numbers repeat on every page through
- * Chromium's header / footer templates; an incident row never splits; the Incidents heading repeats
+ * Page breaks (ReportPDF spec note): the header strip repeats on every page as the page table's
+ * `<thead>` (so it uses the page's own fonts: Chromium's header template, a separate document, printed
+ * a Thai client name as nothing on staging); the page numbers come from the footer template; an incident row never splits; the Incidents heading repeats
  * at the top of a continued list (a repeated table header).
  */
 
@@ -67,6 +68,10 @@ thead { display: table-header-group; }
 .inc .kind[data-k="degraded"] { color: var(--aura-alert-warning-fg); }
 .inc .cause { display: block; color: var(--aura-fg-secondary); font-weight: 400; }
 .empty { color: var(--aura-fg-secondary); }
+table.page { width: 100%; border-collapse: collapse; }
+table.page > thead > tr > td { padding: 0 0 10px; text-align: left; border: 0; }
+table.page > tbody > tr > td { padding: 0; text-align: left; border: 0; font-variant-numeric: normal; }
+.strip { display: flex; justify-content: space-between; font-size: 8px; color: var(--aura-fg-secondary); font-weight: 400; }
 footer.measure { margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--aura-border-default); font-size: 10px; line-height: 1.55; color: var(--aura-fg-secondary); break-inside: avoid; }
 footer.measure b { color: var(--aura-fg-primary); }
 footer.measure .id { display: block; margin-top: 8px; }
@@ -120,11 +125,13 @@ export function reportDocument(model: PdfModel, head: string): string {
     : '<h2>Incidents</h2><p class="empty">No outages or degraded service this month.</p>';
 
   return `<!doctype html><html lang="en" data-theme="light"><head><meta charset="utf-8"><title>${esc(model.title)}</title><style>${head}${STYLE}</style></head><body>
+<table class="page"><thead><tr><td><div class="strip"><span>${esc(model.header)}</span><span>DxT</span></div></td></tr></thead><tbody><tr><td>
 <header class="top"><div><div class="eyebrow mono">${esc(model.eyebrow)}</div><h1>${esc(model.client)}</h1><div class="meta">${esc(model.meta)}</div></div><div class="mark" aria-label="DxT">DxT <i></i></div></header>
 <div class="tiles">${tiles}</div>
 <section class="avail"><h2>Daily availability</h2>${sites}<div class="legend"><span>${swatch('ok')}Fully available</span><span>${swatch('degraded')}Degraded (site reachable)</span><span>${swatch('outage')}Outage</span><span>${swatch('ok', true)}Planned maintenance (not counted)</span><span class="end">Each day shows its worst event</span></div></section>
 <section><h2>By website</h2><table><thead><tr><th>Website</th><th>Uptime</th><th>Downtime</th><th>Typical response</th><th>Slowest 5%</th><th>Incidents</th></tr></thead><tbody>${table}</tbody></table></section>
 <section>${incidents}</section>
 <footer class="measure"><b>How we measure.</b> ${esc(model.measure)}<span class="id mono">${esc(model.footer)}</span></footer>
+</td></tr></tbody></table>
 </body></html>`;
 }
