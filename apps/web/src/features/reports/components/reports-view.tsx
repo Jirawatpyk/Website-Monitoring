@@ -156,15 +156,15 @@ export function ReportsView({
     />
   );
 
-  const [focusCard, setFocusCard] = useState<string | null>(null);
+  const focusCard = useRef<string | null>(null);
   // back to the card it came from once the sheet is gone (after React rendered: apps/web CLAUDE.md → Testing)
   useEffect(() => {
-    if (sheet || !focusCard) return;
-    cards.current.get(focusCard)?.focus();
-    setFocusCard(null);
-  }, [sheet, focusCard]);
+    if (sheet || !focusCard.current) return;
+    cards.current.get(focusCard.current)?.focus();
+    focusCard.current = null;
+  }, [sheet]);
   const closeSheet = () => {
-    setFocusCard(sheet?.clientId ?? null);
+    focusCard.current = sheet?.clientId ?? null;
     setSheet(null);
   };
 
