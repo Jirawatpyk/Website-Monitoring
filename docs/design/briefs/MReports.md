@@ -2,7 +2,7 @@
 
 **Board to draw:** `MReports`, the phone version of `Reports` (390 × 844, light and dark).
 **Route:** `/reports`, built in S20 (D-072, D-073). The desktop board `Reports.dc.html` is built from xl (1280 px).
-**Until this board arrives:** below xl, each client is a card (one column on a phone, two from 768 px). That's a stop-gap, not a design. Screenshots for reference: `reports-390-light.png`, `reports-390-dark.png` and `reports-820-light.png` (Tao has them).
+**Until this board arrives:** below xl, each client is a card (one column on a phone, two from 768 px). That's a stop-gap, not a design: start from the `Reports` board, not from it.
 
 ## What the page holds
 
