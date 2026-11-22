@@ -46,6 +46,8 @@ const REPORT_PDF_FILES = [
   './node_modules/@jirawatpyk/aura-tokens/fonts/inter-*.woff2',
   './node_modules/@jirawatpyk/aura-tokens/fonts/noto-sans-thai-*.woff2',
   './node_modules/@sparticuz/chromium/bin/**',
+  // reads browsers.json and other files by path at run time, which tracing misses
+  './node_modules/playwright-core/**',
 ];
 
 const config: NextConfig = {
