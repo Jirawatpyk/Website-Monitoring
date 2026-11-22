@@ -157,7 +157,7 @@ describe('runReportDrafts (D-073 item 13)', () => {
 });
 
 describe('loadReportsPage', () => {
-  it('a closed month without a draft is worked out now: "Not drafted yet"', async () => {
+  it('a closed month without a draft is worked out now: "No draft yet"', async () => {
     const page = await loadReportsPage(db().db, '2026-10', NOW);
     expect(page).toMatchObject({
       month: '2026-10',

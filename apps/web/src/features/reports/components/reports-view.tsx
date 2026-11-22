@@ -30,13 +30,13 @@ import type { ReportRow, ReportsPage } from '../page-data';
 const STAT_ICONS = [<IconChartColumn key="u" />, <IconClock key="d" />, <IconBell key="i" />];
 
 /** Why Send is off (D-072 item 3: sending to clients comes after go-live). */
-const SEND_OFF = 'Sending reports to clients isn’t available yet — download the PDF and send it yourself';
+const SEND_OFF = 'Sending from here comes later — open the PDF and email it to the client yourself.';
 
 const STATUS_WORDS: Record<ReportRow['status'], string> = {
   draft: 'Draft ready',
-  not_drafted: 'Not drafted yet',
+  not_drafted: 'No draft yet',
   running: 'Month running',
-  unreadable: 'Draft from an older version',
+  unreadable: 'Draft out of date',
 };
 
 function ReportCell({ r }: { r: ReportRow }) {
@@ -264,7 +264,7 @@ export function ReportsView({ data, asOf }: { data: ReportsPage; asOf: string })
             </ul>
           </>
         )}
-        <p className="m-0 text-xs text-fg-secondary">{SEND_OFF}.</p>
+        <p className="m-0 text-xs text-fg-secondary">{SEND_OFF}</p>
       </section>
     </div>
   );

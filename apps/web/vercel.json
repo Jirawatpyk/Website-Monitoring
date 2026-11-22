@@ -21,6 +21,6 @@
     { "path": "/api/cron/expiry", "schedule": "0 * * * *" },
     { "path": "/api/cron/housekeeping", "schedule": "30 20 * * *" },
     { "path": "/api/cron/reports", "schedule": "0 2 * * *" },
-    { "path": "/api/cron/report-drafts", "schedule": "5 * * * *" }
+    { "path": "/api/cron/report-drafts", "schedule": "*/10 * * * *" }
   ]
 }

@@ -7,7 +7,7 @@ import { liveFigures, loadDrafts, loadReportClients } from './queries';
 import { pdfModel } from './words';
 
 /**
- * The monthly drafts (S20, D-072 item 2, D-073 items 11, 13): each hour the cron works out the last
+ * The monthly drafts (S20, D-072 item 2, D-073 items 11, 13): every 10 minutes the cron works out the last
  * complete month for every client and stores the draft — figures and PDF — when there is none yet
  * (the first run on the 1st) or when its figures changed since (a root cause added, a false alarm
  * marked). So the page and the PDF of a closed month always read the stored draft. Service role.

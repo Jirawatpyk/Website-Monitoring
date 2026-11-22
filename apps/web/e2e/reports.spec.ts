@@ -29,7 +29,7 @@ test.describe('Uptime reports (local Supabase)', () => {
 
     const send = rows.first().getByRole('button', { name: 'Send' });
     await expect(send).toBeDisabled();
-    await expect(send).toHaveAttribute('title', /isn’t available yet/);
+    await expect(send).toHaveAttribute('title', /Sending from here comes later/);
 
     // the running month: a live preview on demand
     await page

@@ -20,10 +20,10 @@ const FONTS = [
   ['Noto Sans Thai', 'noto-sans-thai-thai-wght-normal.woff2', '100 900'],
 ] as const;
 
-let headCache: Promise<string> | null = null;
+let headCache: Promise<{ css: string; faces: string }> | null = null;
 
 /** AURA's light tokens and the fonts as `data:` URLs — read once per instance. */
-function head(): Promise<string> {
+function head(): Promise<{ css: string; faces: string }> {
   headCache ??= (async () => {
     const css = await readFile(path.join(AURA_DIR, 'aura.css'), 'utf8');
     const faces = await Promise.all(
@@ -33,7 +33,7 @@ function head(): Promise<string> {
       }),
     );
     // the dark block only applies under prefers-color-scheme: dark, which print never emulates
-    return `${css}\n${faces.join('\n')}`;
+    return { css, faces: faces.join('\n') };
   })().catch((err) => {
     headCache = null;
     throw err;
@@ -52,7 +52,8 @@ async function launch() {
 
 /** The PDF bytes for one report. */
 export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
-  const html = reportDocument(model, await head());
+  const { css, faces } = await head();
+  const html = reportDocument(model, `${css}\n${faces}`);
   const browser = await launch();
   try {
     const context = await browser.newContext({ javaScriptEnabled: false, colorScheme: 'light' });
@@ -62,12 +63,14 @@ export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
     const page = await context.newPage();
     await page.setContent(html, { waitUntil: 'load', timeout: 20_000 });
     // eslint-disable-next-line aura/no-hardcoded-color -- Chromium's header/footer templates are separate documents that can't read the page's CSS variables; #52525b = zinc-600 = --aura-fg-secondary
-    const small = 'font-family:Inter,sans-serif;font-size:8px;color:#52525b;width:100%;padding:0 15mm;';
+    const small =
+      'font-family:Inter,"Noto Sans Thai",sans-serif;font-size:8px;color:#52525b;width:100%;padding:0 15mm;';
     return await page.pdf({
       format: 'A4',
       printBackground: true,
       displayHeaderFooter: true,
-      headerTemplate: `<div style="${small}display:flex;justify-content:space-between"><span>${esc(model.header)}</span><span>DxT</span></div>`,
+      // a separate document: it gets the fonts again, or a Thai client name prints as nothing (S20 staging)
+      headerTemplate: `<style>${faces}</style><div style="${small}display:flex;justify-content:space-between"><span>${esc(model.header)}</span><span>DxT</span></div>`,
       footerTemplate: `<div style="${small}text-align:right">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
       margin: { top: '18mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });
