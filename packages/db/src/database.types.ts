@@ -161,6 +161,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"client_reports": {
+                  Row: {
+                    "client_id": string,"created_at": string,"figures": NonNullable<Json>,"generated_at": string,"id": string,"month": string,"storage_path": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "client_id": string,"created_at"?: string,"figures": NonNullable<Json>,"generated_at"?: string,"id"?: string,"month": string,"storage_path": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "client_id"?: string,"created_at"?: string,"figures"?: NonNullable<Json>,"generated_at"?: string,"id"?: string,"month"?: string,"storage_path"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_reports_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"clients": {
                   Row: {
                     "am_user_id": string | null,"contact_email": string | null,"created_at": string,"id": string,"is_internal": boolean,"language": string,"name": string,"updated_at": string
