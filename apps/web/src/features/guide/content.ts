@@ -275,6 +275,7 @@ const LINKS = {
   probes: { label: 'Probes & heartbeat', href: '/probes', icon: 'monitor' },
   sites: { label: 'Sites', href: '/sites', icon: 'monitor' },
   audit: { label: 'Audit log', href: '/audit', icon: 'file-text' },
+  reports: { label: 'Uptime reports', href: '/reports', icon: 'chart-column' },
   users: { label: 'Users & roles', href: '/settings/users', icon: 'users' },
   security: { label: 'Sign-in & security', href: '/settings/security', icon: 'lock' },
   channels: { label: 'Alert channels', href: '/settings/alert-channels', icon: 'bell' },
@@ -813,14 +814,31 @@ function drafts(f: GuideFacts): Draft[] {
     group: 'Everyday',
     icon: 'chart-column',
     title: 'Reports & client status page',
-    summary: 'The daily digest, the weekly summary and how uptime is counted',
-    keywords: 'report digest weekly summary uptime target status page client outage degraded',
+    summary: 'Uptime reports, the daily digest, the weekly summary and how uptime is counted',
+    keywords:
+      'report reports pdf monthly digest weekly summary uptime target status page client outage degraded root cause',
     roles: ['Stakeholder', 'Admin'],
-    lede: 'What the daily digest and the weekly summary tell you, and how uptime is counted. Client reports and the client status page aren’t in DxT Monitor yet.',
+    lede: 'The monthly client reports, what the daily digest and the weekly summary tell you, and how uptime is counted. Sending reports to clients and the client status page aren’t in DxT Monitor yet.',
     blocks: [
       {
         kind: 'bullets',
         items: [
+          B(
+            'Uptime reports:',
+            'one monthly PDF per client, drafted on the 1st at 06:00 and refreshed on its own when its figures change (a root cause added, a false alarm marked). Pick the last complete month or the running one; the running month is a preview worked out on demand.',
+          ),
+          B(
+            'What a client sees:',
+            'Outage (a DOWN) and Degraded (a slow, key-page, regional or intermittent PROBLEM). SSL, domain, keyword and blocked-check PROBLEMs stay internal, and an incident resolved as a false alarm is left out. Each site is measured against its own tier’s target.',
+          ),
+          B(
+            'Needs root cause',
+            'marks a report with a client-visible incident that has no root cause yet: add it on the incident before the report goes to the client.',
+          ),
+          B(
+            'Open PDF:',
+            'Admins, Responders and Stakeholders open or download a client’s PDF; Viewers see the figures only. Sending from DxT Monitor comes later — for now email the PDF to the client yourself.',
+          ),
           B('Daily digest at 09:00', 'posts to the DxT Website Reports Space, not the Alerts Space.'),
           B('Weekly summary on Monday', 'posts there too, and the CEO gets it by email.'),
           B(
@@ -836,7 +854,7 @@ function drafts(f: GuideFacts): Draft[] {
         ],
       },
     ],
-    related: [LINKS.overview, LINKS.sites],
+    related: [LINKS.reports, LINKS.overview, LINKS.sites],
     relatedTopics: ['statuses', 'client'],
   };
 

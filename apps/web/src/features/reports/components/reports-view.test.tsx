@@ -55,7 +55,7 @@ const card = (name: RegExp) => screen.getByRole('button', { name });
 
 describe('ReportsView', () => {
   it('a card opens the sheet with the figures, Open PDF and Send off with its reason; closing returns focus', async () => {
-    render(<ReportsView data={page()} asOf="Sun 22 Nov 13:03" />);
+    render(<ReportsView data={page()} asOf="Sun 22 Nov 13:03" canOpen />);
     const ba = card(
       /^Bangkok Airways, Tier 1, uptime 99\.97%, down 26 min, 2 incidents, report Draft ready, needs root cause/,
     );
@@ -87,6 +87,7 @@ describe('ReportsView', () => {
           rows: [row({ status: 'running', siteNames: ['MuvMi'], sites: 1 })],
         })}
         asOf="Sun 22 Nov 13:03"
+        canOpen
       />,
     );
     expect(screen.getByText('Preview draft · generated on demand')).toBeInTheDocument();
@@ -99,7 +100,7 @@ describe('ReportsView', () => {
   });
 
   it('the rule note opens with More; the month switch pushes the running month', () => {
-    render(<ReportsView data={page()} asOf="Sun 22 Nov 13:03" />);
+    render(<ReportsView data={page()} asOf="Sun 22 Nov 13:03" canOpen />);
     const more = screen.getByRole('button', { name: 'More' });
     expect(more).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(more);
@@ -111,8 +112,18 @@ describe('ReportsView', () => {
     expect(screen.getAllByText('No draft yet').length).toBeGreaterThan(0);
   });
 
+  it('a Viewer sees the figures, but Preview and Open PDF are off with the reason (PRD §3)', () => {
+    render(<ReportsView data={page()} asOf="Sun 22 Nov 13:03" canOpen={false} />);
+    expect(screen.queryByRole('link', { name: /opens in a new tab/ })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Preview' })[0]).toBeDisabled();
+    fireEvent.click(card(/^Bangkok Airways/));
+    const sheet = screen.getByRole('dialog');
+    expect(within(sheet).getByRole('button', { name: 'Open PDF' })).toBeDisabled();
+    expect(sheet).toHaveTextContent('opening the PDF is for Admins, Responders and Stakeholders');
+  });
+
   it('no rows: the empty state', () => {
-    render(<ReportsView data={page({ rows: [] })} asOf="Sun 22 Nov 13:03" />);
+    render(<ReportsView data={page({ rows: [] })} asOf="Sun 22 Nov 13:03" canOpen />);
     expect(screen.getByText('No client sites were watched this month')).toBeInTheDocument();
   });
 });

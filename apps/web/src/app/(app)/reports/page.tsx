@@ -34,7 +34,11 @@ export default async function ReportsPage({
   const data = await loadReportsPage(await createClient(), month, now);
   return (
     <Container>
-      <ReportsView data={data} asOf={`${formatDay(now, { weekday: true })} ${formatTime(now)}`} />
+      <ReportsView
+        data={data}
+        asOf={`${formatDay(now, { weekday: true })} ${formatTime(now)}`}
+        canOpen={access.profile.role !== 'viewer'}
+      />
     </Container>
   );
 }

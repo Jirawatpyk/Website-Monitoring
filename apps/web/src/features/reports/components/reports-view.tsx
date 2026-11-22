@@ -38,6 +38,9 @@ const STAT_ICONS = [<IconChartColumn key="u" />, <IconClock key="d" />, <IconBel
 /** Why Send is off (D-072 item 3; words settled on MReports, spec §42 item 8). */
 const SEND_OFF = 'Sending from here comes later — open the PDF and email it to the client yourself.';
 
+/** Why a Viewer's Preview / Open PDF is off (PRD §3: Download uptime reports — Admin, Responder, Stakeholder). */
+const VIEW_ONLY = 'Viewers see the figures; opening the PDF is for Admins, Responders and Stakeholders.';
+
 const RULE =
   'Tier 1 clients first. Incidents = what the client sees: Outage (a DOWN) and Degraded (a slow, key-page, regional or intermittent PROBLEM). SSL, domain, keyword and blocked-check PROBLEMs stay internal and aren’t counted. A report can’t go out while one of its incidents has no root cause.';
 
@@ -126,7 +129,16 @@ function RuleNote() {
  * D-072, D-073). From xl the table; below it one card per client (two per row from md), the whole card
  * opening a sheet with the rest and the actions.
  */
-export function ReportsView({ data, asOf }: { data: ReportsPage; asOf: string }) {
+export function ReportsView({
+  data,
+  asOf,
+  canOpen,
+}: {
+  data: ReportsPage;
+  asOf: string;
+  /** Opening the PDF: Admins, Responders, Stakeholders; a Viewer sees the figures only (PRD §3 "Download uptime reports"). */
+  canOpen: boolean;
+}) {
   const router = useRouter();
   const closed = monthLabel(data.closed, { short: true });
   const running = monthLabel(data.runningMonth, { short: true });
@@ -265,18 +277,31 @@ export function ReportsView({ data, asOf }: { data: ReportsPage; asOf: string })
                       </Td>
                       <Td label="Actions">
                         <span className="flex flex-nowrap gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            touchHeight
-                            icon={<IconEye />}
-                            href={pdfHref(r, data.month)}
-                            target="_blank"
-                            rel="noopener"
-                            aria-label={`${preview} — ${r.client}, ${data.label} (PDF, opens in a new tab)`}
-                          >
-                            {preview}
-                          </Button>
+                          {canOpen ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              touchHeight
+                              icon={<IconEye />}
+                              href={pdfHref(r, data.month)}
+                              target="_blank"
+                              rel="noopener"
+                              aria-label={`${preview} — ${r.client}, ${data.label} (PDF, opens in a new tab)`}
+                            >
+                              {preview}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              touchHeight
+                              icon={<IconEye />}
+                              disabled
+                              title={VIEW_ONLY}
+                            >
+                              {preview}
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -336,7 +361,8 @@ export function ReportsView({ data, asOf }: { data: ReportsPage; asOf: string })
             </ul>
           </>
         )}
-        <div className="max-xl:hidden">
+        <div className="flex flex-col gap-1 max-xl:hidden">
+          {!canOpen && <p className="m-0 text-xs text-fg-secondary">{VIEW_ONLY}</p>}
           <SendOff />
         </div>
       </section>
@@ -378,17 +404,26 @@ export function ReportsView({ data, asOf }: { data: ReportsPage; asOf: string })
                 </div>
               ))}
             </dl>
-            <Button
-              variant="secondary"
-              fullWidth
-              icon={<IconExternalLink />}
-              href={pdfHref(shown, data.month)}
-              target="_blank"
-              rel="noopener"
-              aria-label={`${openWords} — ${shown.client}, ${data.label} (opens in a new tab)`}
-            >
-              {openWords}
-            </Button>
+            {canOpen ? (
+              <Button
+                variant="secondary"
+                fullWidth
+                icon={<IconExternalLink />}
+                href={pdfHref(shown, data.month)}
+                target="_blank"
+                rel="noopener"
+                aria-label={`${openWords} — ${shown.client}, ${data.label} (opens in a new tab)`}
+              >
+                {openWords}
+              </Button>
+            ) : (
+              <>
+                <Button variant="secondary" fullWidth icon={<IconExternalLink />} disabled>
+                  {openWords}
+                </Button>
+                <p className="m-0 text-xs text-fg-secondary">{VIEW_ONLY}</p>
+              </>
+            )}
             <Button variant="secondary" fullWidth icon={<IconMail />} disabled>
               Send
             </Button>

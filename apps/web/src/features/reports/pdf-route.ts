@@ -84,6 +84,9 @@ export function reportPdfHandler(deps: PdfRouteDeps = {}) {
     const who = await access();
     if (who.status !== 'active') return text('Sign in first.', 401);
     if (who.profile.role === 'client') return text('Reports are for DxT staff.', 403);
+    // PRD §3 "Download uptime reports": Admin, Responder, Stakeholder; a Viewer sees the figures on the page only
+    if (who.profile.role === 'viewer')
+      return text('Opening the PDF is for Admins, Responders and Stakeholders.', 403);
     const parsed = paramsSchema.safeParse(await ctx.params);
     if (!parsed.success) return text('No such report.', 404);
     const { clientId, month } = parsed.data;

@@ -221,11 +221,14 @@ describe('GET /api/reports/[clientId]/[month]', () => {
     const out = reportPdfHandler({ access: async () => ({ status: 'signed-out' }) as never });
     expect((await out(new Request('http://x'), ctx(CLIENT, '2026-10'))).status).toBe(401);
     expect((await handler('client')(new Request('http://x'), ctx(CLIENT, '2026-10'))).status).toBe(403);
-    expect((await handler('viewer')(new Request('http://x'), ctx('nope', '2026-10'))).status).toBe(404);
-    expect((await handler('viewer')(new Request('http://x'), ctx(CLIENT, '2026-13'))).status).toBe(404);
-    expect((await handler('viewer')(new Request('http://x'), ctx(CLIENT, '2026-08'))).status).toBe(404);
+    expect((await handler('viewer')(new Request('http://x'), ctx(CLIENT, '2026-10'))).status).toBe(403);
+    expect((await handler('stakeholder')(new Request('http://x'), ctx('nope', '2026-10'))).status).toBe(404);
+    expect((await handler('stakeholder')(new Request('http://x'), ctx(CLIENT, '2026-13'))).status).toBe(404);
+    expect((await handler('stakeholder')(new Request('http://x'), ctx(CLIENT, '2026-08'))).status).toBe(404);
     const none = db({ 'clients.select': { data: [] } });
-    expect((await handler('viewer', none)(new Request('http://x'), ctx(CLIENT, '2026-10'))).status).toBe(404);
+    expect((await handler('stakeholder', none)(new Request('http://x'), ctx(CLIENT, '2026-10'))).status).toBe(
+      404,
+    );
   });
 
   it('a closed month serves the stored file, only its own path, privately', async () => {
@@ -245,7 +248,7 @@ describe('GET /api/reports/[clientId]/[month]', () => {
       },
     });
     const service = db({ 'storage.download': { data: new Blob(['%PDF-stored']) } });
-    const res = await handler('viewer', user, service)(new Request('http://x'), ctx(CLIENT, '2026-10'));
+    const res = await handler('stakeholder', user, service)(new Request('http://x'), ctx(CLIENT, '2026-10'));
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('%PDF-stored');
     expect(res.headers.get('content-type')).toBe('application/pdf');

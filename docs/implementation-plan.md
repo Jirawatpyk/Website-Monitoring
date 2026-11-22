@@ -43,6 +43,7 @@
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | In progress |
 | G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov; re-baselined 21 Nov: ≈ Fri 27 Nov, D-071) | Todo |
 | S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 (waived, D-072) | 6 | In progress |
+| S20b | Client report sending | 3 · P2 | M | FR-15 | S20, G2 | 7 | Todo |
 | S21 | Client status page | 3 · P2 | L | FR-16 | S20 | 7 | Todo |
 | S22 | Post-incident review | 3 · P2 | M | FR-18 | G2 | 8 | Todo |
 | S23 | Synthetic transactions | 3 · P2 | L | FR-17 | G2 | 8–9 | Todo |
@@ -794,15 +795,32 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 
 ### S20 · Uptime reports & monthly PDF
 
-- **Scope:** FR-15. Reports page (client-visible counts only: Outage + Degraded, §12, §14.12) and the monthly A4 PDF per client; AM note only on manual sends (§16.12). Pick the PDF renderer first (Q2).
+- **Scope:** FR-15 (D-072, D-073). Reports page (client-visible counts only: Outage + Degraded, §12, §14.12, §42) and the monthly A4 PDF per client, drafted on the 1st and kept; Send shows disabled with its reason. Sending, contacts and the AM note move to S20b. Pick the PDF renderer first (Q2, D-073 item 1).
 - **Boards:** Reports, ReportPDF, MReports, MReportsDark
 - **Depends on:** G2
 - **Done when:**
   1. September sample figures on the page and PDF match spec §5 (BA 11 min, MuvMi 101 min, Cando 12, ORCA 8) and internal-only PROBLEMs are absent (test).
   2. The PDF renders at A4 with no clipped content (file attached to the PR).
-  3. spec-checker passes both boards; nav "Uptime reports" live.
+  3. spec-checker passes the boards (Reports, ReportPDF, MReports); nav "Uptime reports" live.
 - **Guide (D-070):** update the "Reports & client status page" topic in `features/guide/content.ts` for the Reports page and the PDF.
 - **Review:** spec-checker, security-reviewer (client data isolation).
+
+### S20b · Client report sending
+
+- **Scope:** FR-15, D-072 item 3, spec §16.12, §42 items 6–8 (boards Reports and MReports, BUILD / STATE "S20b").
+  - Client report contacts and the per-client delivery setting (Settings › Organisation "Monthly report").
+  - Send / Resend with its confirm (desktop dialog, phone sheet), the automatic send on the 1st for the clients set to it, the reports@ sender.
+  - The AM note (TH or EN) on manual sends.
+  - The three switches (daily digest, weekly summary, monthly client report) and the "Reports sent" stat.
+  - A sent draft is frozen: the drafts cron stops refreshing it (D-073 item 13).
+- **Boards:** none of its own (Reports, MReports).
+- **Depends on:** S20, G2.
+- **Done when:**
+  1. A manual send and an automatic send reach a test contact with the PDF attached; each writes an audit row; Resend says it is a second copy.
+  2. A report with a client-visible incident and no root cause can't be sent, by hand or on the 1st (D-073 item 7).
+  3. spec-checker passes Reports and MReports in their S20b state.
+- **Guide (D-070):** the "Reports & client status page" topic and the role matrix's "Send client reports" row.
+- **Review:** security-reviewer (outbound email to clients, contacts), message-checker, spec-checker.
 
 ### S21 · Client status page
 
