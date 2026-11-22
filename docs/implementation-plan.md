@@ -795,7 +795,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 ### S20 · Uptime reports & monthly PDF
 
 - **Scope:** FR-15. Reports page (client-visible counts only: Outage + Degraded, §12, §14.12) and the monthly A4 PDF per client; AM note only on manual sends (§16.12). Pick the PDF renderer first (Q2).
-- **Boards:** Reports, ReportPDF
+- **Boards:** Reports, ReportPDF, MReports, MReportsDark
 - **Depends on:** G2
 - **Done when:**
   1. September sample figures on the page and PDF match spec §5 (BA 11 min, MuvMi 101 min, Cando 12, ORCA 8) and internal-only PROBLEMs are absent (test).
@@ -981,6 +981,8 @@ Every FR, board, table and go-live test item maps to exactly one slice (`pnpm pl
 | Guide | S18 |
 | MGuide | S18 |
 | Reports | S20 |
+| MReports | S20 |
+| MReportsDark | S20 |
 | ReportPDF | S20 |
 | StatusPage | S21 |
 | MStatusPage | S21 |

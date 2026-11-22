@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile — Uptime reports</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="aura-tokens.css">
+<link rel="stylesheet" href="ds/aura/components/bundle.css">
+<script src="ds/aura/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400&amp;family=Noto+Sans+Thai:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#fafafa}
+a{color:var(--aura-fg-accent)}
+.aura-segmented__option,.aura-segmented--sm .aura-segmented__option{height:44px}
+.aura-dialog__close.aura-icon-btn{width:44px;height:44px;margin:-12px -14px 0 0}
+.aura-input,.aura-input__control,.aura-select__trigger{min-height:44px;box-sizing:border-box}
+.aura-btn{min-height:44px;box-sizing:border-box}
+.r3-scroll{scrollbar-width:none}.r3-scroll > *{flex-shrink:0}
+.rp-card{width:100%;min-height:44px;box-sizing:border-box;padding:12px 10px 12px 14px;display:flex;align-items:center;gap:8px;border:1px solid var(--aura-border-default);border-radius:var(--aura-radius-lg);background:var(--aura-bg-surface);font:inherit;color:inherit;text-align:left;cursor:pointer}
+.rp-card:focus-visible{outline:var(--aura-focus-ring-width,2px) solid var(--aura-focus-ring);outline-offset:2px}
+.rp-more{min-height:44px;min-width:44px;padding:0 4px;border:0;background:none;color:var(--aura-fg-accent);font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.rp-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.st-h{font-family:var(--font-mono);font-size:11px;color:var(--aura-fg-tertiary);padding-left:2px}
+.st-kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--aura-border-subtle);font-size:13px;line-height:1.45}
+.st-kv:first-child{border-top:0}
+.st-kv>span:first-child{color:var(--aura-fg-secondary);flex-shrink:0}
+.st-kv>span:last-child{text-align:right;font-weight:500}
+.rp-sk{background:var(--aura-bg-surface-hover);border-radius:6px}
+.aura-switch{position:relative}.aura-switch::after{content:"";position:absolute;inset:-12px -8px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6">
+
+<header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 4px; display: flex; align-items: center; gap: 4px; background: var(--aura-bg-surface); border-bottom: 1px solid var(--aura-border-default)">
+<a href="MOverview4.dc.html" aria-label="Back to Overview" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="arrow-left" size="md"></x-import></a>
+<span style="flex-grow: 1; font-size: 17px; font-weight: 600">Uptime reports</span>
+<a href="MProfile.dc.html" aria-label="My profile" style="width: 44px; height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-decoration: none"><x-import component-from-global-scope="Aura.Avatar" name="{{me}}" size="sm"></x-import></a>
+</header>
+
+<div class="r3-scroll" style="flex-grow: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; box-sizing: border-box; padding: 14px 16px 88px; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" aria-label="Preview state" options="{{viewOpts}}" value="{{view}}" on-change="{{setView}}" size="sm"></x-import></div>
+</div>
+
+<sc-if value="{{noAccess}}" hint-placeholder-val="{{false}}">
+<div style="padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-surface-hover); color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="lock" size="md"></x-import></span>
+<span style="font-size: 15px; font-weight: 600">Reports are for the DxT team</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Your monthly report comes by email from your account manager.</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="arrow-left" full-width="{{yes}}" href="MOverview4.dc.html">Back to Overview</x-import>
+</div>
+</sc-if>
+
+<sc-if value="{{hasAccess}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 2px; line-height: 1.45">
+<span style="font-size: 12px; color: var(--aura-fg-tertiary)">Figures as of Fri 25 Sep 10:07 (UTC+7)</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">Monthly PDF per client in DxT branding, drafted on the 1st at 06:00 and refreshed when its figures change.</span>
+</div>
+<x-import component-from-global-scope="Aura.SegmentedControl" label="Month" options="{{months}}" value="{{month}}" on-change="{{setMonth}}" full-width="{{yes}}" size="sm"></x-import>
+
+<div class="rp-kpis">
+<sc-for list="{{kpis}}" as="k" hint-placeholder-count="3">
+<div style="grid-column: {{k.span}}; display: flex; flex-direction: column"><x-import component-from-global-scope="Aura.Stat" label="{{k.label}}" value="{{k.value}}" icon="{{k.icon}}" caption="{{k.caption}}"></x-import></div>
+</sc-for>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 2px; padding-top: 4px">
+<span style="font-size: 17px; font-weight: 600; line-height: 1.35">Client reports · {{monthLong}}</span>
+<sc-if value="{{running}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; font-weight: 500; color: var(--aura-fg-secondary)">Preview draft · generated on demand</span></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 6px 6px 6px 14px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); font-size: 13px; line-height: 1.5">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="display: flex; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span>
+<span style="flex-grow: 1; min-width: 0"><b style="font-weight: 600">What counts</b> <span style="color: var(--aura-fg-secondary)">· what the client sees</span></span>
+<button type="button" class="rp-more" aria-expanded="{{ruleOpen}}" aria-controls="rp-rule" onClick="{{toggleRule}}">{{ruleBtn}}</button>
+</div>
+<sc-if value="{{ruleOpen}}" hint-placeholder-val="{{false}}"><span id="rp-rule" style="padding: 0 8px 8px 0; color: var(--aura-fg-secondary)">Tier 1 clients first. Incidents = what the client sees: Outage (a DOWN) and Degraded (a slow, key-page, regional or intermittent PROBLEM). SSL, domain, keyword and blocked-check PROBLEMs stay internal and aren’t counted. A report can’t go out while one of its incidents has no root cause.</span></sc-if>
+</div>
+
+<sc-if value="{{b20}}" hint-placeholder-val="{{true}}"><span style="display: flex; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span>{{sendOff}}</span></span></sc-if>
+
+<sc-if value="{{loading}}" hint-placeholder-val="{{false}}">
+<sc-for list="{{sk}}" as="x" hint-placeholder-count="4"><div aria-hidden="true" style="height: 92px; box-sizing: border-box; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg)"><span class="rp-sk" style="width: 50%; height: 14px"></span><span class="rp-sk" style="width: 80%; height: 12px"></span><span class="rp-sk" style="width: 110px; height: 20px; border-radius: 9999px"></span></div></sc-for>
+</sc-if>
+
+<sc-if value="{{hasRows}}" hint-placeholder-val="{{true}}">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="9">
+<button type="button" class="rp-card" aria-label="{{r.aria}}" onClick="{{r.open}}">
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="display: flex; align-items: center; gap: 8px"><span style="font-size: 15px; font-weight: 600">{{r.client}}</span><sc-if value="{{r.t1}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Tier 1</x-import></sc-if></span>
+<span style="font-size: 13px; line-height: 1.4; font-variant-numeric: tabular-nums"><b style="font-weight: 600">{{r.uptime}}</b> <span style="color: var(--aura-fg-secondary)">· down {{r.down}} · {{r.incShort}}</span></span>
+<span style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap"><x-import component-from-global-scope="Aura.StatusPill" tone="{{r.tone}}" icon="{{r.icon}}">{{r.status}}</x-import><sc-if value="{{r.rc}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="pencil">Needs root cause</x-import></sc-if></span>
+</span>
+<span style="display: flex; color: var(--aura-fg-tertiary)"><x-import component-from-global-scope="Aura.Icon" name="chevron-right" size="sm"></x-import></span>
+</button>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 28px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); line-height: 1.45">
+<span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: var(--aura-bg-surface-hover); color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="file-text" size="md"></x-import></span>
+<span style="font-size: 15px; font-weight: 600">No client sites were watched this month</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">A client gets a report once one of its sites is being monitored.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{b20b}}" hint-placeholder-val="{{false}}">
+<span class="st-h" style="margin-top: 6px">SCHEDULED REPORTS</span>
+<div style="background: var(--aura-bg-surface); border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-lg); overflow: hidden">
+<sc-for list="{{switches}}" as="w" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 12px; min-height: 64px; box-sizing: border-box; padding: 10px 14px; border-top: {{w.border}}">
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.4"><span style="font-size: 14px; font-weight: 600">{{w.name}}</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{w.when}}</span><span style="font-size: 12px; color: var(--aura-fg-tertiary)">{{w.note}}</span></span>
+<x-import component-from-global-scope="Aura.Switch" checked="{{w.on}}" on-change="{{w.set}}" aria-label="{{w.name}}"></x-import>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</sc-if>
+
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Uptime reports at 390 (§42). Stats 2 + 1 (2 × 2 once “Reports sent” arrives). The rule note is one line with More / Less. One card per client, Tier 1 first: name + Tier 1, uptime · down · incidents, the report status (+ Needs root cause); the whole card opens a sheet with the rest and the actions. “Open PDF” opens the client’s A4 PDF in a new tab. Today Send is off — its reason sits once above the list and in each sheet. STATE covers S20 today and S20b. Same sample as the Reports board — made up.</div>
+</div>
+
+<x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="" label="Sections"></x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{sheetOpen}}" on-close="{{close}}" title="{{c.client}}" description="{{c.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap"><x-import component-from-global-scope="Aura.StatusPill" tone="{{c.tone}}" icon="{{c.icon}}">{{c.status}}</x-import><sc-if value="{{c.rc}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="warning" variant="outline" icon="pencil">Needs root cause</x-import></sc-if></div>
+<sc-if value="{{c.hasStatusNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">{{c.statusNote}}</span></sc-if>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{c.kv}}" as="x" hint-placeholder-count="6"><div class="st-kv"><span>{{x.k}}</span><span>{{x.v}}</span></div></sc-for>
+</div>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="external-link" full-width="{{yes}}" href="ReportPDF.dc.html" target="_blank">{{c.pdf}}</x-import>
+<sc-if value="{{b20}}" hint-placeholder-val="{{true}}">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" icon="mail" full-width="{{yes}}" disabled="{{yes}}">Send</x-import>
+<span style="display: flex; gap: 6px; font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span>{{sendOff}}</span></span>
+</sc-if>
+<sc-if value="{{b20b}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="mail" full-width="{{yes}}" disabled="{{c.blocked}}" on-click="{{askSend}}">{{c.sendLabel}}</x-import>
+<sc-if value="{{c.hasWhy}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">{{c.why}}</span></sc-if>
+</sc-if>
+</div>
+</x-import>
+
+<x-import component-from-global-scope="Aura.Dialog" open="{{confirmOpen}}" on-close="{{closeConfirm}}" title="{{cf.title}}" description="{{cf.desc}}" size="sm" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-direction: column; padding: 2px 12px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md)">
+<sc-for list="{{cf.facts}}" as="x" hint-placeholder-count="5"><div class="st-kv"><span>{{x.k}}</span><span>{{x.v}}</span></div></sc-for>
+</div>
+<span style="font-size: 12px; text-align: center; color: var(--aura-fg-secondary)">Emails can’t be recalled · logged in the audit log</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<x-import component-from-global-scope="Aura.Button" variant="secondary" full-width="{{yes}}" on-click="{{closeConfirm}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="mail" full-width="{{yes}}" on-click="{{doSend}}">{{cf.go}}</x-import>
+</div>
+</div>
+</x-import>
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+<div role="status" aria-live="polite" style="position: absolute; left: 16px; right: 16px; bottom: 76px; z-index: 10; display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-md); box-shadow: 0 8px 24px rgba(0,0,0,.18); font-size: 13px; line-height: 1.45"><span style="display: flex; padding-top: 2px"><x-import component-from-global-scope="Aura.Icon" name="circle-check" size="sm"></x-import></span><span>{{toast}}</span></div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { view: 'S20 · today', month: 'Aug 2026', open: '', confirm: false, ruleOpen: false, toast: '', dg: true, ws: true, mr: true }; }
+  renderVals() {
+    var self = this, st = this.state, V = st.view;
+
+    // Same sample as the Reports board. Aug = last complete month, Sep = running (to Fri 25 Sep 10:07).
+    var SITES = { 'Bangkok Airways': 'Bangkok Airways – Taiwan, Bangkok Airways – China', 'ENEOS': 'ENEOS Industrial', 'MuvMi': 'MuvMi', 'realme': 'realme.link', 'Fuji Links': 'Fuji Links', 'Tubtong': 'Tubtong', 'Cando Asia': 'Cando Asia', 'ORCA Thailand': 'ORCA Thailand', 'WeCare': 'WeCare Studio, WeCare Asia' };
+    var RAW = [
+      ['Bangkok Airways', true, '2', ['99.97%', '26 min', '2', '1 outage, 1 degraded'], ['99.98%', '11 min', '2', '1 outage, 1 degraded'], 'Bua', 'auto'],
+      ['ENEOS', true, '1', ['100.00%', '0 min', '0', ''], ['100.00%', '0 min', '0', ''], 'Thee', 'auto'],
+      ['MuvMi', true, '1', ['99.95%', '22 min', '1', '1 outage'], ['99.71%', '1 h 41 min', '3', '3 outages, 1 open'], 'Bua', 'auto'],
+      ['realme', true, '1', ['99.98%', '9 min', '1', '1 outage'], ['100.00%', '0 min', '0', ''], 'Thee', 'am'],
+      ['Fuji Links', false, '1', ['99.99%', '4 min', '1', '1 outage'], ['100.00%', '0 min', '1', '1 degraded, open'], 'Thee', 'am'],
+      ['Tubtong', false, '1', ['99.93%', '30 min', '2', '2 outages'], ['100.00%', '0 min', '0', ''], 'Bua', 'am'],
+      ['Cando Asia', false, '1', ['99.96%', '17 min', '1', '1 outage'], ['99.97%', '12 min', '1', '1 outage'], 'Bua', 'am', 'stale'],
+      ['ORCA Thailand', false, '1', ['100.00%', '0 min', '1', '1 degraded'], ['99.98%', '8 min', '1', '1 outage'], 'Thee', 'am', '', 'rcSep'],
+      ['WeCare', false, '2', ['99.99%', '10 min', '1', '1 outage'], ['100.00%', '0 min', '0', ''], 'Bua', 'am']
+    ];
+    // Report status words (settled on this board). S20 today: Draft ready · No draft yet · Draft out of date · Month running.
+    // S20b adds sending: Sent automatically 1 Sep · Draft, AM sends · Sends automatically 1 Oct.
+    var ST = {
+      ready: { status: 'Draft ready', tone: 'ready', icon: 'file-text' },
+      none: { status: 'No draft yet', tone: 'neutral', icon: 'clock' },
+      stale: { status: 'Draft out of date', tone: 'warning', icon: 'rotate-ccw' },
+      running: { status: 'Month running', tone: 'neutral', icon: 'clock' },
+      sent: { status: 'Sent automatically 1 Sep', tone: 'ready', icon: 'check' },
+      amsends: { status: 'Draft, AM sends', tone: 'neutral', icon: 'pencil' },
+      liveauto: { status: 'Sends automatically 1 Oct', tone: 'neutral', icon: 'clock' }
+    };
+    var SENDOFF = 'Sending from here comes later — open the PDF and email it to the client yourself.';
+
+    var B20B = /^S20b/.test(V), B20 = !B20B, NOACC = V === 'No access · client', LOADING = V === 'Loading', EMPTY = V === 'Empty month';
+    var aug = st.month === 'Aug 2026';
+    var MONLONG = aug ? 'August 2026' : 'September 2026';
+    var rows = EMPTY || LOADING ? [] : RAW.map(function (r) {
+      var m = aug ? r[3] : r[4];
+      var rcOpen = !aug && r[8] === 'rcSep';
+      var stt;
+      if (B20) stt = !aug ? ST.running : (r[7] === 'stale' ? ST.stale : ST.ready);
+      else stt = aug ? (r[6] === 'auto' ? ST.sent : ST.amsends) : (r[6] === 'auto' ? ST.liveauto : ST.running);
+      var sent = B20B && aug && r[6] === 'auto';
+      var blocked = B20 || rcOpen || !aug;
+      var why = B20 ? SENDOFF : rcOpen ? 'Can’t send: an incident still needs a root cause.' : (!aug ? 'Month still running — the report drafts on 1 Oct.' : '');
+      var note = stt === ST.stale ? 'Figures changed after the 1 Sep draft (a root cause was added) — it refreshes on its own within a few minutes. The PDF shows the new figures once it has.' : (stt === ST.running ? 'Generated on demand from live figures — nothing is stored or sent until the 1 Oct draft.' : '');
+      var incShort = m[2] === '0' ? '0 incidents' : m[2] + (m[2] === '1' ? ' incident' : ' incidents');
+      return { client: r[0], t1: r[1], uptime: m[0], down: m[1], incShort: incShort, status: stt.status, tone: stt.tone, icon: stt.icon, rc: rcOpen,
+        aria: r[0] + (r[1] ? ', Tier 1' : '') + ', uptime ' + m[0] + ', down ' + m[1] + ', ' + incShort + ', report ' + stt.status + (rcOpen ? ', needs root cause' : '') + '. Show details',
+        open: function () { self.setState({ open: r[0] }); },
+        _d: { client: r[0], desc: MONLONG + (r[1] ? ' · Tier 1' : '') + ' · AM ' + r[5], status: stt.status, tone: stt.tone, icon: stt.icon, rc: rcOpen, statusNote: note, hasStatusNote: !!note,
+          kv: [{ k: 'Uptime', v: m[0] }, { k: 'Downtime', v: m[1] }, { k: 'Incidents', v: m[2] + (m[3] ? ' · ' + m[3] : '') }, { k: r[2] === '1' ? 'Site' : 'Sites', v: SITES[r[0]] }, { k: 'AM', v: r[5] }],
+          pdf: aug ? 'Open PDF' : 'Open preview draft', blocked: blocked, sendLabel: sent ? 'Resend' : 'Send', why: why, hasWhy: !!why, resend: sent, am: r[5], up: m[0], inc: m[2] + (m[3] ? ' (' + m[3] + ')' : '') } };
+    });
+    var cur = rows.filter(function (r) { return r.client === st.open; })[0];
+    var K = aug
+      ? [['Uptime · Aug 2026', '99.98%', 'chart-column', '11 client sites · maintenance excluded'], ['Downtime', '1 h 58 min', 'clock', 'Outages only, across all clients'], ['Incidents clients see', '10', 'bell', '8 outages · 2 degraded']]
+      : [['Uptime · Sep so far', '99.97%', 'chart-column', '11 client sites · to Fri 25 Sep 10:07'], ['Downtime', '2 h 12 min', 'clock', 'MuvMi 1 h 41 min · 3 others 31 min'], ['Incidents clients see', '8', 'bell', '6 outages · 2 degraded · 2 still open']];
+    if (B20B) K.push(aug ? ['Reports sent', '3 / 9', 'mail', '3 automatic · 6 drafts waiting for the AM'] : ['Reports sent', '—', 'mail', '1 Oct: 3 automatic, 6 to their AM']);
+    if (EMPTY) K = [['Uptime · Aug 2026', '—', 'chart-column', 'No client sites watched'], ['Downtime', '—', 'clock', '—'], ['Incidents clients see', '0', 'bell', '—']];
+    var kpis = K.map(function (k, i) { return { label: k[0], value: k[1], icon: k[2], caption: k[3], span: (K.length === 3 && i === 2) ? '1 / -1' : 'auto' }; });
+    function sw(k) { return function (v) { var o = {}; o[k] = v && v.target ? !!v.target.checked : !!v; self.setState(o); }; }
+    var A = st.confirm && cur ? cur._d : null;
+    function go(v) {
+      var M = { 'S20 · today': {}, 'S20 · client sheet': { open: 'Cando Asia' }, 'Running month': { month: 'Sep 2026' }, 'Empty month': {}, 'Loading': {}, 'No access · client': {},
+        'S20b · with sending': {}, 'S20b · client sheet': { open: 'realme' }, 'S20b · send sheet': { open: 'realme', confirm: true }, 'S20b · running month': { month: 'Sep 2026', open: 'ORCA Thailand' } };
+      self.setState(Object.assign({ view: v, month: 'Aug 2026', open: '', confirm: false, toast: '', ruleOpen: false }, M[v] || {}));
+    }
+    return {
+      yes: true, no: false, me: NOACC ? 'Client' : 'Tao', noAccess: NOACC, hasAccess: !NOACC, b20: B20, b20b: B20B, loading: LOADING, sk: [1, 2, 3, 4],
+      viewOpts: ['S20 · today', 'S20 · client sheet', 'Running month', 'Empty month', 'Loading', 'No access · client', 'S20b · with sending', 'S20b · client sheet', 'S20b · send sheet', 'S20b · running month'].map(function (v) { return { value: v, label: v }; }),
+      view: V, setView: function (e) { go(e && e.target ? e.target.value : e); },
+      months: ['Aug 2026', 'Sep 2026'], month: st.month, setMonth: function (v) { self.setState({ month: v, open: '', confirm: false }); },
+      running: !aug, monthLong: aug ? 'August 2026' : 'September 2026 (running)',
+      kpis: kpis, sendOff: SENDOFF,
+      ruleOpen: !!st.ruleOpen, ruleBtn: st.ruleOpen ? 'Less' : 'More', toggleRule: function () { self.setState({ ruleOpen: !self.state.ruleOpen }); },
+      rows: rows, hasRows: rows.length > 0, empty: EMPTY,
+      sheetOpen: !!cur && !st.confirm, close: function () { self.setState({ open: '' }); },
+      c: cur ? cur._d : { client: '', desc: '', status: '', tone: 'neutral', icon: 'clock', rc: false, statusNote: '', hasStatusNote: false, kv: [], pdf: '', blocked: true, sendLabel: '', why: '', hasWhy: false },
+      askSend: function () { self.setState({ confirm: true }); },
+      confirmOpen: !!A, closeConfirm: function () { self.setState({ confirm: false }); },
+      cf: A ? { title: (A.resend ? 'Resend the ' : 'Send the ') + MONLONG + ' report?', desc: A.resend ? 'It already went out automatically on 1 Sep. The client gets a second copy.' : 'The client gets the PDF by email now. Check the AM note first.', go: A.resend ? 'Resend' : 'Send report',
+        facts: [{ k: 'Client', v: A.client }, { k: 'Report', v: MONLONG + ' · PDF, DxT branding' }, { k: 'Uptime · incidents', v: A.up + ' · ' + A.inc }, { k: 'To', v: '[Client report contacts] · cc ' + A.am + ' (AM)' }, { k: 'From', v: 'reports@ · sent as Tao' }] } : { title: '', desc: '', go: '', facts: [] },
+      doSend: function () { var a = A; self.setState({ confirm: false, open: '', toast: MONLONG + ' report ' + (a.resend ? 'resent' : 'sent') + ' to ' + a.client + ' · cc ' + a.am + ' · logged in the audit log' }); },
+      hasToast: !!st.toast, toast: st.toast,
+      switches: [
+        { name: 'Daily digest', when: 'Every day 09:00 · DxT Website Reports Space', note: st.dg ? 'Last sent today 09:00' : 'Off — no digest tomorrow 09:00', on: st.dg, set: sw('dg'), border: '0' },
+        { name: 'Weekly summary', when: 'Mondays 09:00 · CEO, Thee & Bua', note: st.ws ? 'Next Mon 28 Sep 09:00' : 'Off — Mon 28 Sep is skipped', on: st.ws, set: sw('ws'), border: '1px solid var(--aura-border-subtle)' },
+        { name: 'Monthly client report', when: 'Drafts on the 1st at 06:00', note: st.mr ? 'Next drafts Thu 1 Oct 06:00' : 'Off — no drafts or automatic sends on 1 Oct', on: st.mr, set: sw('mr'), border: '1px solid var(--aura-border-subtle)' }
+      ],
+      bottom: [
+        { id: 'overview', label: 'Overview', icon: 'layout-dashboard', href: 'MOverview4.dc.html' },
+        { id: 'incidents', label: 'Incidents', icon: 'bell', href: 'MIncidents.dc.html', count: 3 },
+        { id: 'sites', label: 'Sites', icon: 'monitor', href: 'MSites.dc.html' },
+        { id: 'oncall', label: 'On-call', icon: 'users', href: 'MOnCall.dc.html' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

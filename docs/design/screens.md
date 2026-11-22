@@ -73,7 +73,9 @@ The index `/implement-screen` reads. One row per canvas board (62). The board fi
 | Guide | User guide | `/guide` | P1 | S18 | §18 | FR-22 |
 | MGuide | Mobile — User guide | `/guide` (390) | P1 | S18 | §18 | FR-22 |
 | EmptyStates | Empty, loading & no-access states | shared components | P0 | S01 | §15.8, §16.1 | — |
-| Reports | Uptime reports | `/reports` | P2 | S20 | §5, §12, §14.12 | FR-15 |
+| Reports | Uptime reports (BUILD switch: S20 today / S20b with sending) | `/reports` | P2 | S20 | §5, §12, §14.12, §42 | FR-15 |
+| MReports | Mobile — Uptime reports (cards + client sheet; 768–1279 two per row) | `/reports` (390) | P2 | S20 | §22, §42 | FR-15 |
+| MReportsDark | Mobile — Uptime reports · dark | `/reports` (390) | P2 | S20 | §22, §42 | FR-15 |
 | ReportPDF | Monthly client report PDF (A4) | `/api/reports/[clientId]/[month]` (PDF) | P2 | S20 | §12, §16.12 | FR-15 |
 | StatusPage | Client status page | `/status/[clientSlug]` (public) | P2 | S21 | §12 | FR-16 |
 | MStatusPage | Client status page — mobile | `/status/[clientSlug]` (390) | P2 | S21 | §12 | FR-16 |
