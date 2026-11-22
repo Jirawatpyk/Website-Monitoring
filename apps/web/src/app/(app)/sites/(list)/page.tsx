@@ -5,6 +5,8 @@ import { listMeta, SitesEmpty, SitesList } from '@/features/sites';
 import { chatConnected, listSites } from '@/features/sites/server';
 import { ExpiryLink } from '@/features/expiry';
 import { getExpirySummary } from '@/features/expiry/server';
+import { ReportsLink } from '@/features/reports';
+import { getReportsSummary } from '@/features/reports/server';
 import { getAccess } from '@/lib/auth/session';
 
 export const metadata: Metadata = { title: 'Sites' };
@@ -15,15 +17,19 @@ export const maxDuration = 60;
 export default async function SitesPage() {
   // MSites (§39.6): phones reach SSL & domains from a row at the foot of the list (staff only, as
   // /expiry); read alongside the list, not after it (site_expiry is staff-read, so a client reads none)
-  const [sites, access, expirySummary] = await Promise.all([
+  // and Uptime reports from a row under it (§42 item 1), staff only as /reports
+  const [sites, access, expirySummary, reportsSummary] = await Promise.all([
     listSites(),
     getAccess(),
     // an optional row: a failed read leaves it out rather than failing the Sites page
     getExpirySummary().catch(() => null),
+    getReportsSummary().catch(() => null),
   ]);
   const active = access.status === 'active' ? access : null;
   const isAdmin = active?.profile.role === 'admin';
-  const expiry = active && active.profile.role !== 'client' && sites.length > 0 ? expirySummary : null;
+  const staff = active && active.profile.role !== 'client' && sites.length > 0;
+  const expiry = staff ? expirySummary : null;
+  const reports = staff ? reportsSummary : null;
 
   return (
     <Container>
@@ -62,9 +68,10 @@ export default async function SitesPage() {
             nowIso={new Date().toISOString()}
           />
         )}
-        {expiry && (
-          <div className="md:hidden">
-            <ExpiryLink summary={expiry} />
+        {(expiry || reports) && (
+          <div className="flex flex-col gap-2.5 md:hidden">
+            {expiry && <ExpiryLink summary={expiry} />}
+            {reports && <ReportsLink summary={reports} />}
           </div>
         )}
       </div>

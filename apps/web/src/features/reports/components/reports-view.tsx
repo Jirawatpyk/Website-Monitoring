@@ -1,9 +1,11 @@
 'use client';
 
+import { useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Badge,
   Button,
+  Dialog,
   EmptyState,
   PageHeader,
   SegmentedControl,
@@ -15,12 +17,16 @@ import {
   Th,
   THead,
   Tr,
+  type StatusTone,
 } from '@jirawatpyk/aura-react';
 import {
   IconBell,
   IconChartColumn,
+  IconChevronRight,
   IconClock,
+  IconExternalLink,
   IconEye,
+  IconInfo,
   IconMail,
   IconPencil,
 } from '@jirawatpyk/aura-react/icons';
@@ -29,20 +35,35 @@ import type { ReportRow, ReportsPage } from '../page-data';
 
 const STAT_ICONS = [<IconChartColumn key="u" />, <IconClock key="d" />, <IconBell key="i" />];
 
-/** Why Send is off (D-072 item 3: sending to clients comes after go-live). */
+/** Why Send is off (D-072 item 3; words settled on MReports, spec §42 item 8). */
 const SEND_OFF = 'Sending from here comes later — open the PDF and email it to the client yourself.';
 
-const STATUS_WORDS: Record<ReportRow['status'], string> = {
-  draft: 'Draft ready',
-  not_drafted: 'No draft yet',
-  running: 'Month running',
-  unreadable: 'Draft out of date',
+const RULE =
+  'Tier 1 clients first. Incidents = what the client sees: Outage (a DOWN) and Degraded (a slow, key-page, regional or intermittent PROBLEM). SSL, domain, keyword and blocked-check PROBLEMs stay internal and aren’t counted. A report can’t go out while one of its incidents has no root cause.';
+
+/** The report status (spec §42 item 8): words and a tone, so the pill carries its icon too (§11). */
+const STATUS: Record<ReportRow['status'], { words: string; tone: StatusTone }> = {
+  draft: { words: 'Draft ready', tone: 'ready' },
+  not_drafted: { words: 'No draft yet', tone: 'neutral' },
+  running: { words: 'Month running', tone: 'neutral' },
+  unreadable: { words: 'Draft out of date', tone: 'warning' },
 };
+
+/** The sheet's line under the status, where it helps (MReports). */
+function statusNote(r: ReportRow, nextMonth: string): string | null {
+  if (r.status === 'running')
+    return `Generated on demand from live figures — nothing is stored or sent until the 1 ${nextMonth} draft.`;
+  if (r.status === 'unreadable')
+    return 'The stored draft is being made again — it refreshes on its own within a few minutes.';
+  if (r.status === 'not_drafted')
+    return 'Figures worked out now; the draft is made on its own within a few minutes.';
+  return null;
+}
 
 function ReportCell({ r }: { r: ReportRow }) {
   return (
     <span className="flex flex-wrap items-center gap-1.5">
-      <StatusPill tone={r.status === 'draft' ? 'ready' : 'neutral'}>{STATUS_WORDS[r.status]}</StatusPill>
+      <StatusPill tone={STATUS[r.status].tone}>{STATUS[r.status].words}</StatusPill>
       {r.needsRootCause && (
         <Badge tone="warning" variant="outline" icon={<IconPencil />}>
           Needs root cause
@@ -52,83 +73,94 @@ function ReportCell({ r }: { r: ReportRow }) {
   );
 }
 
-interface RowProps {
-  r: ReportRow;
-  month: string;
-  label: string;
-  preview: string;
-}
+const pdfHref = (r: ReportRow, month: string) => `/api/reports/${r.clientId}/${month}`;
+const incidentsShort = (n: string) => `${n} incident${n === '1' ? '' : 's'}`;
 
-/** Preview (the PDF, a new tab: the app's frame rules forbid showing it inside the page) and Send (off). */
-function Actions({ r, month, label, preview }: RowProps) {
+/** The reason Send is off, said in words wherever Send is (never only in a tooltip, §42 item 6). */
+function SendOff() {
   return (
-    <span className="flex flex-nowrap gap-1">
-      <Button
-        variant="ghost"
-        size="sm"
-        touchHeight
-        icon={<IconEye />}
-        href={`/api/reports/${r.clientId}/${month}`}
-        target="_blank"
-        rel="noopener"
-        aria-label={`${preview} — ${r.client}, ${label} (PDF, opens in a new tab)`}
-      >
-        {preview}
-      </Button>
-      <Button variant="ghost" size="sm" touchHeight icon={<IconMail />} disabled title={SEND_OFF}>
-        Send
-      </Button>
-    </span>
+    <p className="m-0 flex gap-1.5 text-xs text-fg-secondary">
+      <span className="flex pt-0.5" aria-hidden>
+        <IconInfo size="sm" />
+      </span>
+      {SEND_OFF}
+    </p>
   );
 }
 
-/** Below xl a card per client: the table's columns don't fit 820 or a phone (D-018, no sideways scroll). */
-function ReportCard(p: RowProps) {
-  const { r } = p;
+/** "What counts": the full rule from xl; below it one line with More / Less (§42 item 3). */
+function RuleNote() {
+  const [open, setOpen] = useState(false);
+  const id = useId();
   return (
-    <div className="flex flex-col gap-2 rounded-aura-lg border border-border-default bg-bg-surface px-aura-4 py-3 text-sm">
-      <span className="flex flex-wrap items-center gap-2 font-semibold">
-        {r.client}
-        {r.tier1 && (
-          <Badge tone="neutral" variant="outline">
-            Tier 1
-          </Badge>
-        )}
-      </span>
-      <dl className="m-0 grid grid-cols-3 gap-2 tabular-nums">
-        <div>
-          <dt className="text-xs text-fg-secondary">Uptime</dt>
-          <dd className="m-0 font-medium">{r.uptime}</dd>
+    <>
+      <p className="m-0 text-sm text-fg-secondary max-xl:hidden">{RULE}</p>
+      <div className="rounded-aura-lg border border-border-default bg-bg-surface text-sm xl:hidden">
+        <div className="flex items-center gap-1.5 py-1 pr-1.5 pl-3.5">
+          <span className="flex text-fg-secondary" aria-hidden>
+            <IconInfo size="sm" />
+          </span>
+          <span className="min-w-0 grow">
+            <b>What counts</b> <span className="text-xs text-fg-secondary">· what the client sees</span>
+          </span>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={id}
+            onClick={() => setOpen((o) => !o)}
+            className="min-h-11 min-w-11 shrink-0 rounded-aura-sm px-1 font-medium text-fg-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+          >
+            {open ? 'Less' : 'More'}
+          </button>
         </div>
-        <div>
-          <dt className="text-xs text-fg-secondary">Downtime</dt>
-          <dd className="m-0 font-medium">{r.down}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-fg-secondary">Incidents</dt>
-          <dd className="m-0 font-medium">{r.incidents}</dd>
-        </div>
-      </dl>
-      <span className="text-fg-secondary">
-        {[`${r.sites} site${r.sites === 1 ? '' : 's'}`, r.incidentNote, `AM ${r.am}`]
-          .filter(Boolean)
-          .join(' · ')}
-      </span>
-      <ReportCell r={r} />
-      <Actions {...p} />
-    </div>
+        <p id={id} hidden={!open} className="m-0 px-3.5 pb-3 text-fg-secondary">
+          {RULE}
+        </p>
+      </div>
+    </>
   );
 }
 
 /**
- * `/reports` — Uptime reports (board Reports, spec §5, §12, §14.12; S20, D-072, D-073). Desktop and
- * tablet; the phone layout waits for its board (D-072 item 4); below xl each client is a card.
+ * `/reports` — Uptime reports (boards Reports, MReports, MReportsDark; spec §5, §12, §14.12, §42; S20,
+ * D-072, D-073). From xl the table; below it one card per client (two per row from md), the whole card
+ * opening a sheet with the rest and the actions.
  */
 export function ReportsView({ data, asOf }: { data: ReportsPage; asOf: string }) {
   const router = useRouter();
   const closed = monthLabel(data.closed, { short: true });
   const running = monthLabel(data.runningMonth, { short: true });
   const preview = data.running ? 'Preview draft' : 'Preview';
+  const openWords = data.running ? 'Open preview draft' : 'Open PDF';
+  const nextMonth = monthLabel(data.runningMonth === data.month ? nextKey(data.month) : data.runningMonth, {
+    short: true,
+  }).split(' ')[0]!;
+  const [sheet, setSheet] = useState<ReportRow | null>(null);
+  // the last one opened stays in the sheet while it animates closed (no blank title), as MAuditLog
+  const [last, setLast] = useState<ReportRow | null>(null);
+  if (sheet && sheet !== last) setLast(sheet);
+  const shown = sheet ?? last;
+  const cards = useRef(new Map<string, HTMLButtonElement>());
+
+  const monthSwitch = (fullWidth: boolean) => (
+    <SegmentedControl
+      label="Month"
+      size="sm"
+      fullWidth={fullWidth}
+      options={[closed, running]}
+      value={data.running ? running : closed}
+      onChange={(v) =>
+        router.push(v === running ? `/reports?month=${data.runningMonth}` : '/reports', { scroll: false })
+      }
+    />
+  );
+
+  const closeSheet = () => {
+    const id = sheet?.clientId;
+    setSheet(null);
+    // back to the card it came from once the sheet is gone
+    if (id) setTimeout(() => cards.current.get(id)?.focus(), 0);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -145,22 +177,13 @@ export function ReportsView({ data, asOf }: { data: ReportsPage; asOf: string })
             </span>
           </>
         }
-        actions={
-          <SegmentedControl
-            label="Month"
-            size="sm"
-            options={[closed, running]}
-            value={data.running ? running : closed}
-            onChange={(v) =>
-              router.push(v === running ? `/reports?month=${data.runningMonth}` : '/reports', {
-                scroll: false,
-              })
-            }
-          />
-        }
+        actions={<span className="max-md:hidden">{monthSwitch(false)}</span>}
       />
+      {/* Phones: full width under the header (MReports, §42 item 1), as Sites' Add site button */}
+      <div className="md:hidden">{monthSwitch(true)}</div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
+      {/* 2 + 1 on a phone, the third full width; 3 across from md (MReports, §42 item 2) */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
         {data.tiles.map((t, i) => (
           <Stat
             key={t.label}
@@ -168,26 +191,19 @@ export function ReportsView({ data, asOf }: { data: ReportsPage; asOf: string })
             value={t.value}
             caption={t.caption}
             icon={STAT_ICONS[i]}
+            className={i === 2 ? 'max-md:col-span-2' : undefined}
           />
         ))}
       </div>
 
       <section className="flex flex-col gap-3" aria-labelledby="reports-table">
-        <div className="flex flex-col gap-1">
-          <h2 id="reports-table" className="m-0 flex flex-wrap items-baseline gap-x-3 text-lg font-semibold">
-            {`Client reports · ${data.label}`}
-            {data.running && (
-              <span className="text-sm font-normal text-fg-secondary">
-                Preview draft · generated on demand
-              </span>
-            )}
-          </h2>
-          <p className="m-0 text-sm text-fg-secondary">
-            Tier 1 clients first. Incidents = what the client sees: Outage (a DOWN) and Degraded (a slow,
-            key-page, regional or intermittent PROBLEM). SSL, domain, keyword and blocked-check PROBLEMs stay
-            internal and aren’t counted. A report can’t go out while one of its incidents has no root cause.
-          </p>
-        </div>
+        <h2 id="reports-table" className="m-0 flex flex-wrap items-baseline gap-x-3 text-lg font-semibold">
+          {`Client reports · ${data.label}`}
+          {data.running && (
+            <span className="text-sm font-normal text-fg-secondary">Preview draft · generated on demand</span>
+          )}
+        </h2>
+        <RuleNote />
 
         {data.rows.length === 0 ? (
           <EmptyState
@@ -248,24 +264,144 @@ export function ReportsView({ data, asOf }: { data: ReportsPage; asOf: string })
                         <ReportCell r={r} />
                       </Td>
                       <Td label="Actions">
-                        <Actions r={r} month={data.month} label={data.label} preview={preview} />
+                        <span className="flex flex-nowrap gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            touchHeight
+                            icon={<IconEye />}
+                            href={pdfHref(r, data.month)}
+                            target="_blank"
+                            rel="noopener"
+                            aria-label={`${preview} — ${r.client}, ${data.label} (PDF, opens in a new tab)`}
+                          >
+                            {preview}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            touchHeight
+                            icon={<IconMail />}
+                            disabled
+                            title={SEND_OFF}
+                          >
+                            Send
+                          </Button>
+                        </span>
                       </Td>
                     </Tr>
                   ))}
                 </TBody>
               </Table>
             </div>
+
+            {/* below xl the reason sits once above the list (§42 item 6) */}
+            <div className="xl:hidden">
+              <SendOff />
+            </div>
             <ul className="m-0 grid list-none grid-cols-1 gap-2.5 p-0 md:grid-cols-2 xl:hidden">
               {data.rows.map((r) => (
                 <li key={r.clientId}>
-                  <ReportCard r={r} month={data.month} label={data.label} preview={preview} />
+                  <button
+                    type="button"
+                    ref={(el) => {
+                      if (el) cards.current.set(r.clientId, el);
+                      else cards.current.delete(r.clientId);
+                    }}
+                    onClick={() => setSheet(r)}
+                    aria-label={`${r.client}${r.tier1 ? ', Tier 1' : ''}, uptime ${r.uptime}, down ${r.down}, ${incidentsShort(r.incidents)}, report ${STATUS[r.status].words}${r.needsRootCause ? ', needs root cause' : ''}. Show details`}
+                    className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-aura-lg border border-border-default bg-bg-surface py-3 pr-2.5 pl-3.5 text-left text-fg-primary hover:bg-bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                  >
+                    <span className="flex min-w-0 grow flex-col gap-1.5">
+                      <span className="flex flex-wrap items-center gap-2 font-semibold">
+                        {r.client}
+                        {r.tier1 && (
+                          <Badge tone="neutral" variant="outline">
+                            Tier 1
+                          </Badge>
+                        )}
+                      </span>
+                      <span className="text-sm tabular-nums">
+                        <b className="font-semibold">{r.uptime}</b>
+                        <span className="text-fg-secondary">{` · down ${r.down} · ${incidentsShort(r.incidents)}`}</span>
+                      </span>
+                      <ReportCell r={r} />
+                    </span>
+                    <span className="flex shrink-0 text-fg-tertiary" aria-hidden>
+                      <IconChevronRight size="sm" />
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
           </>
         )}
-        <p className="m-0 text-xs text-fg-secondary">{SEND_OFF}</p>
+        <div className="max-xl:hidden">
+          <SendOff />
+        </div>
       </section>
+
+      <Dialog
+        open={sheet !== null}
+        onClose={closeSheet}
+        size="sm"
+        title={shown?.client ?? ''}
+        description={
+          shown
+            ? [data.label, shown.tier1 ? 'Tier 1' : null, `AM ${shown.am}`].filter(Boolean).join(' · ')
+            : ''
+        }
+      >
+        {shown && (
+          <div className="flex flex-col gap-3">
+            <ReportCell r={shown} />
+            {statusNote(shown, nextMonth) && (
+              <p className="m-0 text-sm text-fg-secondary">{statusNote(shown, nextMonth)}</p>
+            )}
+            <dl className="m-0 flex flex-col text-sm">
+              {[
+                ['Uptime', shown.uptime],
+                ['Downtime', shown.down],
+                [
+                  'Incidents',
+                  shown.incidentNote ? `${shown.incidents} · ${shown.incidentNote}` : shown.incidents,
+                ],
+                [shown.siteNames.length === 1 ? 'Site' : 'Sites', shown.siteNames.join(', ')],
+                ['AM', shown.am],
+              ].map(([k, v]) => (
+                <div
+                  key={k}
+                  className="flex justify-between gap-3 border-t border-border-subtle py-2 first:border-t-0"
+                >
+                  <dt className="shrink-0 text-fg-secondary">{k}</dt>
+                  <dd className="m-0 text-right font-medium">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <Button
+              variant="secondary"
+              fullWidth
+              icon={<IconExternalLink />}
+              href={pdfHref(shown, data.month)}
+              target="_blank"
+              rel="noopener"
+              aria-label={`${openWords} — ${shown.client}, ${data.label} (opens in a new tab)`}
+            >
+              {openWords}
+            </Button>
+            <Button variant="secondary" fullWidth icon={<IconMail />} disabled>
+              Send
+            </Button>
+            <SendOff />
+          </div>
+        )}
+      </Dialog>
     </div>
   );
+}
+
+/** The month after `key` (`YYYY-MM`). */
+function nextKey(key: string): string {
+  const [y, m] = key.split('-').map(Number) as [number, number];
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
 }

@@ -10,7 +10,7 @@ test.describe('Uptime reports (local Supabase)', () => {
     page,
     context,
     baseURL,
-  }) => {
+  }, info) => {
     await ensureUser('tao@example.test');
     await signIn(context, baseURL!, 'tao@example.test');
     await page.goto('/reports');
@@ -19,17 +19,8 @@ test.describe('Uptime reports (local Supabase)', () => {
     await expect(page.getByText('Incidents clients see')).toBeVisible();
     await expect(page.getByRole('heading', { name: /^Client reports · / })).toBeVisible();
 
-    // a table row from xl, a card below it
-    const rows = page
-      .locator('tr:visible, li:visible')
-      .filter({ has: page.getByRole('link', { name: /PDF, opens in a new tab/ }) });
-    await expect(rows.first()).toBeVisible();
     // the internal client never gets a report
     await expect(page.getByRole('link', { name: /— Internal,/ })).toHaveCount(0);
-
-    const send = rows.first().getByRole('button', { name: 'Send' });
-    await expect(send).toBeDisabled();
-    await expect(send).toHaveAttribute('title', /Sending from here comes later/);
 
     // the running month: a live preview on demand
     await page
@@ -39,7 +30,30 @@ test.describe('Uptime reports (local Supabase)', () => {
     await expect(page).toHaveURL(/month=\d{4}-\d{2}/);
     await expect(page.getByText('Preview draft · generated on demand')).toBeVisible();
 
-    const href = await rows.first().getByRole('link').first().getAttribute('href');
+    // from xl a table row carries the actions; below it a card opens a sheet with them (MReports, §42)
+    const phone = info.project.name === 'mobile';
+    let scope;
+    if (phone) {
+      await page
+        .getByRole('button', { name: /Show details$/ })
+        .first()
+        .click();
+      scope = page.getByRole('dialog');
+      await expect(scope).toContainText('Sending from here comes later');
+    } else {
+      scope = page
+        .locator('tr:visible')
+        .filter({ has: page.getByRole('link', { name: /opens in a new tab/ }) })
+        .first();
+    }
+    const send = scope.getByRole('button', { name: 'Send' });
+    await expect(send).toBeDisabled();
+    if (!phone) await expect(send).toHaveAttribute('title', /Sending from here comes later/);
+
+    const href = await scope
+      .getByRole('link', { name: /opens in a new tab/ })
+      .first()
+      .getAttribute('href');
     const res = await page.request.get(href!);
     expect(res.status()).toBe(200);
     expect(res.headers()['content-type']).toBe('application/pdf');

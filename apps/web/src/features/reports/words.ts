@@ -58,6 +58,8 @@ export function whatWord(i: Pick<ReportFiguresIncident, 'kind' | 'trigger'>): st
 export interface ReportRowWords {
   client: string;
   sites: number;
+  /** The sites by name, for the phone sheet (MReports). */
+  siteNames: string[];
   uptime: string;
   down: string;
   incidents: string;
@@ -70,6 +72,7 @@ export function rowWords(f: ReportFigures): ReportRowWords {
   return {
     client: f.client.name,
     sites: f.sites.length,
+    siteNames: f.sites.map((s) => s.name),
     uptime: uptimeWord(f.uptime),
     down: formatDuration(f.downMinutes),
     incidents: String(f.outages + f.degraded),
