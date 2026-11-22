@@ -21,6 +21,7 @@ import {
 import {
   IconBell,
   IconChartColumn,
+  IconFileText,
   IconChevronRight,
   IconClock,
   IconExternalLink,
@@ -77,7 +78,6 @@ function RuleNote() {
   const id = useId();
   return (
     <>
-      <p className="m-0 text-sm text-fg-secondary max-xl:hidden">{RULE}</p>
       <div className="rounded-aura-lg border border-border-default bg-bg-surface text-sm xl:hidden">
         <div className="flex items-center gap-1.5 py-1 pr-1.5 pl-3.5">
           <span className="flex text-fg-secondary" aria-hidden>
@@ -189,7 +189,10 @@ export function ReportsView({
       <div className="md:hidden">{monthSwitch(true)}</div>
 
       {/* 2 + 1 on a phone, the third full width; 3 across from md (MReports, §42 item 2) */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+      <div
+        className={`grid grid-cols-2 gap-3 transition-opacity motion-reduce:transition-none md:grid-cols-3 md:gap-4 ${pending ? 'opacity-60' : ''}`}
+        aria-busy={pending}
+      >
         {data.tiles.map((t, i) => (
           <Stat
             key={t.label}
@@ -203,17 +206,23 @@ export function ReportsView({
       </div>
 
       <section
-        className={`flex flex-col gap-3 transition-opacity ${pending ? 'opacity-60' : ''}`}
+        className={`flex flex-col gap-3 transition-opacity motion-reduce:transition-none ${pending ? 'opacity-60' : ''}`}
         aria-labelledby="reports-table"
         aria-busy={pending}
       >
         <div className="flex flex-col gap-0.5">
-          <h2 id="reports-table" className="m-0 text-2xl font-semibold">
-            {`Client reports · ${data.label}`}
-          </h2>
-          {data.running && (
-            <span className="text-sm text-fg-secondary">Preview draft · generated on demand</span>
-          )}
+          {/* the running note sits on the title's line from xl (Reports), under it below (MReports) */}
+          <div className="flex flex-col gap-0.5 xl:flex-row xl:items-baseline xl:gap-3">
+            <h2 id="reports-table" className="m-0 text-2xl font-semibold">
+              {`Client reports · ${data.label}`}
+            </h2>
+            {data.running && (
+              <span className="text-sm font-medium text-fg-secondary">
+                Preview draft · generated on demand
+              </span>
+            )}
+          </div>
+          <p className="m-0 text-sm text-fg-secondary max-xl:hidden">{RULE}</p>
         </div>
         <RuleNote />
 
@@ -221,7 +230,7 @@ export function ReportsView({
           <EmptyState
             bordered
             headingLevel={3}
-            icon={<IconChartColumn />}
+            icon={<IconFileText />}
             title="No client sites were watched this month"
             description="A client gets a report once one of its sites is being monitored."
           />
@@ -236,8 +245,8 @@ export function ReportsView({
                     <Th>Sites</Th>
                     <Th className="text-right">Uptime</Th>
                     <Th className="text-right">Downtime</Th>
-                    <Th className="whitespace-nowrap">Incidents</Th>
-                    <Th>AM</Th>
+                    <Th>Incidents</Th>
+                    <Th className="whitespace-nowrap">AM</Th>
                     <Th>Report</Th>
                     <Th className="text-right">Actions</Th>
                   </Tr>
@@ -267,13 +276,19 @@ export function ReportsView({
                       >
                         {r.down}
                       </Td>
-                      <Td label="Incidents" className="whitespace-nowrap">
-                        <span className="font-semibold tabular-nums">{r.incidents}</span>
-                        {r.incidentNote && (
-                          <span className="text-fg-secondary">{` · ${r.incidentNote}`}</span>
-                        )}
+                      <Td label="Incidents">
+                        <span className="flex flex-col">
+                          <span className="font-semibold tabular-nums">{r.incidents}</span>
+                          {r.incidentNote && (
+                            <span className="whitespace-nowrap text-xs text-fg-secondary">
+                              {r.incidentNote}
+                            </span>
+                          )}
+                        </span>
                       </Td>
-                      <Td label="AM">{r.am}</Td>
+                      <Td label="AM" className="whitespace-nowrap">
+                        {r.am}
+                      </Td>
                       <Td label="Report">
                         <ReportCell r={r} />
                       </Td>
@@ -288,7 +303,7 @@ export function ReportsView({
                               href={pdfHref(r, data.month)}
                               target="_blank"
                               rel="noopener"
-                              aria-label={`${preview} — ${r.client}, ${data.label} (PDF, opens in a new tab)`}
+                              aria-label={`${preview} — ${r.client}, ${monthLabel(data.month)} (PDF, opens in a new tab)`}
                             >
                               {preview}
                             </Button>

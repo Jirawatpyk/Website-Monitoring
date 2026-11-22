@@ -11,15 +11,16 @@ export default function Loading() {
     <Container>
       <PageSkeleton label="Loading uptime reports">
         <PageHeaderSkeleton actions={1} actionFullOnPhone phoneBar="title" />
-        <div className="md:hidden" aria-hidden>
-          <Skeleton variant="rect" height={44} />
-        </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4" aria-hidden>
           <CardSkeleton lines={2} />
           <CardSkeleton lines={2} />
           <div className="max-md:col-span-2">
             <CardSkeleton lines={2} />
           </div>
+        </div>
+        <div className="flex flex-col gap-3" aria-hidden>
+          <Skeleton variant="text" width="40%" />
+          <Skeleton variant="rect" height={44} />
         </div>
         <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:hidden" aria-hidden>
           {Array.from({ length: 4 }, (_, i) => (
