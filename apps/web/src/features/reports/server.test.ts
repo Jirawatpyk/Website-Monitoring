@@ -150,6 +150,15 @@ describe('runReportDrafts (D-073 item 13)', () => {
     error.mockRestore();
   });
 
+  it('past its budget a run starts no print and defers the rest', async () => {
+    let t = 0;
+    const clock = () => (t += 300_000); // the look before the print is already past 240 s
+    const f = db();
+    const r = await runReportDrafts(f.db, NOW, render, clock);
+    expect(r).toMatchObject({ ok: true, made: 0, deferred: 1 });
+    expect(f.storageCalls).toHaveLength(0);
+  });
+
   it('a failed read throws (the cron reports it)', async () => {
     const f = db({ 'clients.select': { error: { message: 'down' } } });
     await expect(runReportDrafts(f.db, NOW, render)).rejects.toThrow('clients: down');

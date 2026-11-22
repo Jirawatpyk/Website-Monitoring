@@ -56,6 +56,7 @@ export function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise
 }
 
 const STEP_MS = 30_000;
+const CLOSE_MS = 10_000;
 
 async function launch() {
   const { chromium } = await import('playwright-core');
@@ -69,7 +70,7 @@ async function launch() {
 type Browser = Awaited<ReturnType<typeof launch>>;
 
 /** One report printed in an open browser: its own context, JavaScript off, every request but data: refused. */
-async function printIn(browser: Browser, model: PdfModel): Promise<Buffer> {
+export async function printIn(browser: Browser, model: PdfModel): Promise<Buffer> {
   const html = reportDocument(model, await head());
   const context = await withTimeout(
     browser.newContext({ javaScriptEnabled: false, colorScheme: 'light' }),
@@ -101,7 +102,7 @@ async function printIn(browser: Browser, model: PdfModel): Promise<Buffer> {
       'pdf',
     );
   } finally {
-    await context.close();
+    await withTimeout(context.close(), CLOSE_MS, 'close context').catch(() => {});
   }
 }
 
@@ -111,7 +112,7 @@ export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
   try {
     return await printIn(browser, model);
   } finally {
-    await browser.close();
+    await withTimeout(browser.close(), CLOSE_MS, 'close browser').catch(() => {});
   }
 }
 
@@ -140,7 +141,9 @@ export function pdfPrinter<B extends { close: () => Promise<void> } = Browser>(
   const drop = async () => {
     const was = browser;
     browser = null;
-    await (await was?.catch(() => null))?.close().catch(() => {});
+    const b = await was?.catch(() => null);
+    // a browser that hung may never close either: bounded, so the run goes on
+    if (b) await withTimeout(b.close(), CLOSE_MS, 'close browser').catch(() => {});
   };
   return {
     render: async (model) => {

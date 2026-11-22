@@ -18,6 +18,9 @@ export const REPORTS_BUCKET = 'client-reports';
 /** 06:00 on the 1st, Bangkok: six hours after the month ends. */
 export const DRAFTS_FROM_MS = 6 * 3_600_000;
 
+/** No print starts after this long into a run; the route's limit is 300 s. */
+export const DRAFTS_BUDGET_MS = 240_000;
+
 export const draftPath = (clientId: string, monthKey: string) => `${clientId}/${monthKey}.pdf`;
 
 /** JSON with every object's keys sorted, so the stored copy (jsonb reorders keys) compares equal. */
@@ -42,18 +45,21 @@ export type DraftsResult = {
   refreshed: number;
   unchanged: number;
   failed: number;
+  /** Left for the next run: no print starts after `DRAFTS_BUDGET_MS`, so the run always reports. */
+  deferred: number;
 };
 
 export async function runReportDrafts(
   db: DbClient,
   now: Date,
   render: (model: ReturnType<typeof pdfModel>) => Promise<Buffer>,
+  clock: () => number = Date.now,
 ): Promise<DraftsResult> {
   const month = previousMonth(monthKeyOf(now));
   const { to } = bangkokMonth(month, now);
   // the drafts are made from 06:00 on the 1st (board Reports), once the last day's rollups are in
   if (now.getTime() - to.getTime() < DRAFTS_FROM_MS) {
-    return { ok: true, month, clients: 0, made: 0, refreshed: 0, unchanged: 0, failed: 0 };
+    return { ok: true, month, clients: 0, made: 0, refreshed: 0, unchanged: 0, failed: 0, deferred: 0 };
   }
   const clients = await loadReportClients(db, to);
   const [figures, drafts] = await Promise.all([liveFigures(db, month, now, clients), loadDrafts(db, month)]);
@@ -65,13 +71,20 @@ export async function runReportDrafts(
     refreshed: 0,
     unchanged: 0,
     failed: 0,
+    deferred: 0,
   };
+  const started = clock();
   for (const c of clients) {
     const f = figures.get(c.id);
     if (!f) continue;
     const stored = drafts.get(c.id);
     if (stored?.figures && comparable(stored.figures) === comparable(f)) {
       out.unchanged++;
+      continue;
+    }
+    // the cron has 300 s: stop starting prints in time to answer (as the crawler stops at 95 s)
+    if (clock() - started > DRAFTS_BUDGET_MS) {
+      out.deferred++;
       continue;
     }
     try {
