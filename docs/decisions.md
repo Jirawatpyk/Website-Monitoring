@@ -92,6 +92,7 @@ Decisions that settle a conflict between the PRD and the design spec, a conflict
 6. **A site watched for part of the month** counts from when monitoring started (D-031); the days before are drawn empty.
 7. **Root-cause gate:** a report can't go out while a client-visible incident in it has no root cause (or "Unknown"); internal-only ones don't block.
 8. **Language:** the report's labels are English; the staff's "What happened" text appears as written. A Thai template for `th` clients is later.
+9. **Minutes (engine review, 22 Nov):** an incident's minutes are whole clock minutes (D-033 `clockMinutes`, at least 1) of what the client sees, clipped to the month and outside maintenance — the same number the Incident page and the weekly summary print. A site's and a client's Downtime is those lines added up, so the page adds up. Uptime and "Target met" are worked out on the exact time, as the internal pages do (spec §5), and rounded only for display. A PROBLEM drop is split by its causes (`new_cause` / `cause_back`, D-067), so only a client-visible stretch is degraded; "open" means a client-visible stretch is still going at the end of that month.
 
 ## D-072 — S20 before G2; sending to clients moves to S20b
 

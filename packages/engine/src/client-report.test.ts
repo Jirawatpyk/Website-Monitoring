@@ -1,35 +1,52 @@
 import { describe, expect, it } from 'vitest';
+import { TRIGGERS } from '@dxt/shared';
 import {
   bangkokMonth,
+  CLIENT_DEGRADED_TRIGGERS,
   clientKindOf,
   clientMonth,
   siteMonth,
+  type CauseChange,
   type ReportIncidentInput,
   type ReportSiteInput,
 } from './client-report';
+import { outageMinutes } from './lifecycle';
 
 // Times are UTC; Bangkok = UTC+7. Spec §5 sample: September so far = 1 Sep 00:00 → Fri 25 Sep 10:07
 // Bangkok = 31 Aug 17:00Z → 25 Sep 03:07Z, 35,167 minutes per site.
 const SEP_NOW = new Date('2026-09-25T03:07:00Z');
 const sep = bangkokMonth('2026-09', SEP_NOW);
+const aug = bangkokMonth('2026-08', SEP_NOW);
 
 const at = (iso: string) => new Date(iso);
+const plus = (iso: string, minutes: number) => new Date(at(iso).getTime() + minutes * 60_000);
 const down = (start: string, minutes: number | null) => ({
   severity: 'down' as const,
   start: at(start),
-  end: minutes === null ? null : new Date(at(start).getTime() + minutes * 60_000),
+  end: minutes === null ? null : plus(start, minutes),
 });
-const problem = (start: string, minutes: number) => ({
+const downTo = (start: string, end: string | null) => ({
+  severity: 'down' as const,
+  start: at(start),
+  end: end === null ? null : at(end),
+});
+const problem = (start: string, minutes: number | null) => ({
   severity: 'problem' as const,
   start: at(start),
-  end: new Date(at(start).getTime() + minutes * 60_000),
+  end: minutes === null ? null : plus(start, minutes),
 });
 const inc = (
   number: number,
   episodes: ReportIncidentInput['episodes'],
-  problemTrigger: ReportIncidentInput['problemTrigger'] = 'hard_fail',
+  trigger: CauseChange['trigger'] = 'hard_fail',
   rootCauseCategory: string | null = 'hosting',
-): ReportIncidentInput => ({ number, episodes, problemTrigger, rootCauseCategory });
+  causes?: CauseChange[],
+): ReportIncidentInput => ({
+  number,
+  episodes,
+  causes: causes ?? [{ at: episodes[0]!.start, trigger }],
+  rootCauseCategory,
+});
 const site = (
   name: string,
   tier: 1 | 2 | 3,
@@ -45,7 +62,7 @@ const site = (
 });
 
 describe('bangkokMonth (D-073)', () => {
-  it('a running month ends at now, on Bangkok midnights', () => {
+  it('a running month ends at now; every day of the month has a cell', () => {
     expect(sep.from.toISOString()).toBe('2026-08-31T17:00:00.000Z');
     expect(sep.to.toISOString()).toBe('2026-09-25T03:07:00.000Z');
     expect(sep.running).toBe(true);
@@ -53,7 +70,6 @@ describe('bangkokMonth (D-073)', () => {
     expect((sep.to.getTime() - sep.from.getTime()) / 60_000).toBe(35_167);
   });
   it('a past month runs to the next month’s first Bangkok midnight', () => {
-    const aug = bangkokMonth('2026-08', SEP_NOW);
     expect(aug.from.toISOString()).toBe('2026-07-31T17:00:00.000Z');
     expect(aug.to.toISOString()).toBe('2026-08-31T17:00:00.000Z');
     expect(aug.running).toBe(false);
@@ -62,30 +78,17 @@ describe('bangkokMonth (D-073)', () => {
 });
 
 describe('clientKindOf (spec §12, D-073 items 2–3)', () => {
-  it.each([
-    ['hard_fail', true, 'outage'],
-    ['manual', true, 'outage'],
-    ['slow', false, 'degraded'],
-    ['key_page', false, 'degraded'],
-    ['regional', false, 'degraded'],
-    ['intermittent', false, 'degraded'],
-    ['ssl', false, null],
-    ['domain', false, null],
-    ['tls_chain', false, null],
-    ['keyword', false, null],
-    ['redirect', false, null],
-    ['content_change', false, null],
-    ['blocked_unverified', false, null],
-  ] as const)('%s (a DOWN drop: %s) → %s', (trigger, hasDown, kind) => {
-    expect(clientKindOf(trigger, hasDown)).toBe(kind);
+  it.each(TRIGGERS.map((t) => [t]))('%s', (trigger) => {
+    expect(clientKindOf(trigger, true)).toBe('outage');
+    expect(clientKindOf(trigger, false)).toBe(CLIENT_DEGRADED_TRIGGERS.includes(trigger) ? 'degraded' : null);
   });
-  it('a PROBLEM that became DOWN is an outage, whatever its trigger', () => {
-    expect(clientKindOf('ssl', true)).toBe('outage');
+  it('degraded = slow, key page, regional, intermittent only', () => {
+    expect([...CLIENT_DEGRADED_TRIGGERS].sort()).toEqual(['intermittent', 'key_page', 'regional', 'slow']);
   });
 });
 
 describe('spec §5 September so far — clients only', () => {
-  // BA: Taiwan 11 min DOWN + an internal SSL PROBLEM (not counted, not listed); China a 14-min slow booking page.
+  // BA: Taiwan 11 min DOWN + an internal SSL PROBLEM (not counted, not listed); China a 14-min slow page.
   const ba = [
     site('Bangkok Airways – Taiwan', 1, [
       inc(4, [down('2026-09-03T07:06:00Z', 11)]),
@@ -141,20 +144,139 @@ describe('spec §5 September so far — clients only', () => {
     expect(china.incidents[0]).toMatchObject({ number: 6, kind: 'degraded', minutes: 14 });
     expect(china.days[17]?.kind).toBe('degraded'); // 18 Sep
     expect(china.uptime).toBe(1); // degraded doesn't reduce uptime
+    expect(china.days[29]?.kind).toBe('none'); // 30 Sep hasn't come yet
+  });
+});
+
+describe('minutes are whole clock minutes, as every page counts them (D-033)', () => {
+  it('INC-0133 VOCA, four drops from :40 s → 41 min, as outageMinutes', () => {
+    const eps = [
+      downTo('2026-09-25T03:12:40Z', '2026-09-25T03:19:00Z'),
+      downTo('2026-09-25T03:24:40Z', '2026-09-25T03:35:00Z'),
+      downTo('2026-09-25T03:38:40Z', '2026-09-25T03:52:00Z'),
+      downTo('2026-09-25T03:55:40Z', '2026-09-25T04:04:00Z'),
+    ];
+    const s = siteMonth(
+      site('VOCA', 2, [inc(133, eps)]),
+      bangkokMonth('2026-09', at('2026-10-01T00:00:00Z')),
+    );
+    expect(s.incidents[0]?.minutes).toBe(41);
+    expect(s.incidents[0]?.minutes).toBe(outageMinutes(eps, SEP_NOW));
+    expect(s.downMinutes).toBe(41);
+  });
+  it.each([
+    ['INC-0142 settled 09:47:41 → 10:20', '2026-09-25T02:47:41Z', '2026-09-25T03:20:00Z', 33, false],
+    ['INC-0142 running 09:48:12 → now 10:07', '2026-09-25T02:48:12Z', null, 19, true],
+    ['a 20-second DOWN', '2026-09-10T05:00:10Z', '2026-09-10T05:00:30Z', 1, false],
+  ])('%s → %s min', (_c, start, end, minutes, open) => {
+    const now = end ? at('2026-10-01T00:00:00Z') : SEP_NOW;
+    const s = siteMonth(site('MuvMi', 1, [inc(142, [downTo(start, end)])]), bangkokMonth('2026-09', now));
+    expect(s.incidents[0]).toMatchObject({ minutes, open });
+    expect(s.days.some((d) => d.kind === 'outage')).toBe(true);
+  });
+  it('the headline is the lines added up, so the page adds up (D-073 item 9)', () => {
+    const s = siteMonth(
+      site('Tubtong', 2, [
+        inc(1, [downTo('2026-08-10T01:00:00Z', '2026-08-10T01:07:30Z')]),
+        inc(2, [downTo('2026-08-11T01:00:00Z', '2026-08-11T01:07:30Z')]),
+      ]),
+      aug,
+    );
+    expect(s.incidents.map((i) => i.minutes)).toEqual([7, 7]);
+    expect(s.downMinutes).toBe(14);
+  });
+});
+
+describe('causes change inside an incident (D-067, D-023)', () => {
+  it('an SSL PROBLEM with a key-page failure inside it: only the key-page stretch is degraded', () => {
+    const s = siteMonth(
+      site('BA', 1, [
+        inc(70, [problem('2026-08-31T17:00:00Z', 19 * 24 * 60)], 'ssl', null, [
+          { at: at('2026-08-31T17:00:00Z'), trigger: 'ssl' },
+          { at: at('2026-09-10T02:00:00Z'), trigger: 'key_page' },
+          { at: at('2026-09-10T04:00:00Z'), trigger: 'ssl' },
+        ]),
+      ]),
+      sep,
+    );
+    expect(s.incidents).toEqual([expect.objectContaining({ kind: 'degraded', minutes: 120 })]);
+    expect(s.days.filter((d) => d.kind === 'degraded')).toHaveLength(1);
+  });
+  it('slow, then PROBLEM AGAIN as keyword: only the slow minutes count', () => {
+    const s = siteMonth(
+      site('Fuji', 2, [
+        inc(71, [problem('2026-08-05T02:00:00Z', 30), problem('2026-08-06T02:00:00Z', 60)], 'slow', null, [
+          { at: at('2026-08-05T02:00:00Z'), trigger: 'slow' },
+          { at: at('2026-08-06T02:00:00Z'), trigger: 'keyword' },
+        ]),
+      ]),
+      aug,
+    );
+    expect(s.incidents[0]).toMatchObject({ kind: 'degraded', minutes: 30 });
+    expect(s.days[5]?.kind).toBe('ok'); // 6 Aug, keyword only
+  });
+  it('a DOWN that comes back to a failing key page past midnight: outage, then a degraded day', () => {
+    // 21 Aug 23:30–23:50 Bangkok DOWN, then the key page failing to 22 Aug 01:30; latest cause hard_fail
+    const s = siteMonth(
+      site('BA', 1, [
+        inc(
+          72,
+          [downTo('2026-08-21T16:30:00Z', '2026-08-21T16:50:00Z'), problem('2026-08-21T16:50:00Z', 100)],
+          'hard_fail',
+          'hosting',
+          [
+            { at: at('2026-08-21T16:30:00Z'), trigger: 'hard_fail' },
+            { at: at('2026-08-21T16:50:00Z'), trigger: 'key_page' },
+          ],
+        ),
+      ]),
+      aug,
+    );
+    expect(s.incidents[0]).toMatchObject({ kind: 'outage', minutes: 20 });
+    expect(s.days[20]?.kind).toBe('outage'); // 21 Aug
+    expect(s.days[21]?.kind).toBe('degraded'); // 22 Aug
+  });
+});
+
+describe('open means what the client sees is still going (M1)', () => {
+  it('August’s report: a 21 Aug outage that relapses on 2 Sep is closed in August', () => {
+    const s = siteMonth(
+      site('MuvMi', 1, [inc(80, [down('2026-08-21T07:00:00Z', 20), down('2026-09-02T01:00:00Z', null)])]),
+      aug,
+    );
+    expect(s.incidents[0]).toMatchObject({ minutes: 20, open: false });
+    expect(clientMonth([s]).open).toBe(0);
+  });
+  it('an outage back up while an SSL PROBLEM stays open (D-068) is not open', () => {
+    const s = siteMonth(
+      site('BA', 1, [
+        inc(
+          81,
+          [down('2026-09-20T01:00:00Z', 20), problem('2026-09-20T01:20:00Z', null)],
+          'hard_fail',
+          null,
+          [
+            { at: at('2026-09-20T01:00:00Z'), trigger: 'hard_fail' },
+            { at: at('2026-09-20T01:20:00Z'), trigger: 'ssl' },
+          ],
+        ),
+      ]),
+      sep,
+    );
+    expect(s.incidents[0]).toMatchObject({ kind: 'outage', minutes: 20, open: false });
   });
 });
 
 describe('maintenance, partial months and targets (spec §5, D-073 items 5–6)', () => {
-  const aug = bangkokMonth('2026-08', SEP_NOW);
-
-  it('DOWN inside a maintenance window leaves both sides, and the day gets its cap', () => {
+  it('DOWN inside a maintenance window leaves both sides, the line and the day', () => {
     const s = siteMonth(
-      site('Tubtong', 2, [inc(20, [down('2026-08-12T15:30:00Z', 60)])], {
+      site('Tubtong', 2, [inc(20, [downTo('2026-08-12T15:30:20Z', '2026-08-12T15:41:00Z')])], {
         maintenance: [{ start: at('2026-08-12T15:00:00Z'), end: at('2026-08-12T17:00:00Z') }],
       }),
       aug,
     );
     expect(s.downMinutes).toBe(0);
+    expect(s.incidents).toEqual([]);
     expect(s.maintenanceMinutes).toBe(120);
     expect(s.uptime).toBe(1);
     expect(s.days[11]).toEqual({ kind: 'ok', maintenance: true }); // 12 Aug Bangkok
@@ -167,25 +289,58 @@ describe('maintenance, partial months and targets (spec §5, D-073 items 5–6)'
     expect(s.days[19]?.kind).toBe('ok'); // 20 Aug
   });
 
-  it('a site never monitored in the month has no figures', () => {
-    const s = siteMonth(site('New', 3, [], { monitoringStartedAt: at('2026-09-02T00:00:00Z') }), aug);
-    expect(s.windowMinutes).toBe(0);
+  it.each([
+    ['started after the month', at('2026-09-02T00:00:00Z'), aug],
+    ['never started', null, aug],
+    ['a month still to come', at('2026-07-01T00:00:00Z'), bangkokMonth('2026-12', SEP_NOW)],
+    [
+      'the month’s first second',
+      at('2026-07-01T00:00:00Z'),
+      bangkokMonth('2026-09', at('2026-08-31T17:00:00Z')),
+    ],
+  ] as const)('%s → no figures and nothing listed', (_c, started, month) => {
+    const s = siteMonth(
+      site('New', 3, [inc(90, [down('2026-08-21T07:00:00Z', 20)])], { monitoringStartedAt: started }),
+      month,
+    );
     expect(s.uptime).toBeNull();
     expect(s.metTarget).toBeNull();
+    expect(s.incidents).toEqual([]);
+    expect(s.days.every((d) => d.kind === 'none')).toBe(true);
   });
 
-  // Tier 1 target 99.95% over 31 days (44,640 min) allows 22.32 min down.
+  // Tier 1 target 99.95% over 31 days (44,640 min) allows 22.32 min down — judged on the exact time.
   it.each([
-    [22, true],
-    [23, false],
-  ])('Tier 1, %s min down in August → target met: %s', (minutes, met) => {
-    const s = siteMonth(site('MuvMi', 1, [inc(30, [down('2026-08-21T07:06:00Z', minutes)])]), aug);
+    ['22 min', 22 * 60, true],
+    ['22 min 24 s', 22 * 60 + 24, false],
+    ['23 min', 23 * 60, false],
+  ])('Tier 1, %s down in August → target met: %s', (_c, seconds, met) => {
+    const s = siteMonth(
+      site('MuvMi', 1, [
+        inc(30, [
+          downTo(
+            '2026-08-21T07:06:00Z',
+            new Date(at('2026-08-21T07:06:00Z').getTime() + seconds * 1000).toISOString(),
+          ),
+        ]),
+      ]),
+      aug,
+    );
     expect(s.metTarget).toBe(met);
   });
 
+  it('Tier 3, exactly at 99.5% (216 min in 30 days) meets it', () => {
+    const s = siteMonth(
+      site('WeCare', 3, [inc(31, [down('2026-09-10T01:00:00Z', 216)])]),
+      bangkokMonth('2026-09', at('2026-10-01T00:00:00Z')),
+    );
+    expect(s.uptime).toBeCloseTo(0.995, 10);
+    expect(s.metTarget).toBe(true);
+  });
+
   it('a client meets its target only when every site meets its own', () => {
-    const ok = siteMonth(site('A', 3, [inc(31, [down('2026-08-21T07:06:00Z', 100)])]), aug); // 99.78% ≥ 99.5%
-    const miss = siteMonth(site('B', 1, [inc(32, [down('2026-08-21T07:06:00Z', 30)])]), aug); // < 99.95%
+    const ok = siteMonth(site('A', 3, [inc(31, [down('2026-08-21T07:06:00Z', 100)])]), aug);
+    const miss = siteMonth(site('B', 1, [inc(32, [down('2026-08-21T07:06:00Z', 30)])]), aug);
     expect(clientMonth([ok]).metTarget).toBe(true);
     expect(clientMonth([ok, miss]).metTarget).toBe(false);
   });

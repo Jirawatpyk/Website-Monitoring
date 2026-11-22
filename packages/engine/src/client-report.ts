@@ -1,7 +1,7 @@
-import { TIER_CONFIG, type Tier, type Trigger } from '@dxt/shared';
+import { TIER_CONFIG, clockMinutes, type Tier, type Trigger } from '@dxt/shared';
 import type { Episode } from './lifecycle';
 import type { Span } from './maintenance';
-import { aggregateUptime, downMinutesIn, downMinutesInside, siteUptime, spanMinutesIn } from './uptime';
+import { aggregateUptime } from './uptime';
 
 /**
  * The monthly client report (FR-15, S20, D-073): what a client sees of a month. Spec §5 for uptime
@@ -20,12 +20,12 @@ export type ClientKind = 'outage' | 'degraded';
 export type DayKind = ClientKind | 'ok' | 'none';
 
 /**
- * How a client sees an incident (D-073 items 2–3): any DOWN drop in the month makes it an outage —
- * a hand-check DOWN too, and a PROBLEM that became DOWN; otherwise its PROBLEM trigger decides.
+ * How a client sees a stretch of an incident (D-073 items 2–3): a DOWN drop is an outage (a hand-check
+ * DOWN too); a PROBLEM stretch is degraded when its cause is one a client sees, else internal.
  */
-export function clientKindOf(problemTrigger: Trigger, hasDown: boolean): ClientKind | null {
-  if (hasDown) return 'outage';
-  return CLIENT_DEGRADED_TRIGGERS.includes(problemTrigger) ? 'degraded' : null;
+export function clientKindOf(trigger: Trigger, down: boolean): ClientKind | null {
+  if (down) return 'outage';
+  return CLIENT_DEGRADED_TRIGGERS.includes(trigger) ? 'degraded' : null;
 }
 
 export interface ReportMonth {
@@ -34,11 +34,11 @@ export interface ReportMonth {
   /** The next month's first Bangkok midnight, or `now` while the month runs. */
   to: Date;
   running: boolean;
-  /** Each day's Bangkok midnight, up to the last day that has begun. */
+  /** Every day's Bangkok midnight; in a running month the days still to come are drawn empty. */
   days: Date[];
 }
 
-/** A calendar month in Bangkok (`YYYY-MM`), cut at `now` while it runs. */
+/** A calendar month in Bangkok (`YYYY-MM`, validated by the caller), cut at `now` while it runs. */
 export function bangkokMonth(month: string, now: Date): ReportMonth {
   const [y, m] = month.split('-').map(Number) as [number, number];
   const from = new Date(Date.UTC(y, m - 1, 1) - BANGKOK_MS);
@@ -46,17 +46,22 @@ export function bangkokMonth(month: string, now: Date): ReportMonth {
   const running = now < end;
   const to = running ? now : end;
   const days: Date[] = [];
-  // Every day of the month: in a running month the days still to come are drawn empty.
   for (let t = from.getTime(); t < end.getTime(); t += DAY_MS) days.push(new Date(t));
   return { from, to, running, days };
 }
 
+/** When a cause took over in an incident: `detected`, `relapsed`, `new_cause`, `cause_back` (D-067). */
+export interface CauseChange {
+  at: Date;
+  trigger: Trigger;
+}
+
 export interface ReportIncidentInput {
   number: number;
-  /** The incident's drops (`episodesOf`). */
+  /** The incident's drops, as `episodesFromTimeline` reads them (a resolve ends an open drop). */
   episodes: readonly Episode[];
-  /** What its PROBLEM drops were about: the cause in progress, else the opening trigger. */
-  problemTrigger: Trigger;
+  /** Every cause with when it took over, oldest first; the first one covers anything before it. */
+  causes: readonly CauseChange[];
   rootCauseCategory: string | null;
 }
 
@@ -74,9 +79,9 @@ export interface ReportIncidentLine {
   startedAt: Date;
   /** Started before the month (the minutes are only the month's). */
   startedBefore: boolean;
-  /** An outage's DOWN minutes, a degraded's PROBLEM minutes, inside the month. */
+  /** Whole clock minutes of what the client sees, outside maintenance, inside the month (D-033). */
   minutes: number;
-  /** Still failing at the report's end. */
+  /** The part the client sees is still going at the month's end (or now). */
   open: boolean;
   rootCauseCategory: string | null;
 }
@@ -84,96 +89,155 @@ export interface ReportIncidentLine {
 export interface SiteMonthReport {
   name: string;
   tier: Tier;
-  /** Null when the site wasn't monitored at all in the month. */
+  /** Null when the site wasn't watched for any of the month. */
   uptime: number | null;
+  /** The outage lines added up — the figure printed beside them. */
   downMinutes: number;
   windowMinutes: number;
   maintenanceMinutes: number;
-  /** Its tier's target (D-073 item 5); null without figures. */
+  /** Its tier's target, judged on the exact uptime (D-073 item 5); null without figures. */
   metTarget: boolean | null;
   incidents: ReportIncidentLine[];
   /** One cell per day: its worst client-visible event, and a cap when maintenance touched it. */
   days: { kind: DayKind; maintenance: boolean }[];
 }
 
-const overlaps = (e: Episode, a: number, b: number, to: Date) =>
-  e.start.getTime() < b && (e.end ?? to).getTime() > a;
+interface Piece {
+  kind: ClientKind;
+  a: number;
+  b: number;
+  /** Still going past the report's end. */
+  ongoing: boolean;
+}
 
-function clipMinutes(eps: readonly Episode[], from: Date, to: Date): number {
-  let ms = 0;
-  for (const e of eps) {
-    const a = Math.max(e.start.getTime(), from.getTime());
-    const b = Math.min((e.end ?? to).getTime(), to.getTime());
-    if (b > a) ms += b - a;
+/** [a, b) minus the spans, as the parts left. */
+function minus(a: number, b: number, spans: readonly Span[]): [number, number][] {
+  let parts: [number, number][] = [[a, b]];
+  for (const s of spans) {
+    const sa = s.start.getTime();
+    const sb = s.end.getTime();
+    parts = parts.flatMap(([x, y]): [number, number][] =>
+      sb <= x || sa >= y
+        ? [[x, y]]
+        : (
+            [
+              [x, sa],
+              [sb, y],
+            ] as [number, number][]
+          ).filter(([p, q]) => q > p),
+    );
   }
-  return Math.round(ms / 60_000);
+  return parts;
+}
+
+function mergedMs(spans: readonly Span[], a: number, b: number): number {
+  const parts = spans
+    .map((s): [number, number] => [Math.max(s.start.getTime(), a), Math.min(s.end.getTime(), b)])
+    .filter(([x, y]) => y > x)
+    .sort((x, y) => x[0] - y[0]);
+  let ms = 0;
+  let end = -Infinity;
+  for (const [x, y] of parts) {
+    if (y <= end) continue;
+    ms += y - Math.max(x, end);
+    end = y;
+  }
+  return ms;
+}
+
+/** The client-visible stretches of one incident inside [from, to), outside maintenance. */
+function piecesOf(inc: ReportIncidentInput, from: number, to: number, maintenance: readonly Span[]): Piece[] {
+  const triggerAt = (t: number): Trigger => {
+    let trig = inc.causes[0]?.trigger ?? 'hard_fail';
+    for (const c of inc.causes) if (c.at.getTime() <= t) trig = c.trigger;
+    return trig;
+  };
+  const out: Piece[] = [];
+  for (const e of inc.episodes) {
+    const ea = e.start.getTime();
+    const eb = e.end?.getTime() ?? Infinity;
+    if (e.severity === 'down') {
+      out.push(...cut('outage', ea, eb));
+      continue;
+    }
+    // A PROBLEM drop takes each cause in turn (D-067): only a client-visible cause is degraded.
+    const bounds = [ea, ...inc.causes.map((c) => c.at.getTime()).filter((t) => t > ea && t < eb), eb];
+    for (let i = 0; i + 1 < bounds.length; i++) {
+      const sa = bounds[i]!;
+      const sb = bounds[i + 1]!;
+      if (clientKindOf(triggerAt(sa), false)) out.push(...cut('degraded', sa, sb));
+    }
+  }
+  return out;
+
+  function cut(kind: ClientKind, a: number, b: number): Piece[] {
+    const ongoing = a < to && b > to;
+    const ca = Math.max(a, from);
+    const cb = Math.min(b, to);
+    if (cb <= ca) return [];
+    const parts = minus(ca, cb, maintenance);
+    return parts.map(([x, y], i) => ({
+      kind,
+      a: x,
+      b: y,
+      ongoing: ongoing && i === parts.length - 1 && y === cb,
+    }));
+  }
 }
 
 /** One site's month (spec §5, §12; D-073). */
 export function siteMonth(site: ReportSiteInput, month: ReportMonth): SiteMonthReport {
   const start = site.monitoringStartedAt;
-  const from = start && start > month.from ? start : month.from;
-  const watched = start !== null && start < month.to;
-  const windowMinutes = watched ? (month.to.getTime() - from.getTime()) / 60_000 : 0;
-
-  // D-073 item 4: a false alarm is left out of the report, minutes and all.
-  const counted = site.incidents.filter((i) => i.rootCauseCategory !== 'false_alarm');
-  const inMonth = (e: Episode) => overlaps(e, from.getTime(), month.to.getTime(), month.to);
+  const fromMs = Math.max(month.from.getTime(), start?.getTime() ?? Infinity);
+  const toMs = month.to.getTime();
+  const watched = start !== null && toMs > fromMs;
+  const windowMs = watched ? toMs - fromMs : 0;
+  const maintenanceMs = watched ? mergedMs(site.maintenance, fromMs, toMs) : 0;
 
   const lines: ReportIncidentLine[] = [];
-  const outageDrops: Episode[] = [];
-  const degradedDrops: Episode[] = [];
-  for (const inc of counted) {
-    const drops = inc.episodes.filter(inMonth);
-    if (!drops.length) continue;
-    const downs = drops.filter((e) => e.severity === 'down');
-    const kind = clientKindOf(inc.problemTrigger, downs.length > 0);
-    if (!kind) continue;
-    const mine = kind === 'outage' ? downs : drops.filter((e) => e.severity === 'problem');
-    (kind === 'outage' ? outageDrops : degradedDrops).push(...mine);
-    // An outage's PROBLEM drops of a client-visible cause still colour their days amber.
-    if (kind === 'outage' && CLIENT_DEGRADED_TRIGGERS.includes(inc.problemTrigger))
-      degradedDrops.push(...drops.filter((e) => e.severity === 'problem'));
-    const first = mine.reduce((a, b) => (b.start < a.start ? b : a));
-    const last = inc.episodes.reduce((a, b) => (b.start > a.start ? b : a));
-    lines.push({
-      number: inc.number,
-      kind,
-      startedAt: first.start,
-      startedBefore: first.start < from,
-      minutes: clipMinutes(mine, from, month.to),
-      open: last.end === null || last.end > month.to,
-      rootCauseCategory: inc.rootCauseCategory,
-    });
+  const pieces: Piece[] = [];
+  if (watched) {
+    for (const inc of site.incidents) {
+      // D-073 item 4: a false alarm is left out of the report, minutes and all (a category is set only
+      // when the incident is resolved, or saved as Unknown).
+      if (inc.rootCauseCategory === 'false_alarm') continue;
+      const mine = piecesOf(inc, fromMs, toMs, site.maintenance);
+      const kind: ClientKind | null = mine.some((p) => p.kind === 'outage')
+        ? 'outage'
+        : mine.length
+          ? 'degraded'
+          : null;
+      if (!kind) continue;
+      pieces.push(...mine);
+      const shown = mine.filter((p) => p.kind === kind);
+      const first = inc.episodes
+        .filter((e) => (kind === 'outage' ? e.severity === 'down' : e.severity === 'problem'))
+        .find((e) => (e.end?.getTime() ?? Infinity) > fromMs);
+      const startedAt = first?.start ?? new Date(shown[0]!.a);
+      lines.push({
+        number: inc.number,
+        kind,
+        startedAt,
+        startedBefore: startedAt.getTime() < fromMs,
+        minutes: shown.reduce((n, p) => n + clockMinutes(new Date(p.a), new Date(p.b)), 0),
+        open: shown.some((p) => p.ongoing),
+        rootCauseCategory: inc.rootCauseCategory,
+      });
+    }
   }
   lines.sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
 
-  const maintenanceMinutes = watched ? spanMinutesIn(site.maintenance, from, month.to) : 0;
-  const downMinutes = watched
-    ? Math.round(
-        downMinutesIn(outageDrops, from, month.to) -
-          downMinutesInside(outageDrops, site.maintenance, from, month.to),
-      )
-    : 0;
-  const uptime = watched ? siteUptime({ windowMinutes, downMinutes, maintenanceMinutes }) : null;
+  const downMs = pieces.filter((p) => p.kind === 'outage').reduce((n, p) => n + (p.b - p.a), 0);
+  const countedMs = windowMs - maintenanceMs;
+  const uptime = !watched ? null : countedMs <= 0 ? 1 : 1 - Math.min(downMs, countedMs) / countedMs;
 
-  const minutesInside = (e: Episode, a: number, b: number) =>
-    spanMinutesIn(
-      site.maintenance.map((s) => ({
-        start: new Date(Math.max(s.start.getTime(), e.start.getTime())),
-        end: new Date(Math.min(s.end.getTime(), (e.end ?? month.to).getTime())),
-      })),
-      new Date(a),
-      new Date(b),
-    );
   const days = month.days.map((d) => {
     const a = d.getTime();
-    const b = Math.min(a + DAY_MS, month.to.getTime());
+    const b = Math.min(a + DAY_MS, toMs);
     const maintenance = b > a && site.maintenance.some((s) => s.start.getTime() < b && s.end.getTime() > a);
-    if (!watched || b <= a || b <= from.getTime()) return { kind: 'none' as const, maintenance };
-    // Only what fell outside maintenance colours a day (§5: maintenance isn't counted).
-    const shows = (e: Episode) => clipMinutes([e], new Date(a), new Date(b)) > minutesInside(e, a, b);
-    const kind: DayKind = outageDrops.some(shows) ? 'outage' : degradedDrops.some(shows) ? 'degraded' : 'ok';
+    if (!watched || b <= a || b <= fromMs) return { kind: 'none' as const, maintenance };
+    const on = (k: ClientKind) => pieces.some((p) => p.kind === k && p.a < b && p.b > a);
+    const kind: DayKind = on('outage') ? 'outage' : on('degraded') ? 'degraded' : 'ok';
     return { kind, maintenance };
   });
 
@@ -181,9 +245,9 @@ export function siteMonth(site: ReportSiteInput, month: ReportMonth): SiteMonthR
     name: site.name,
     tier: site.tier,
     uptime,
-    downMinutes,
-    windowMinutes,
-    maintenanceMinutes,
+    downMinutes: lines.filter((l) => l.kind === 'outage').reduce((n, l) => n + l.minutes, 0),
+    windowMinutes: windowMs / 60_000,
+    maintenanceMinutes: maintenanceMs / 60_000,
     metTarget: uptime === null ? null : uptime >= TIER_CONFIG[site.tier].uptimeTarget,
     incidents: lines,
     days,
@@ -207,7 +271,16 @@ export function clientMonth(sites: readonly SiteMonthReport[]): ClientMonthRepor
   const watched = sites.filter((s) => s.uptime !== null);
   const lines = sites.flatMap((s) => s.incidents);
   return {
-    uptime: watched.length ? aggregateUptime(watched) : null,
+    uptime: watched.length
+      ? aggregateUptime(
+          watched.map((s) => ({
+            windowMinutes: s.windowMinutes,
+            maintenanceMinutes: s.maintenanceMinutes,
+            // the exact DOWN share, so the client figure agrees with its sites' (D-073 item 9)
+            downMinutes: (1 - s.uptime!) * (s.windowMinutes - s.maintenanceMinutes),
+          })),
+        )
+      : null,
     downMinutes: sites.reduce((n, s) => n + s.downMinutes, 0),
     incidents: lines.length,
     outages: lines.filter((l) => l.kind === 'outage').length,
