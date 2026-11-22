@@ -79,7 +79,9 @@ function tilesOf(all: readonly ReportFigures[], month: string, running: boolean)
       )
     : null;
   const sum = (k: 'outages' | 'degraded' | 'open' | 'downMinutes') => all.reduce((n, f) => n + f[k], 0);
-  const note = incidentNote({ outages: sum('outages'), degraded: sum('degraded'), open: sum('open') });
+  // the tile reads "6 outages · 2 degraded · 2 still open" (board Reports); a row says "1 open"
+  const note = incidentNote({ outages: sum('outages'), degraded: sum('degraded'), open: 0 });
+  const open = sum('open') ? `${sum('open')} still open` : null;
   return [
     {
       label: `Uptime · ${running ? `${monthLabel(month, { short: true }).split(' ')[0]} so far` : monthLabel(month, { short: true })}`,
@@ -94,7 +96,7 @@ function tilesOf(all: readonly ReportFigures[], month: string, running: boolean)
     {
       label: 'Incidents',
       value: String(sum('outages') + sum('degraded')),
-      caption: note ? note.split(', ').join(' · ') : 'None',
+      caption: note ? [...note.split(', '), ...(open ? [open] : [])].join(' · ') : 'None',
     },
   ];
 }
