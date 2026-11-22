@@ -9,8 +9,12 @@ create table public.client_reports (
   month date not null check (extract(day from month) = 1),
   -- What the PDF says (clientMonth + per-site lines), kept so the page needn't re-read the month.
   figures jsonb not null check (jsonb_typeof(figures) = 'object'),
-  -- The PDF in the `client-reports` bucket: `<client id>/<YYYY-MM>.pdf`.
-  storage_path text not null check (storage_path ~ '^[0-9a-f-]{36}/[0-9]{4}-[0-9]{2}\.pdf$'),
+  -- The PDF in the `client-reports` bucket: always `<this client id>/<this YYYY-MM>.pdf`, so a row can
+  -- never point at another client's file (security review L1).
+  storage_path text not null check (
+    storage_path = client_id::text || '/' || extract(year from month)::int::text || '-'
+      || lpad(extract(month from month)::int::text, 2, '0') || '.pdf'
+  ),
   generated_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -22,7 +26,8 @@ create trigger client_reports_set_updated_at before update on public.client_repo
 
 alter table public.client_reports enable row level security;
 
--- Every staff role reads (the Reports page, D-072); only the reports cron (service role) writes.
+-- Every staff role reads (PRD §3: the staff dashboards and reports; D-072); only the reports cron
+-- (service role) writes. The Phase 3 client role reads nothing here until it has its own policy.
 create policy client_reports_select_staff on public.client_reports
   for select to authenticated
   using ((select public.is_staff()));
@@ -36,4 +41,5 @@ grant all on public.client_reports to service_role;
 -- the app serves a file only after its own staff check (the PDF route), like the verifier screenshots.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('client-reports', 'client-reports', false, 5242880, array['application/pdf'])
-on conflict (id) do nothing;
+on conflict (id) do update
+  set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
