@@ -42,7 +42,7 @@
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Done |
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | In progress |
 | G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov; re-baselined 21 Nov: ≈ Fri 27 Nov, D-071) | Todo |
-| S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 | 6 | Todo |
+| S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 (waived, D-072) | 6 | In progress |
 | S21 | Client status page | 3 · P2 | L | FR-16 | S20 | 7 | Todo |
 | S22 | Post-incident review | 3 · P2 | M | FR-18 | G2 | 8 | Todo |
 | S23 | Synthetic transactions | 3 · P2 | L | FR-17 | G2 | 8–9 | Todo |
