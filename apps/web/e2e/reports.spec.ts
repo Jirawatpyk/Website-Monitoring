@@ -13,6 +13,11 @@ test.describe('Uptime reports (local Supabase)', () => {
   }, info) => {
     await ensureUser('tao@example.test');
     await signIn(context, baseURL!, 'tao@example.test');
+    // the page never calls the PDF route by itself (no prefetch: each call prints a PDF)
+    const pdfCalls: string[] = [];
+    page.on('request', (r) => {
+      if (r.url().includes('/api/reports/')) pdfCalls.push(r.url());
+    });
     await page.goto('/reports');
     await expect(page.getByRole('heading', { name: 'Uptime reports', level: 1 })).toBeAttached();
     await expect(page.getByText(/^Figures as of /)).toBeVisible();
@@ -29,6 +34,8 @@ test.describe('Uptime reports (local Supabase)', () => {
       .click();
     await expect(page).toHaveURL(/month=\d{4}-\d{2}/);
     await expect(page.getByText('Preview draft · generated on demand')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    expect(pdfCalls, 'no PDF printed by viewing the page').toEqual([]);
 
     // from xl a table row carries the actions; below it a card opens a sheet with them (MReports, §42)
     const phone = info.project.name === 'mobile';

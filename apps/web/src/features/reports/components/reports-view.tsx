@@ -58,6 +58,8 @@ function ReportCell({ r }: { r: ReportRow }) {
   );
 }
 
+// Always rendered with `linkComponent="a"`: AURA's default link is next/link, which prefetches —
+// that would print a PDF per visible row on every page view and use up the preview limit (CI, S20).
 const pdfHref = (r: ReportRow, month: string) => `/api/reports/${r.clientId}/${month}`;
 
 /** The reason Send is off, said in words wherever Send is (never only in a tooltip, §42 item 6). */
@@ -301,6 +303,7 @@ export function ReportsView({
                               touchHeight
                               icon={<IconEye />}
                               href={pdfHref(r, data.month)}
+                              linkComponent="a"
                               target="_blank"
                               rel="noopener"
                               aria-label={`${preview} — ${r.client}, ${monthLabel(data.month)} (PDF, opens in a new tab)`}
@@ -431,6 +434,7 @@ export function ReportsView({
                 fullWidth
                 icon={<IconExternalLink />}
                 href={pdfHref(shown, data.month)}
+                linkComponent="a"
                 target="_blank"
                 rel="noopener"
                 aria-label={`${openWords} — ${shown.client}, ${monthLabel(data.month)} (opens in a new tab)`}
