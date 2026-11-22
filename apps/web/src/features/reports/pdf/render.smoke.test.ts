@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildFigures, type FigureIncident } from '../figures';
 import { pdfModel } from '../words';
-import { renderReportPdf } from './render';
+import { pdfPrinter, renderReportPdf } from './render';
 
 /**
  * S20 Done-when 2: prints a long, Thai-heavy sample to A4 with the real Chromium. Opt-in (it launches a
@@ -59,5 +59,17 @@ run('renderReportPdf (smoke)', () => {
     await mkdir(out, { recursive: true });
     await writeFile(path.join(out, 'report-smoke.pdf'), pdf);
     console.info(JSON.stringify({ bytes: pdf.length, ms }));
-  }, 60_000);
+
+    // the drafts cron's way: several reports in one browser (the first run on production prints ~10)
+    const printer = pdfPrinter();
+    try {
+      const t1 = Date.now();
+      const many = [];
+      for (let i = 0; i < 3; i++) many.push(await printer.render(pdfModel(f)));
+      expect(many.every((b) => b.subarray(0, 5).toString() === '%PDF-')).toBe(true);
+      console.info(JSON.stringify({ printedInOneBrowser: many.length, ms: Date.now() - t1 }));
+    } finally {
+      await printer.close();
+    }
+  }, 90_000);
 });

@@ -240,8 +240,9 @@ export function ReportsView({
               <Table caption="Client reports" captionHidden align="middle">
                 <THead>
                   <Tr>
-                    {/* Client takes the room the fixed columns leave (as Expiry) */}
-                    <Th className="w-full">Client</Th>
+                    {/* no fixed widths: every column gets its full width when the row has room (1440), and
+                        Client, the incident words and the actions wrap only when it doesn't (1280) */}
+                    <Th>Client</Th>
                     <Th>Sites</Th>
                     <Th className="text-right">Uptime</Th>
                     <Th className="text-right">Downtime</Th>

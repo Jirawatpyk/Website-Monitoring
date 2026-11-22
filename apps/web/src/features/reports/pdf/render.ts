@@ -94,16 +94,36 @@ export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
   }
 }
 
+/** What a printer needs: a way to start a browser, and to print one report in it. Tests pass fakes. */
+export interface PrinterDeps<B extends { close: () => Promise<void> }> {
+  launch: () => Promise<B>;
+  print: (browser: B, model: PdfModel) => Promise<Buffer>;
+}
+
 /**
  * For many reports in one run (the drafts cron): Chromium starts on the first print, not before — a run
- * where nothing changed launches nothing — and every print reuses it until `close`.
+ * where nothing changed launches nothing — and every print reuses it until `close`. A failed launch or
+ * print drops that browser, so the next client starts a fresh one instead of failing too (advisor, S20).
  */
-export function pdfPrinter(): { render: (model: PdfModel) => Promise<Buffer>; close: () => Promise<void> } {
-  let browser: Promise<Browser> | null = null;
+export function pdfPrinter<B extends { close: () => Promise<void> } = Browser>(
+  deps: PrinterDeps<B> = { launch, print: printIn } as unknown as PrinterDeps<B>,
+): { render: (model: PdfModel) => Promise<Buffer>; close: () => Promise<void> } {
+  let browser: Promise<B> | null = null;
+  const drop = async () => {
+    const was = browser;
+    browser = null;
+    await (await was?.catch(() => null))?.close().catch(() => {});
+  };
   return {
-    render: async (model) => printIn(await (browser ??= launch()), model),
-    close: async () => {
-      if (browser) await (await browser.catch(() => null))?.close();
+    render: async (model) => {
+      const current = (browser ??= deps.launch());
+      try {
+        return await deps.print(await current, model);
+      } catch (err) {
+        if (browser === current) await drop();
+        throw err;
+      }
     },
+    close: drop,
   };
 }
