@@ -432,7 +432,7 @@ export function ReportsView({
                 href={pdfHref(shown, data.month)}
                 target="_blank"
                 rel="noopener"
-                aria-label={`${openWords} — ${shown.client}, ${data.label} (opens in a new tab)`}
+                aria-label={`${openWords} — ${shown.client}, ${monthLabel(data.month)} (opens in a new tab)`}
               >
                 {openWords}
               </Button>
