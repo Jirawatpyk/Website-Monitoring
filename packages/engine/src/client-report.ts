@@ -60,8 +60,11 @@ export interface ReportIncidentInput {
   number: number;
   /** The incident's drops, as `episodesFromTimeline` reads them (a resolve ends an open drop). */
   episodes: readonly Episode[];
-  /** Every cause with when it took over, oldest first; the first one covers anything before it. */
-  causes: readonly CauseChange[];
+  /**
+   * Every cause with when it took over (any order; at least one). A drop's opening event may be stamped
+   * when it was confirmed, after the drop began: the cause in force at a drop's confirm covers its start.
+   */
+  causes: readonly [CauseChange, ...CauseChange[]];
   rootCauseCategory: string | null;
 }
 
@@ -106,6 +109,8 @@ interface Piece {
   kind: ClientKind;
   a: number;
   b: number;
+  /** When the stretch began, before the month and maintenance cut it. */
+  began: number;
   /** Still going past the report's end. */
   ongoing: boolean;
 }
@@ -147,9 +152,10 @@ function mergedMs(spans: readonly Span[], a: number, b: number): number {
 
 /** The client-visible stretches of one incident inside [from, to), outside maintenance. */
 function piecesOf(inc: ReportIncidentInput, from: number, to: number, maintenance: readonly Span[]): Piece[] {
+  const causes = [...inc.causes].sort((x, y) => x.at.getTime() - y.at.getTime());
   const triggerAt = (t: number): Trigger => {
-    let trig = inc.causes[0]?.trigger ?? 'hard_fail';
-    for (const c of inc.causes) if (c.at.getTime() <= t) trig = c.trigger;
+    let trig = causes[0]!.trigger;
+    for (const c of causes) if (c.at.getTime() <= t) trig = c.trigger;
     return trig;
   };
   const out: Piece[] = [];
@@ -160,12 +166,15 @@ function piecesOf(inc: ReportIncidentInput, from: number, to: number, maintenanc
       out.push(...cut('outage', ea, eb));
       continue;
     }
-    // A PROBLEM drop takes each cause in turn (D-067): only a client-visible cause is degraded.
-    const bounds = [ea, ...inc.causes.map((c) => c.at.getTime()).filter((t) => t > ea && t < eb), eb];
+    // A PROBLEM drop takes each cause in turn (D-067): only a client-visible cause is degraded. Its
+    // opening cause is the one in force when it was confirmed (D-050 counts an intermittent "from the 1st").
+    const confirmed = Math.max(ea, e.confirmedAt?.getTime() ?? ea);
+    const changes = causes.map((c) => c.at.getTime()).filter((t) => t > confirmed && t < eb);
+    const bounds = [ea, ...changes, eb];
     for (let i = 0; i + 1 < bounds.length; i++) {
       const sa = bounds[i]!;
       const sb = bounds[i + 1]!;
-      if (clientKindOf(triggerAt(sa), false)) out.push(...cut('degraded', sa, sb));
+      if (clientKindOf(triggerAt(i === 0 ? confirmed : sa), false)) out.push(...cut('degraded', sa, sb));
     }
   }
   return out;
@@ -180,9 +189,21 @@ function piecesOf(inc: ReportIncidentInput, from: number, to: number, maintenanc
       kind,
       a: x,
       b: y,
-      ongoing: ongoing && i === parts.length - 1 && y === cb,
+      began: a,
+      ongoing: ongoing && i === parts.length - 1,
     }));
   }
+}
+
+/** Touching stretches as one, so a cause change inside a drop doesn't add a minute (D-033's floor of 1). */
+function joined(pieces: readonly Piece[]): [number, number][] {
+  const out: [number, number][] = [];
+  for (const p of [...pieces].sort((x, y) => x.a - y.a)) {
+    const last = out[out.length - 1];
+    if (last && p.a <= last[1]) last[1] = Math.max(last[1], p.b);
+    else out.push([p.a, p.b]);
+  }
+  return out;
 }
 
 /** One site's month (spec §5, §12; D-073). */
@@ -210,17 +231,16 @@ export function siteMonth(site: ReportSiteInput, month: ReportMonth): SiteMonthR
       if (!kind) continue;
       pieces.push(...mine);
       const shown = mine.filter((p) => p.kind === kind);
-      const first = inc.episodes
-        .filter((e) => (kind === 'outage' ? e.severity === 'down' : e.severity === 'problem'))
-        .find((e) => (e.end?.getTime() ?? Infinity) > fromMs);
-      const startedAt = first?.start ?? new Date(shown[0]!.a);
+      // When what the client sees began, not the drop it sits in (an SSL drop's key-page stretch).
+      const startedAt = new Date(Math.min(...shown.map((p) => p.began)));
       lines.push({
         number: inc.number,
         kind,
         startedAt,
         startedBefore: startedAt.getTime() < fromMs,
-        minutes: shown.reduce((n, p) => n + clockMinutes(new Date(p.a), new Date(p.b)), 0),
-        open: shown.some((p) => p.ongoing),
+        minutes: joined(shown).reduce((n, [a, b]) => n + clockMinutes(new Date(a), new Date(b)), 0),
+        // D-073 item 9: any client-visible stretch still going (a DOWN back up to a failing key page, D-023)
+        open: mine.some((p) => p.ongoing),
         rootCauseCategory: inc.rootCauseCategory,
       });
     }
@@ -234,8 +254,8 @@ export function siteMonth(site: ReportSiteInput, month: ReportMonth): SiteMonthR
   const days = month.days.map((d) => {
     const a = d.getTime();
     const b = Math.min(a + DAY_MS, toMs);
-    const maintenance = b > a && site.maintenance.some((s) => s.start.getTime() < b && s.end.getTime() > a);
-    if (!watched || b <= a || b <= fromMs) return { kind: 'none' as const, maintenance };
+    if (!watched || b <= a || b <= fromMs) return { kind: 'none' as const, maintenance: false };
+    const maintenance = site.maintenance.some((s) => s.start.getTime() < b && s.end.getTime() > a);
     const on = (k: ClientKind) => pieces.some((p) => p.kind === k && p.a < b && p.b > a);
     const kind: DayKind = on('outage') ? 'outage' : on('degraded') ? 'degraded' : 'ok';
     return { kind, maintenance };

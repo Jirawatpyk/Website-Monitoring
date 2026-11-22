@@ -40,7 +40,7 @@ const inc = (
   episodes: ReportIncidentInput['episodes'],
   trigger: CauseChange['trigger'] = 'hard_fail',
   rootCauseCategory: string | null = 'hosting',
-  causes?: CauseChange[],
+  causes?: ReportIncidentInput['causes'],
 ): ReportIncidentInput => ({
   number,
   episodes,
@@ -359,5 +359,127 @@ describe('maintenance, partial months and targets (spec §5, D-073 items 5–6)'
       aug,
     );
     expect(s.days[20]?.kind).toBe('outage');
+  });
+});
+
+describe('engine review, round 2', () => {
+  const confirmedProblem = (start: string, minutes: number | null, confirmed: string) => ({
+    ...problem(start, minutes),
+    confirmedAt: at(confirmed),
+  });
+  it('P1: a relapse stamped at its confirm — the drop’s first minutes take the new cause', () => {
+    const s = siteMonth(
+      site('Fuji', 2, [
+        inc(
+          100,
+          [
+            problem('2026-08-05T02:00:00Z', 30),
+            confirmedProblem('2026-08-06T02:00:00Z', 60, '2026-08-06T02:03:00Z'),
+          ],
+          'slow',
+          null,
+          [
+            { at: at('2026-08-06T02:03:00Z'), trigger: 'keyword' },
+            { at: at('2026-08-05T02:00:00Z'), trigger: 'slow' },
+          ],
+        ),
+      ]),
+      aug,
+    );
+    expect(s.incidents[0]).toMatchObject({ kind: 'degraded', minutes: 30 });
+  });
+  it('P2: keyword, then an intermittent relapse counted from the 1st timeout (D-050)', () => {
+    const s = siteMonth(
+      site('Fuji', 2, [
+        inc(
+          101,
+          [
+            problem('2026-08-05T02:00:00Z', 30),
+            confirmedProblem('2026-08-06T02:00:00Z', 60, '2026-08-06T02:30:00Z'),
+          ],
+          'keyword',
+          null,
+          [
+            { at: at('2026-08-05T02:00:00Z'), trigger: 'keyword' },
+            { at: at('2026-08-06T02:30:00Z'), trigger: 'intermittent' },
+          ],
+        ),
+      ]),
+      aug,
+    );
+    expect(s.incidents[0]).toMatchObject({ kind: 'degraded', minutes: 60 });
+  });
+  it('P3: an SSL drop since 25 Aug with a key-page stretch on 10 Sep starts on 10 Sep', () => {
+    const s = siteMonth(
+      site('BA', 1, [
+        inc(102, [problem('2026-08-25T02:00:00Z', null)], 'ssl', null, [
+          { at: at('2026-08-25T02:00:00Z'), trigger: 'ssl' },
+          { at: at('2026-09-10T02:00:00Z'), trigger: 'key_page' },
+          { at: at('2026-09-10T04:00:00Z'), trigger: 'ssl' },
+        ]),
+      ]),
+      sep,
+    );
+    expect(s.incidents[0]).toMatchObject({
+      kind: 'degraded',
+      minutes: 120,
+      startedBefore: false,
+      open: false,
+    });
+    expect(s.incidents[0]?.startedAt.toISOString()).toBe('2026-09-10T02:00:00.000Z');
+  });
+  it('P4: a DOWN back up to a key page still failing at the month’s end is open (D-023, item 9)', () => {
+    const s = siteMonth(
+      site('BA', 1, [
+        inc(
+          103,
+          [down('2026-08-31T10:00:00Z', 20), problem('2026-08-31T10:20:00Z', null)],
+          'hard_fail',
+          null,
+          [
+            { at: at('2026-08-31T10:00:00Z'), trigger: 'hard_fail' },
+            { at: at('2026-08-31T10:20:00Z'), trigger: 'key_page' },
+          ],
+        ),
+      ]),
+      aug,
+    );
+    expect(s.incidents[0]).toMatchObject({ kind: 'outage', minutes: 20, open: true });
+  });
+  it('P5: a 40-second key-page stretch then slow, in one drop, is 10 minutes, not 11', () => {
+    const s = siteMonth(
+      site('BA', 1, [
+        inc(104, [problem('2026-08-10T02:00:00Z', 10)], 'key_page', null, [
+          { at: at('2026-08-10T02:00:00Z'), trigger: 'key_page' },
+          { at: at('2026-08-10T02:00:40Z'), trigger: 'slow' },
+        ]),
+      ]),
+      aug,
+    );
+    expect(s.incidents[0]?.minutes).toBe(10);
+  });
+  it('overlapping maintenance windows are counted once and cut the outage once', () => {
+    const s = siteMonth(
+      site('Tubtong', 2, [inc(105, [down('2026-08-12T14:30:00Z', 120)])], {
+        maintenance: [
+          { start: at('2026-08-12T15:00:00Z'), end: at('2026-08-12T16:00:00Z') },
+          { start: at('2026-08-12T15:30:00Z'), end: at('2026-08-12T16:15:00Z') },
+        ],
+      }),
+      aug,
+    );
+    expect(s.maintenanceMinutes).toBe(75);
+    expect(s.incidents[0]?.minutes).toBe(45); // 14:30–15:00 and 16:15–16:30
+    expect(s.downMinutes).toBe(45);
+  });
+  it('no maintenance cap on a day before monitoring started', () => {
+    const s = siteMonth(
+      site('WeCare', 3, [], {
+        monitoringStartedAt: at('2026-08-19T17:00:00Z'),
+        maintenance: [{ start: at('2026-08-05T15:00:00Z'), end: at('2026-08-05T17:00:00Z') }],
+      }),
+      aug,
+    );
+    expect(s.days[4]).toEqual({ kind: 'none', maintenance: false });
   });
 });
