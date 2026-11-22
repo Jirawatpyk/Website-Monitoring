@@ -1551,6 +1551,11 @@ isOneToOne: false
               "bucket_start": string,"checks": number,"hard_fails": number,"location": string,"p50_ms": number,"p95_ms": number
             }[]
                            },
+"site_stopped_spans":
+{ Args: { "p_from": string,"p_to": string }; Returns: {
+              "site_id": string,"started_at": string,"stopped_at": string
+            }[]
+                           },
 "undo_ack":
 { Args: { "p_incident_id": string }; Returns: undefined
                            },

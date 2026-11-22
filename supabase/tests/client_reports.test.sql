@@ -2,7 +2,7 @@
 -- (service role) writes; one draft per client and month; the PDF bucket is private and PDF-only.
 begin;
 \ir _helpers.psql
-select plan(17);
+select plan(21);
 
 select tests.clear_sites();
 create temp table ids (name text primary key, id uuid) on commit drop;
@@ -74,6 +74,35 @@ select is(
 select is(
   (select count(*)::int from pg_policies where schemaname = 'storage' and tablename = 'objects'),
   0, 'no storage policies: files only through the app');
+
+-- site_stopped_spans (D-073 item 12): Stop → Start pairs from the audit rows; staff only.
+with s as (
+  insert into public.sites (client_id, name, tier) select id, 'pgTAP stop site', 3 from ids where name = 'ba' returning id
+) insert into ids select 's', id from s;
+insert into public.audit_log (action, entity, entity_id, before, after, at)
+select 'site.update', 'site', id, '{"is_active":false}'::jsonb, '{"is_active":true}'::jsonb, '2026-08-01T00:00:00Z'::timestamptz from ids where name = 's'
+union all select 'site.update', 'site', id, '{"is_active":true}'::jsonb, '{"is_active":false}'::jsonb, '2026-08-10T00:00:00Z'::timestamptz from ids where name = 's'
+union all select 'site.update', 'site', id, '{"is_active":false}'::jsonb, '{"is_active":true}'::jsonb, '2026-08-20T00:00:00Z'::timestamptz from ids where name = 's'
+union all select 'site.update', 'site', id, '{"is_active":true}'::jsonb, '{"is_active":false}'::jsonb, '2026-09-05T00:00:00Z'::timestamptz from ids where name = 's';
+select tests.authenticate_as((select id from ids where name = 'mint'));
+select is(
+  (select array_agg(stopped_at::date || '→' || coalesce(started_at::date::text, 'still') order by stopped_at)
+     from public.site_stopped_spans('2026-08-01T00:00:00Z', '2026-10-01T00:00:00Z')
+     where site_id = (select id from ids where name = 's')),
+  array['2026-08-10→2026-08-20', '2026-09-05→still'], 'a Viewer reads the stopped stretches, the open one last');
+select is(
+  (select count(*)::int from public.site_stopped_spans('2026-08-21T00:00:00Z', '2026-09-01T00:00:00Z')
+     where site_id = (select id from ids where name = 's')),
+  0, 'a month with no stop has none');
+select tests.authenticate_as((select id from ids where name = 'cli'));
+select is((select count(*)::int from public.site_stopped_spans('2026-01-01', '2027-01-01')), 0, 'the client role reads none');
+reset role;
+set local role service_role;
+select is(
+  (select count(*)::int from public.site_stopped_spans('2026-08-01T00:00:00Z', '2026-10-01T00:00:00Z')
+     where site_id = (select id from ids where name = 's')),
+  2, 'the reports cron reads them');
+reset role;
 
 select * from finish();
 rollback;

@@ -43,3 +43,36 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('client-reports', 'client-reports', false, 5242880, array['application/pdf'])
 on conflict (id) do update
   set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+-- ── When a site's monitoring was stopped (D-073 item 12) ──────────────────────────────────────────
+-- Each Stop → Draft and the Start after it, read from the site's audit rows (`is_active` changes);
+-- `started_at` null = still stopped. The report leaves these stretches out. Staff only: the audit log
+-- itself stays Admin-only, so this returns the times and nothing else.
+create function public.site_stopped_spans(p_from timestamptz, p_to timestamptz)
+returns table (site_id uuid, stopped_at timestamptz, started_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with t as (
+    select a.entity_id as site_id, a.at, (a.after ->> 'is_active')::boolean as on_
+    from public.audit_log a
+    -- (inside security definer current_user is the owner: the caller's role is the session setting)
+    where (public.is_staff() or current_setting('role', true) = 'service_role')
+      and a.entity = 'site'
+      and a.before ? 'is_active' and a.after ? 'is_active'
+      and (a.before ->> 'is_active') is distinct from (a.after ->> 'is_active')
+  ), s as (
+    select site_id, at, on_,
+      lead(at) over (partition by site_id order by at) as next_at,
+      lead(on_) over (partition by site_id order by at) as next_on
+    from t
+  )
+  select site_id, at, case when next_on then next_at end
+  from s
+  where not on_ and at < p_to and coalesce(case when next_on then next_at end, 'infinity') > p_from;
+$$;
+
+revoke execute on function public.site_stopped_spans(timestamptz, timestamptz) from public, anon;
+grant execute on function public.site_stopped_spans(timestamptz, timestamptz) to authenticated, service_role;
