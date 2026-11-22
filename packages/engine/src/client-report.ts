@@ -73,6 +73,8 @@ export interface ReportSiteInput {
   tier: Tier;
   monitoringStartedAt: Date | null;
   maintenance: readonly Span[];
+  /** When monitoring was stopped (Stop → Draft): not watched, so out of the window and of the minutes. */
+  stopped?: readonly Span[];
   incidents: readonly ReportIncidentInput[];
 }
 
@@ -212,8 +214,13 @@ export function siteMonth(site: ReportSiteInput, month: ReportMonth): SiteMonthR
   const fromMs = Math.max(month.from.getTime(), start?.getTime() ?? Infinity);
   const toMs = month.to.getTime();
   const watched = start !== null && toMs > fromMs;
-  const windowMs = watched ? toMs - fromMs : 0;
-  const maintenanceMs = watched ? mergedMs(site.maintenance, fromMs, toMs) : 0;
+  // Stopped stretches aren't watched (D-073 item 12): out of the window, never counted as up.
+  const stopped = site.stopped ?? [];
+  const stoppedMs = watched ? mergedMs(stopped, fromMs, toMs) : 0;
+  const windowMs = watched ? toMs - fromMs - stoppedMs : 0;
+  // Maintenance while stopped is already out of the window.
+  const maintenanceMs = watched ? mergedMs([...site.maintenance, ...stopped], fromMs, toMs) - stoppedMs : 0;
+  const excluded = [...site.maintenance, ...stopped];
 
   const lines: ReportIncidentLine[] = [];
   const pieces: Piece[] = [];
@@ -222,7 +229,7 @@ export function siteMonth(site: ReportSiteInput, month: ReportMonth): SiteMonthR
       // D-073 item 4: a false alarm is left out of the report, minutes and all (a category is set only
       // when the incident is resolved, or saved as Unknown).
       if (inc.rootCauseCategory === 'false_alarm') continue;
-      const mine = piecesOf(inc, fromMs, toMs, site.maintenance);
+      const mine = piecesOf(inc, fromMs, toMs, excluded);
       const kind: ClientKind | null = mine.some((p) => p.kind === 'outage')
         ? 'outage'
         : mine.length
@@ -254,7 +261,8 @@ export function siteMonth(site: ReportSiteInput, month: ReportMonth): SiteMonthR
   const days = month.days.map((d) => {
     const a = d.getTime();
     const b = Math.min(a + DAY_MS, toMs);
-    if (!watched || b <= a || b <= fromMs) return { kind: 'none' as const, maintenance: false };
+    if (!watched || b <= a || b <= fromMs || mergedMs(stopped, a, b) >= b - a)
+      return { kind: 'none' as const, maintenance: false };
     const maintenance = site.maintenance.some((s) => s.start.getTime() < b && s.end.getTime() > a);
     const on = (k: ClientKind) => pieces.some((p) => p.kind === k && p.a < b && p.b > a);
     const kind: DayKind = on('outage') ? 'outage' : on('degraded') ? 'degraded' : 'ok';

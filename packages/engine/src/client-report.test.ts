@@ -483,3 +483,47 @@ describe('engine review, round 2', () => {
     expect(s.days[4]).toEqual({ kind: 'none', maintenance: false });
   });
 });
+
+describe('stopped periods are not watched (D-073 item 12)', () => {
+  it('a site stopped 10–20 Aug: those days are empty, out of the window, and a DOWN then doesn’t count', () => {
+    const s = siteMonth(
+      site(
+        'Tubtong',
+        2,
+        [inc(110, [down('2026-08-12T01:00:00Z', 60)]), inc(111, [down('2026-08-25T01:00:00Z', 10)])],
+        {
+          stopped: [{ start: at('2026-08-09T17:00:00Z'), end: at('2026-08-20T17:00:00Z') }],
+        },
+      ),
+      aug,
+    );
+    expect(s.windowMinutes).toBe(20 * 24 * 60);
+    expect(s.days[9]?.kind).toBe('none'); // 10 Aug
+    expect(s.days[19]?.kind).toBe('none'); // 20 Aug
+    expect(s.days[20]?.kind).toBe('ok'); // 21 Aug
+    expect(s.incidents.map((i) => i.number)).toEqual([111]);
+    expect(s.downMinutes).toBe(10);
+    expect(s.uptime).toBeCloseTo(1 - 10 / (20 * 24 * 60), 10);
+  });
+  it('stopped for the whole month → no figures', () => {
+    const s = siteMonth(
+      site('Old', 3, [], {
+        stopped: [{ start: at('2026-07-15T00:00:00Z'), end: at('2026-10-01T00:00:00Z') }],
+      }),
+      aug,
+    );
+    expect(s.windowMinutes).toBe(0);
+    expect(s.days.every((d) => d.kind === 'none')).toBe(true);
+  });
+  it('maintenance inside a stopped stretch isn’t counted twice', () => {
+    const s = siteMonth(
+      site('Old', 3, [], {
+        stopped: [{ start: at('2026-08-09T17:00:00Z'), end: at('2026-08-10T17:00:00Z') }],
+        maintenance: [{ start: at('2026-08-10T10:00:00Z'), end: at('2026-08-10T20:00:00Z') }],
+      }),
+      aug,
+    );
+    expect(s.maintenanceMinutes).toBe(180); // 17:00–20:00 only
+    expect(s.windowMinutes).toBe(30 * 24 * 60);
+  });
+});
