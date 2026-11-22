@@ -18,8 +18,32 @@ const CLIENTS = [
     name: 'Bangkok Airways',
     am: { display_name: 'Account Manager' },
     sites: [
-      { id: 's1', name: 'BA Taiwan', tier: 1, monitoring_started_at: '2026-07-01T00:00:00Z' },
-      { id: 's0', name: 'Never started', tier: 2, monitoring_started_at: null },
+      {
+        id: 's1',
+        name: 'BA Taiwan',
+        tier: 1,
+        is_active: true,
+        monitoring_started_at: '2026-07-01T00:00:00Z',
+        created_at: '2026-06-01T00:00:00Z',
+      },
+      // a Draft never started: no report
+      {
+        id: 's0',
+        name: 'Never started',
+        tier: 2,
+        is_active: false,
+        monitoring_started_at: null,
+        created_at: '2026-06-01T00:00:00Z',
+      },
+      // set live by a script: counts from when it was added, as Site detail does
+      {
+        id: 's2',
+        name: 'BA China',
+        tier: 1,
+        is_active: true,
+        monitoring_started_at: null,
+        created_at: '2026-06-01T00:00:00Z',
+      },
     ],
   },
 ];
@@ -88,7 +112,7 @@ describe('runReportDrafts (D-073 item 13)', () => {
     const row = up.values as { figures: ReportFigures; month: string; storage_path: string };
     expect(row.month).toBe('2026-10-01');
     expect(row.figures.downMinutes).toBe(11);
-    expect(row.figures.sites.map((s) => s.name)).toEqual(['BA Taiwan']); // the Draft site is left out
+    expect(row.figures.sites.map((s) => s.name)).toEqual(['BA China', 'BA Taiwan']); // the Draft site is left out
   });
 
   it('leaves an unchanged draft alone and refreshes a changed one', async () => {

@@ -35,12 +35,23 @@ export interface ReportClient {
   sites: FigureSite[];
 }
 
+/**
+ * When a site's monitoring started (D-073 item 6), as Site detail reads it (`watchedSince`): a live
+ * site set live by a script has no `monitoring_started_at` and counts from when it was added; a Draft
+ * never started has no start. A stopped site keeps its start; its stopped stretches leave the month
+ * through `site_stopped_spans` (item 12).
+ */
+function startedAt(s: { is_active: boolean; monitoring_started_at: string | null; created_at: string }) {
+  const at = s.monitoring_started_at ?? (s.is_active ? s.created_at : null);
+  return at === null ? null : Date.parse(at);
+}
+
 /** Clients with a site that was being watched by `to`, Tier 1 clients first, then by name. */
 export async function loadReportClients(db: DbClient, to: Date, clientId?: string): Promise<ReportClient[]> {
   let q = db
     .from('clients')
     .select(
-      'id, name, am:profiles!clients_am_user_id_fkey(display_name), sites(id, name, tier, monitoring_started_at)',
+      'id, name, am:profiles!clients_am_user_id_fkey(display_name), sites(id, name, tier, is_active, monitoring_started_at, created_at)',
     )
     .eq('is_internal', false);
   if (clientId) q = q.eq('id', clientId);
@@ -51,12 +62,13 @@ export async function loadReportClients(db: DbClient, to: Date, clientId?: strin
       name: c.name,
       am: c.am?.display_name ?? null,
       sites: c.sites
-        .filter((s) => s.monitoring_started_at && Date.parse(s.monitoring_started_at) < to.getTime())
-        .map((s) => ({
+        .map((s) => ({ s, started: startedAt(s) }))
+        .filter(({ started }) => started !== null && started < to.getTime())
+        .map(({ s, started }) => ({
           id: s.id,
           name: s.name,
           tier: s.tier as Tier,
-          monitoringStartedAt: new Date(s.monitoring_started_at!),
+          monitoringStartedAt: new Date(started!),
         })),
     }))
     .filter((c) => c.sites.length > 0)
