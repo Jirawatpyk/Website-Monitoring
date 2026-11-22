@@ -18,6 +18,9 @@ const FONTS = [
   ['Inter', 'inter-latin-wght-normal.woff2', '100 900'],
   ['Inter', 'inter-latin-ext-wght-normal.woff2', '100 900'],
   ['Noto Sans Thai', 'noto-sans-thai-thai-wght-normal.woff2', '100 900'],
+  // AURA's display and mono faces, as the board (D-073 item 1 as amended)
+  ['Fraunces', 'fraunces-latin-opsz-normal.woff2', '100 900'],
+  ['JetBrains Mono', 'jetbrains-mono-latin-400-normal.woff2', '400'],
 ] as const;
 
 let headCache: Promise<string> | null = null;
@@ -74,7 +77,7 @@ async function printIn(browser: Browser, model: PdfModel): Promise<Buffer> {
       // the header strip is in the page (document.ts); the footer template holds only digits and words in Latin
       headerTemplate: '<span></span>',
       footerTemplate: `<div style="${small}text-align:right">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
-      margin: { top: '18mm', bottom: '18mm', left: '15mm', right: '15mm' },
+      margin: { top: '13mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });
   } finally {
     await context.close();

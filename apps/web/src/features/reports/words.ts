@@ -108,7 +108,7 @@ export interface PdfModel {
   eyebrow: string;
   client: string;
   meta: string;
-  tiles: { label: string; value: string; caption: string; positive?: boolean }[];
+  tiles: { label: string; value: string; caption: string; positive?: boolean; negative?: boolean }[];
   sites: {
     name: string;
     uptime: string;
@@ -155,6 +155,7 @@ export function pdfModel(f: ReportFigures): PdfModel {
         value: uptimeWord(f.uptime),
         caption: targetWord(f) ?? 'Not monitored this month',
         positive: f.metTarget === true,
+        negative: f.metTarget === false,
       },
       {
         label: 'Downtime',
@@ -171,7 +172,8 @@ export function pdfModel(f: ReportFigures): PdfModel {
       {
         label: 'Typical response',
         value: f.p50 === null ? '—' : formatMs(f.p50),
-        caption: `${watchedSites > 1 ? (watchedSites === 2 ? 'Both sites' : `All ${watchedSites} sites`) : 'Checked'}, ${formatLocations(PROBE_LOCATIONS.length)}`,
+        // "Both sites, 3 locations" (the board), "From 3 locations" for one site
+        caption: `${watchedSites > 1 ? `${watchedSites === 2 ? 'Both sites' : `All ${watchedSites} sites`},` : 'From'} ${formatLocations(PROBE_LOCATIONS.length)}`,
       },
     ],
     sites: f.sites.map((s) => ({
@@ -205,18 +207,18 @@ export function pdfModel(f: ReportFigures): PdfModel {
         time: `${formatTime(at)} (UTC+7)`,
         kind: i.kind,
         kindWord: i.kind === 'outage' ? 'Outage' : 'Degraded',
-        duration: `${formatDuration(i.minutes)}${i.open ? ', ongoing' : ''}${i.startedBefore ? ' this month' : ''}`,
+        duration: `${formatDuration(i.minutes)}${i.startedBefore ? ' this month' : ''}${i.open ? ' · still ongoing' : ''}`,
         line: `${i.site} — ${whatWord(i)}`,
         cause:
           i.rootCause?.trim() ||
           (i.kind === 'degraded'
-            ? 'The site stayed available throughout, so this does not reduce uptime.'
+            ? 'The site stayed up, so this does not reduce uptime.'
             : 'Root cause under review.'),
       };
     }),
     measure: [
       `Each website is checked every 1–5 minutes from Bangkok, Singapore and Tokyo. We count an outage only when at least 2 of 3 locations fail two checks in a row.`,
-      `"Degraded" means the site stayed reachable but was slow, or showed an error on a key page — it does not reduce uptime.`,
+      `"Degraded" means the site stayed up but was slow, unreachable from one location, timing out now and then, or showed an error on a key page — it does not reduce uptime.`,
       maint.length
         ? `Planned maintenance (${plural(maint.length, 'window')}, ${maint.join(', ')}) is excluded.`
         : null,

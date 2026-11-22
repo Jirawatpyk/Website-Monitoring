@@ -184,7 +184,7 @@ describe('spec §5 September so far — the page row and the PDF (S20 Done-when 
     ]);
     expect(needsRootCause(f)).toBe(true);
     expect(rowWords(f).needsRootCause).toBe(true);
-    expect(pdfModel(f).incidents[0]!.duration).toBe('41 min, ongoing');
+    expect(pdfModel(f).incidents[0]!.duration).toBe('41 min · still ongoing');
   });
 
   it('a target is the tier’s own (D-073 item 5); a running month says PREVIEW', () => {

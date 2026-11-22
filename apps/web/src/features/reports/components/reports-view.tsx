@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Badge,
@@ -46,7 +46,7 @@ const RULE =
 
 function ReportCell({ r }: { r: ReportRow }) {
   return (
-    <span className="flex flex-wrap items-center gap-1.5">
+    <span className="flex flex-col items-start gap-1.5">
       <StatusPill tone={STATUS[r.status].tone}>{STATUS[r.status].words}</StatusPill>
       {r.needsRootCause && (
         <Badge tone="warning" variant="outline" icon={<IconPencil />}>
@@ -62,7 +62,7 @@ const pdfHref = (r: ReportRow, month: string) => `/api/reports/${r.clientId}/${m
 /** The reason Send is off, said in words wherever Send is (never only in a tooltip, §42 item 6). */
 function SendOff() {
   return (
-    <p className="m-0 flex gap-1.5 text-xs text-fg-secondary">
+    <p className="m-0 flex gap-1.5 text-sm text-fg-secondary">
       <span className="flex pt-0.5" aria-hidden>
         <IconInfo size="sm" />
       </span>
@@ -131,6 +131,14 @@ export function ReportsView({
   const shown = sheet ?? last;
   const cards = useRef(new Map<string, HTMLButtonElement>());
 
+  const [pending, startTransition] = useTransition();
+  // the chosen month shows at once; the figures follow when the server answers
+  const [picked, setPicked] = useState<string | null>(null);
+  const [pickedFor, setPickedFor] = useState(data.month);
+  if (pickedFor !== data.month) {
+    setPickedFor(data.month);
+    setPicked(null);
+  }
   const monthSwitch = (fullWidth: boolean) => (
     <SegmentedControl
       label="Month"
@@ -138,10 +146,13 @@ export function ReportsView({
       fullWidth={fullWidth}
       touchHeight={fullWidth ? 'always' : true}
       options={[closed, running]}
-      value={data.running ? running : closed}
-      onChange={(v) =>
-        router.push(v === running ? `/reports?month=${data.runningMonth}` : '/reports', { scroll: false })
-      }
+      value={picked ?? (data.running ? running : closed)}
+      onChange={(v) => {
+        setPicked(v);
+        startTransition(() =>
+          router.push(v === running ? `/reports?month=${data.runningMonth}` : '/reports', { scroll: false }),
+        );
+      }}
     />
   );
 
@@ -191,9 +202,13 @@ export function ReportsView({
         ))}
       </div>
 
-      <section className="flex flex-col gap-3" aria-labelledby="reports-table">
+      <section
+        className={`flex flex-col gap-3 transition-opacity ${pending ? 'opacity-60' : ''}`}
+        aria-labelledby="reports-table"
+        aria-busy={pending}
+      >
         <div className="flex flex-col gap-0.5">
-          <h2 id="reports-table" className="m-0 text-lg font-semibold">
+          <h2 id="reports-table" className="m-0 text-2xl font-semibold">
             {`Client reports · ${data.label}`}
           </h2>
           {data.running && (
@@ -213,26 +228,25 @@ export function ReportsView({
         ) : (
           <>
             <div className="max-xl:hidden">
-              <Table>
+              <Table caption="Client reports" captionHidden align="middle">
                 <THead>
                   <Tr>
-                    <Th>Client</Th>
-                    <Th className="text-right">Sites</Th>
+                    {/* Client takes the room the fixed columns leave (as Expiry) */}
+                    <Th className="w-full">Client</Th>
+                    <Th>Sites</Th>
                     <Th className="text-right">Uptime</Th>
                     <Th className="text-right">Downtime</Th>
-                    <Th>Incidents</Th>
+                    <Th className="whitespace-nowrap">Incidents</Th>
                     <Th>AM</Th>
                     <Th>Report</Th>
-                    <Th>
-                      <span className="sr-only">Actions</span>
-                    </Th>
+                    <Th className="text-right">Actions</Th>
                   </Tr>
                 </THead>
                 <TBody>
                   {data.rows.map((r) => (
                     <Tr key={r.clientId}>
                       <Td label="Client" className="font-medium">
-                        <span className="flex flex-wrap items-center gap-2">
+                        <span className="flex items-center gap-2 whitespace-nowrap">
                           {r.client}
                           {r.tier1 && (
                             <Badge tone="neutral" variant="outline">
@@ -241,17 +255,20 @@ export function ReportsView({
                           )}
                         </span>
                       </Td>
-                      <Td label="Sites" className="text-right tabular-nums">
+                      <Td label="Sites" className="tabular-nums">
                         {r.sites}
                       </Td>
-                      <Td label="Uptime" className="text-right tabular-nums">
+                      <Td label="Uptime" className="text-right font-semibold tabular-nums">
                         {r.uptime}
                       </Td>
-                      <Td label="Downtime" className="whitespace-nowrap text-right tabular-nums">
+                      <Td
+                        label="Downtime"
+                        className="whitespace-nowrap text-right text-fg-secondary tabular-nums"
+                      >
                         {r.down}
                       </Td>
-                      <Td label="Incidents">
-                        <span className="tabular-nums">{r.incidents}</span>
+                      <Td label="Incidents" className="whitespace-nowrap">
+                        <span className="font-semibold tabular-nums">{r.incidents}</span>
                         {r.incidentNote && (
                           <span className="text-fg-secondary">{` · ${r.incidentNote}`}</span>
                         )}
@@ -346,10 +363,12 @@ export function ReportsView({
             </ul>
           </>
         )}
-        <div className="flex flex-col gap-1 max-xl:hidden">
-          {!canOpen && <p className="m-0 text-xs text-fg-secondary">{VIEW_ONLY}</p>}
-          <SendOff />
-        </div>
+        {data.rows.length > 0 && (
+          <div className="flex flex-col gap-1 max-xl:hidden">
+            {!canOpen && <p className="m-0 text-sm text-fg-secondary">{VIEW_ONLY}</p>}
+            <SendOff />
+          </div>
+        )}
       </section>
 
       <Dialog

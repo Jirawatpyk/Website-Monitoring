@@ -16,12 +16,13 @@ import type { PdfModel } from '../words';
  */
 
 const STYLE = `
-@page { size: A4; margin: 18mm 15mm 18mm; }
+@page { size: A4; margin: 13mm 15mm 18mm; }
 html, body { margin: 0; background: var(--aura-bg-surface); }
 body { color: var(--aura-fg-primary); font-family: "Inter", "Noto Sans Thai", sans-serif; font-size: 12px; line-height: 1.55; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.mono { font-family: "Inter", "Noto Sans Thai", sans-serif; letter-spacing: 0.04em; }
+.mono, th, .strip { font-family: "JetBrains Mono", "Noto Sans Thai", monospace; letter-spacing: 0.04em; }
 header.top { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 18px; border-bottom: 1px solid var(--aura-border-default); }
 header.top .eyebrow { font-size: 10px; color: var(--aura-fg-secondary); }
+h1, .mark { font-family: "Fraunces", "Noto Sans Thai", serif; }
 h1 { margin: 6px 0; font-size: 32px; line-height: 1.1; font-weight: 600; letter-spacing: -0.01em; }
 .meta { font-size: 12px; color: var(--aura-fg-secondary); }
 .mark { height: 30px; padding: 0 10px; display: flex; align-items: center; gap: 6px; background: var(--aura-bg-surface-strong); color: var(--aura-fg-inverted); border-radius: var(--aura-radius-sm); font-size: 15px; font-weight: 600; }
@@ -32,11 +33,12 @@ h1 { margin: 6px 0; font-size: 32px; line-height: 1.1; font-weight: 600; letter-
 .tile .v { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .tile .c { font-size: 11px; color: var(--aura-fg-secondary); }
 .tile .c.pos { color: var(--aura-fg-positive); font-weight: 500; }
-h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+.tile .c.neg { color: var(--aura-fg-danger); font-weight: 500; }
+h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; break-after: avoid; }
 section { margin-bottom: 22px; }
 .avail { break-inside: avoid; }
 .row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-.row .name { width: 110px; flex-shrink: 0; font-weight: 500; overflow-wrap: anywhere; }
+.row .name { width: 140px; flex-shrink: 0; font-weight: 500; overflow-wrap: anywhere; }
 .row .pct { width: 56px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
 .cells { flex-grow: 1; display: grid; grid-template-columns: repeat(31, minmax(0, 1fr)); gap: 2px; }
 .day { position: relative; display: flex; align-items: center; justify-content: center; box-sizing: border-box; height: 22px; border-radius: 3px; background: var(--aura-lime-500); color: var(--aura-zinc-0); font-size: 11px; font-weight: 600; line-height: 1; }
@@ -48,19 +50,20 @@ section { margin-bottom: 22px; }
 .day.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-flex; }
 .day.sw[data-m="1"] { box-shadow: inset 0 3px 0 0 var(--aura-fg-secondary); }
 .day.sw[data-k="outage"]::after { font-size: 9px; }
-.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding-left: 122px; font-size: 10px; color: var(--aura-fg-secondary); }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding-left: 152px; font-size: 10px; color: var(--aura-fg-secondary); }
 .legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .legend .end { margin-left: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th h2 { text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--aura-fg-primary); }
+th h2 { margin: 0; text-transform: none; letter-spacing: 0; font-family: "Inter", "Noto Sans Thai", sans-serif; font-size: 15px; color: var(--aura-fg-primary); }
+.inc thead th { border-bottom: 0; padding: 0 0 2px; }
 th { text-align: right; padding: 8px 0; border-bottom: 1px solid var(--aura-border-default); font-weight: 400; font-size: 10px; color: var(--aura-fg-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
 th:first-child, td:first-child { text-align: left; }
 td { padding: 9px 0; border-bottom: 1px solid var(--aura-border-subtle); text-align: right; font-variant-numeric: tabular-nums; }
 td:first-child { font-weight: 500; }
-tr { break-inside: avoid; }
+section tr { break-inside: avoid; }
 thead { display: table-header-group; }
 .inc td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; }
-.inc td:first-child { width: 76px; }
+.inc td:first-child { width: 88px; white-space: nowrap; }
 .inc td:nth-child(2) { width: 96px; }
 .inc .sub { display: block; font-size: 11px; color: var(--aura-fg-secondary); font-weight: 400; }
 .inc .kind { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; }
@@ -95,7 +98,7 @@ export function reportDocument(model: PdfModel, head: string): string {
   const tiles = model.tiles
     .map(
       (t) =>
-        `<div class="tile"><span class="k">${esc(t.label)}</span><span class="v">${esc(t.value)}</span><span class="${t.positive ? 'c pos' : 'c'}">${esc(t.caption)}</span></div>`,
+        `<div class="tile"><span class="k">${esc(t.label)}</span><span class="v">${esc(t.value)}</span><span class="${t.positive ? 'c pos' : t.negative ? 'c neg' : 'c'}">${esc(t.caption)}</span></div>`,
     )
     .join('');
   const sites = model.sites
@@ -128,7 +131,7 @@ export function reportDocument(model: PdfModel, head: string): string {
 <table class="page"><thead><tr><td><div class="strip"><span>${esc(model.header)}</span><span>DxT</span></div></td></tr></thead><tbody><tr><td>
 <header class="top"><div><div class="eyebrow mono">${esc(model.eyebrow)}</div><h1>${esc(model.client)}</h1><div class="meta">${esc(model.meta)}</div></div><div class="mark" aria-label="DxT">DxT <i></i></div></header>
 <div class="tiles">${tiles}</div>
-<section class="avail"><h2>Daily availability</h2>${sites}<div class="legend"><span>${swatch('ok')}Fully available</span><span>${swatch('degraded')}Degraded (site reachable)</span><span>${swatch('outage')}Outage</span><span>${swatch('ok', true)}Planned maintenance (not counted)</span><span class="end">Each day shows its worst event</span></div></section>
+<section class="avail"><h2>Daily availability</h2>${sites}<div class="legend"><span>${swatch('ok')}Fully available</span><span>${swatch('degraded')}Degraded (site reachable)</span><span>${swatch('outage')}Outage</span><span>${swatch('ok', true)}Planned maintenance (not counted)</span>${model.sites.some((s) => s.days.some((x) => x.kind === 'none')) ? `<span>${swatch('none')}Not monitored</span>` : ''}<span class="end">Each day shows its worst event</span></div></section>
 <section><h2>By website</h2><table><thead><tr><th>Website</th><th>Uptime</th><th>Downtime</th><th>Typical response</th><th>Slowest 5%</th><th>Incidents</th></tr></thead><tbody>${table}</tbody></table></section>
 <section>${incidents}</section>
 <footer class="measure"><b>How we measure.</b> ${esc(model.measure)}<span class="id mono">${esc(model.footer)}</span></footer>
