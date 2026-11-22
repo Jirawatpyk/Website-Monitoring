@@ -255,7 +255,7 @@ export function ReportsView({
                   {data.rows.map((r) => (
                     <Tr key={r.clientId}>
                       <Td label="Client" className="font-medium">
-                        <span className="flex items-center gap-2 whitespace-nowrap">
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           {r.client}
                           {r.tier1 && (
                             <Badge tone="neutral" variant="outline">
@@ -280,9 +280,7 @@ export function ReportsView({
                         <span className="flex flex-col">
                           <span className="font-semibold tabular-nums">{r.incidents}</span>
                           {r.incidentNote && (
-                            <span className="whitespace-nowrap text-xs text-fg-secondary">
-                              {r.incidentNote}
-                            </span>
+                            <span className="text-xs text-fg-secondary">{r.incidentNote}</span>
                           )}
                         </span>
                       </Td>
