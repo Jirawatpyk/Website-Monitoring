@@ -99,6 +99,8 @@ begin
   delete from public.check_results;
   delete from public.monitors;
   delete from public.sites;
+  -- S20: a monthly report references its client (on delete restrict).
+  delete from public.client_reports;
   delete from public.clients;
 end;
 $$;

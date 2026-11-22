@@ -367,12 +367,8 @@ function BlockView({ block, phone }: { block: Block; phone: boolean }) {
   }
 }
 
-/** Rows for features not built yet (S20, S22) stay on Settings › Users but not in the guide (D-070 item 3). */
-const NOT_BUILT = new Set([
-  'Download uptime reports',
-  'Send client reports / edit AM note',
-  'Approve incident review',
-]);
+/** Rows for features not built yet (S20b, S22) stay on Settings › Users but not in the guide (D-070 item 3). */
+const NOT_BUILT = new Set(['Send client reports / edit AM note', 'Approve incident review']);
 const GUIDE_MATRIX = ROLE_MATRIX.filter((r) => !NOT_BUILT.has(r.label));
 const STAFF = MATRIX_ROLES.filter((r) => r !== 'client');
 const COL: Record<(typeof STAFF)[number], string> = {

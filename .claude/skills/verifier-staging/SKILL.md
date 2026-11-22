@@ -354,6 +354,14 @@ select json_build_object(
 
 - **Browser pane under width emulation** (`resize_window` 1440 / 820 / 390): clicks by coordinate can miss and screenshots can be stale or half-size (S06b `/verify`: "Acknowledge did nothing"). Check the control is on top with `document.elementFromPoint`, act with a DOM `.click()`, and read layout with `getBoundingClientRect`; screenshots at those widths come from Playwright locally (e2e helpers) or from the pane without emulation. A hidden (not fronted) tab pauses `requestAnimationFrame` and CSS transitions — front it before timing anything.
 
+Uptime reports and the monthly PDF (S20, D-072, D-073), as Tao on https://monitor-staging.dxtspace.com/reports. Staging has one client ("DxT test") with one site, so every report is one page.
+
+- **The draft:** `select month, generated_at, storage_path, figures->>'downMinutes' from client_reports` and the bucket object's size (`storage.objects`, bucket `client-reports`, `metadata->>'size'`). The cron (every 10 min) makes last month's draft from 06:00 on the 1st and re-makes it when the figures change — a client rename counts, so expect a new `generated_at` after one.
+- **The route, in the page's console:** `fetch('/api/reports/<client id>/<YYYY-MM>')` → 200 `application/pdf`, `private, no-store`; a closed month's bytes equal the stored object's size. Bad month / unknown client / not a uuid → 404, POST → 405, `credentials: 'omit'` → a redirect to /login. Printed previews: 4 a minute per person, then 429 for the rest of that minute (so wait a minute before opening one in the viewer after a probe run).
+- **Thai on Vercel:** rename the client to Thai for the check and back after (`update clients set name = … where id = …`) — the running head and the title must keep every tone mark (ติ้ง ตั๋ว น้ำ).
+- **Reading the PDF in the pane:** add a fresh query and a viewer fragment so the viewer reloads and jumps — `…/2026-11?v=3#page=1&zoom=300,470,805` (zoom %, left and top in points from the page's top) — then scroll by small steps; a hash change alone doesn't reload it. Clicks inside the viewer don't reach it.
+- **Widths:** 1280 is the narrowest table — read `wrap.scrollWidth - wrap.clientWidth` on `.aura-tbl-wrap` (must be 0), with a long client name too. Below xl: a card opens the sheet; Escape returns focus to the card. A hidden pane leaves the page on its skeleton until a screenshot fronts it.
+
 ## 4. Reset between runs
 
 A new problem on an incident that is still open (Monitoring / Needs root cause) is a relapse into it (S04b), not a new incident. For a clean start — a fresh DOWN or PROBLEM card — run `supabase/staging/reset-test-incident.sql` in the SQL editor first, and leave the target on `ok` at the end.

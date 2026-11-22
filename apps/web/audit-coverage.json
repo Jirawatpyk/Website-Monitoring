@@ -13,7 +13,8 @@
     "server/probe/run-probe.ts#probe_locations": "A cloud probe location's last heartbeat (service role).",
     "server/notifier/dispatch.ts#notifications": "Delivery state of queued messages (service role): sent, failed, retry time.",
     "server/notifier/dispatch.ts#notification_attempts": "The delivery log, one row per attempt (service role, append-only).",
-    "server/notifier/dispatch.ts#incident_events": "The 'alerted' timeline line after a message went; no incident state changes."
+    "server/notifier/dispatch.ts#incident_events": "The 'alerted' timeline line after a message went; no incident state changes.",
+    "features/reports/drafts.ts#client_reports": "The monthly client report drafts (service role, D-073 items 11, 13): figures worked out from the month's data, not config or incident state."
   },
   "actions": {
     "features/auth/actions.ts#signOut": {
@@ -265,6 +266,12 @@
     },
     "app/api/cron/reports/route.ts#GET": {
       "exempt": "Queues and sends the daily digest and the weekly summary; changes no state."
+    },
+    "app/api/cron/report-drafts/route.ts#GET": {
+      "exempt": "Stores the last complete month's client report drafts (client_reports and its PDF, service role): a report of the month's figures, not config or incident state."
+    },
+    "app/api/reports/[clientId]/[month]/route.ts#GET": {
+      "exempt": "Serves a client's monthly PDF to staff; reads only, writes nothing."
     },
     "app/api/ingest/route.ts#GET": {
       "exempt": "Hands the VPS the monitors due from Bangkok and stamps its watchdog beat; no config or incident."

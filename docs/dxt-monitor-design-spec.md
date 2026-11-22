@@ -1,7 +1,7 @@
 # DxT Monitor — Design spec for developer handoff
 
-Version: 19 Nov 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
-Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (63 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
+Version: 22 Nov 2026 · Owner: Tao (Jirawat Piyakit) · Status: approved, ready for build.
+Companion documents: PRD — DxT Website Monitoring Platform (what to build, priority, architecture, budget) · Design canvas "DxT Website Monitoring" (65 screens, open in Play mode to click through flows) · AURA design system (components + tokens).
 
 ## 0. How to use this spec
 - **What this is:** the rules every screen follows — statuses, escalation, lifecycle, messages, copy and formats. The canvas shows how it looks; this file says how it behaves.
@@ -22,7 +22,7 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | SiteDetail | Site detail — Bangkok Airways – Taiwan · Page fingerprint card (§26) · CHECK LOG marks (§29) | 1440×3420 | Web app — desktop 1440 + mobile 390 |
 | Incident | Incident — INC-0142 MuvMi DOWN · OPENED shows who was paged outside response hours (§28.6) · ↻ on the Recheck column (§29) · CASE adds the manual incident + Escalate now (§30) · CASE "Home page back · /booking still failing" (§37) | 1440×2180 | Web app — desktop 1440 + mobile 390 |
 | MOverview | Mobile — Overview (pre-S06 reference — superseded by MOverview4, §21) | 390×844 | Web app — desktop 1440 + mobile 390 |
-| MSites | Mobile — Sites · SSL & domains row → MExpiry (§39) | 390×844 | Web app — desktop 1440 + mobile 390 |
+| MSites | Mobile — Sites · SSL & domains row → MExpiry (§39) · Uptime reports row → MReports (§42) | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MSite | Mobile — Site detail · Check log with marks + key (§29) | 390×844 | Web app — desktop 1440 + mobile 390 |
 | MIncident | Mobile — Incident detail · CASE adds the manual incident + Escalate now (§30) · CASE "Home page back · /booking still failing" (§37) | 390×844 | Web app — desktop 1440 + mobile 390 |
 | StatusModel | Status model & verification logic | 1440×4680 | Status logic · Mobile ack · Alert channel |
@@ -53,7 +53,9 @@ Companion documents: PRD — DxT Website Monitoring Platform (what to build, pri
 | MEscalation | Mobile — Escalation (view only, §22) | 390×844 | Mobile app · 390 |
 | MProfile | Mobile — My profile (§22) | 390×844 | Mobile app · 390 |
 | MMaintenanceList | Mobile — Maintenance & mutes (§23) · series (§32) | 390×844 | Mobile app · 390 |
-| Reports | Uptime reports | 1440×1220 | Reports · client-facing · admin |
+| Reports | Uptime reports · BUILD S20 today / S20b with sending (§42) | 1440×1320 | Reports · client-facing · admin |
+| MReports | Mobile — Uptime reports (§42) | 390×844 | Reports · client-facing · admin |
+| MReportsDark | Mobile — Uptime reports · dark (§42) | 390×844 | Reports · client-facing · admin |
 | ReportPDF | Monthly client report PDF (A4) | 794×1123 | Reports · client-facing · admin |
 | StatusPage | Client status page | 1280×1380 | Reports · client-facing · admin |
 | MStatusPage | Client status page — mobile | 390×844 | Reports · client-facing · admin |
@@ -609,3 +611,17 @@ Route /settings/organisation. Boards: **OrganisationLists** + **OrganisationList
 6. **Remove phrase:** chip × → dialog "Remove “…”?" — "sites stop being checked for it from the next round. Incidents it already opened stay open until they're resolved." + required note.
 7. **Phone — answer to Q5 (view only, §22.5):** "View only on phones." line; with four Settings pages the tab links become a "Settings page" select (§35.1) — MUsers and MSecurity (and their Dark twins) now use the same select, 44 px; choosing a page opens it (Alert channels has no phone board yet, so it opens the desktop page). Holidays as the same per-year list without actions (date · name · Company day off / weekend line); forbidden words as groups with a count, a tap opens one group read-only. "Holidays and phrases change on a larger screen." No access → "Only Admins can see Settings".
 8. **Audit:** holiday add / rename / remove and phrase add / remove are logged with who, when and (for phrases) the note; no codes in the UI.
+
+## 42. Uptime reports on a phone (MReports) and the S20 / S20b copy — S20, D-072 / D-073, added 22 Nov 2026
+Boards: **MReports** + **MReportsDark** (390; STATE S20 · today · S20 · client sheet · Running month · Empty month · Loading · No access · client · S20b · with sending · S20b · client sheet · S20b · send sheet · S20b · running month) and **Reports** (desktop, new BUILD switch: S20 · today / S20b · with sending). Same sample as the Reports board (Aug / Sep 2026, board clock Fri 25 Sep 10:07) — made up. Every staff role sees the page; the client role gets "Reports are for the DxT team — Your monthly report comes by email from your account manager."
+
+1. **Phone shell (§22.1–3):** reached from a row at the foot of Sites (MSites, under SSL & domains): "Uptime reports · August 2026 · 9 client reports", 52 px. Top bar "Uptime reports" with back → Overview and the avatar; bottom nav with nothing selected; meta "Figures as of …" + "Monthly PDF per client in DxT branding, drafted on the 1st at 06:00 and refreshed when its figures change."; the month switch full width ("Aug 2026 · Sep 2026" — last complete month and the running one).
+2. **Stats — answer to Q1: 2 + 1** (as MExpiry), the third full width; when S20b adds "Reports sent" it becomes 2 × 2. Running month: "Uptime · Sep so far" and "· 2 still open" in the incidents caption.
+3. **Rule note — answer to Q2: one line with More / Less** — "What counts · what the client sees" (44 px button, aria-expanded); More shows the full rule (Outage / Degraded incl. intermittent; internal PROBLEMs not counted; no report while an incident has no root cause).
+4. **Client card — answer to Q3:** the whole card is one button (≥ 44 px) → a sheet. On the card: name + Tier 1 badge · "99.97% · down 26 min · 2 incidents" · the report status pill (+ "Needs root cause", pencil). In the sheet: status + a status note where useful, Uptime, Downtime, Incidents with their words ("2 · 1 outage, 1 degraded"), Site(s) by name, AM, then the actions. Tier 1 first, as on desktop.
+5. **Preview — answer to Q4: "Open PDF"** (running month: "Open preview draft"), opening the client's A4 PDF in a new tab — the phone's own viewer handles it (iOS shows it with a Share button; Android hands it to its viewer / Downloads), which is also how an AM forwards it. No "Download" label: the same button does both.
+6. **Disabled Send — answer to Q5:** S20 has one reason for every client, so it's said **once above the list** and **again in each sheet** under the disabled Send — never only in a tooltip. In S20b the reasons differ per client, so they move into the sheet ("Can't send: an incident still needs a root cause.", "Month still running — the report drafts on 1 Oct.").
+7. **S20b — answer to Q6:** Send / Resend in the sheet opens a confirm sheet: Client · Report · Uptime · incidents · To · From, "Emails can't be recalled · logged in the audit log", Cancel / Send report (Resend: "It already went out automatically on 1 Sep. The client gets a second copy."); a toast confirms. The three switches sit under the list as one "SCHEDULED REPORTS" card — Daily digest, Weekly summary, Monthly client report, each with its when-line and the next/off note; each switch's hit area is enlarged to 44 px.
+8. **Copy settled — answer to Q7 (phone and desktop alike).** S20 report status: **"Draft ready"** (kept) · **"No draft yet"** (was "Not drafted yet") · **"Draft out of date"** (was "Draft from an older version"; sheet note "Figures changed after the 1 Sep draft … it refreshes on its own within a few minutes.") · **"Month running"**. S20b keeps "Sent automatically 1 Sep", "Draft, AM sends", "Sends automatically 1 Oct". Every pill carries an icon and its words. Send-off reason: **"Sending from here comes later — open the PDF and email it to the client yourself."** Desktop BUILD › S20 shows 3 stats, these statuses, Send disabled with the reason once under the table, and no switch cards.
+9. **Tablet — answer to Q8:** 768–1279 keeps the same card, two per row; no separate 820 board. From xl (1280) the desktop table.
+10. **Empty / loading:** "No client sites were watched this month — A client gets a report once one of its sites is being monitored."; loading = skeleton cards.

@@ -96,7 +96,7 @@ const SECTIONS: { title?: string; items: NavEntry[] }[] = [
         icon: <IconChartColumn />,
         href: '/reports',
         slice: 'S20',
-        live: false,
+        live: true,
       },
       { id: 'audit', label: 'Audit log', icon: <IconFileText />, href: '/audit', slice: 'S15', live: true },
     ],

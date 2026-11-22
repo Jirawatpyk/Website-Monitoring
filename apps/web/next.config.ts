@@ -40,10 +40,28 @@ const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
 ];
 
+/** S20: what the report PDF reads from disk at run time — AURA's stylesheet and fonts, and Chromium's binary. */
+const REPORT_PDF_FILES = [
+  './node_modules/@jirawatpyk/aura-tokens/aura.css',
+  './node_modules/@jirawatpyk/aura-tokens/fonts/inter-*.woff2',
+  './node_modules/@jirawatpyk/aura-tokens/fonts/noto-sans-thai-*.woff2',
+  './node_modules/@jirawatpyk/aura-tokens/fonts/fraunces-latin-opsz-normal.woff2',
+  './node_modules/@jirawatpyk/aura-tokens/fonts/jetbrains-mono-latin-400-normal.woff2',
+  './node_modules/@sparticuz/chromium/bin/**',
+  // reads browsers.json and other files by path at run time, which tracing misses
+  './node_modules/playwright-core/**',
+];
+
 const config: NextConfig = {
   poweredByHeader: false,
   // Workspace packages ship TypeScript source; Next compiles them.
   transpilePackages: ['@dxt/shared', '@dxt/engine', '@dxt/probe', '@dxt/notifier', '@dxt/db'],
+  // S20: the report PDF reads AURA's stylesheet and fonts from disk (features/reports/pdf/render.ts);
+  // @sparticuz/chromium is external by default and brings its own binary.
+  outputFileTracingIncludes: {
+    '/api/reports/*/*': REPORT_PDF_FILES,
+    '/api/cron/report-drafts': REPORT_PDF_FILES,
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
