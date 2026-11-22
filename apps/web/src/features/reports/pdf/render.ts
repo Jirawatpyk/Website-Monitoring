@@ -62,9 +62,11 @@ export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
     );
     const page = await context.newPage();
     await page.setContent(html, { waitUntil: 'load', timeout: 20_000 });
-    // eslint-disable-next-line aura/no-hardcoded-color -- Chromium's header/footer templates are separate documents that can't read the page's CSS variables; #52525b = zinc-600 = --aura-fg-secondary
-    const small =
-      'font-family:Inter,"Noto Sans Thai",sans-serif;font-size:8px;color:#52525b;width:100%;padding:0 15mm;';
+    // Chromium's header/footer templates are separate documents that can't read the page's CSS
+    // variables; #52525b = zinc-600 = --aura-fg-secondary
+    // eslint-disable-next-line aura/no-hardcoded-color -- see above
+    const muted = '#52525b';
+    const small = `font-family:Inter,"Noto Sans Thai",sans-serif;font-size:8px;color:${muted};width:100%;padding:0 15mm;`;
     return await page.pdf({
       format: 'A4',
       printBackground: true,
