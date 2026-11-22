@@ -43,6 +43,9 @@ const siteSchema = z.object({
   tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   uptime: z.number().nullable(),
   downMinutes: z.number().int().nonnegative(),
+  /** The watched minutes and the maintenance inside them: what the uptime is worked out over. */
+  windowMinutes: z.number().nonnegative(),
+  maintenanceMinutes: z.number().nonnegative(),
   metTarget: z.boolean().nullable(),
   p50: z.number().nullable(),
   p95: z.number().nullable(),
@@ -199,6 +202,8 @@ export function buildFigures(input: FigureInputs): ReportFigures {
       };
     });
 
+  // a site stopped all month (or started after it) has nothing to report (D-073 items 6, 12)
+  sites.splice(0, sites.length, ...sites.filter((s) => s.report.uptime !== null));
   const all = clientMonth(sites.map((s) => s.report));
   const incidents = sites
     .flatMap((s) =>
@@ -245,6 +250,8 @@ export function buildFigures(input: FigureInputs): ReportFigures {
       tier: report.tier,
       uptime: report.uptime,
       downMinutes: report.downMinutes,
+      windowMinutes: report.windowMinutes,
+      maintenanceMinutes: report.maintenanceMinutes,
       metTarget: report.metTarget,
       p50,
       p95,

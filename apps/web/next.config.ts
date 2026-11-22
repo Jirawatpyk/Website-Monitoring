@@ -44,6 +44,18 @@ const config: NextConfig = {
   poweredByHeader: false,
   // Workspace packages ship TypeScript source; Next compiles them.
   transpilePackages: ['@dxt/shared', '@dxt/engine', '@dxt/probe', '@dxt/notifier', '@dxt/db'],
+  // S20: the report PDF reads AURA's stylesheet and fonts from disk (features/reports/pdf/render.ts);
+  // @sparticuz/chromium is external by default and brings its own binary.
+  outputFileTracingIncludes: {
+    '/api/reports/*/*': [
+      './node_modules/@jirawatpyk/aura-tokens/aura.css',
+      './node_modules/@jirawatpyk/aura-tokens/fonts/*.woff2',
+    ],
+    '/api/cron/report-drafts': [
+      './node_modules/@jirawatpyk/aura-tokens/aura.css',
+      './node_modules/@jirawatpyk/aura-tokens/fonts/*.woff2',
+    ],
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

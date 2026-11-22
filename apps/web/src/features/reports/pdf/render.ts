@@ -1,16 +1,14 @@
 import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import type { PdfModel } from '../words';
-import { ReportDocument } from './document';
+import { esc, reportDocument } from './document';
 
 /**
  * Prints the monthly report to an A4 PDF with headless Chromium (D-073 item 1). On Vercel the binary
  * is `@sparticuz/chromium`; locally Playwright's own Chromium (`pnpm exec playwright install chromium`).
  *
- * Safety (security review, S20): every string reaches the page through React (escaped); JavaScript is
+ * Safety (security review, S20): every string reaches the page escaped (`esc` in document.ts); JavaScript is
  * off; every request but a `data:` URL is aborted, so a client name or root-cause text can never make
  * the renderer fetch anything; the fonts and AURA's stylesheet are inlined from the app's own files.
  */
@@ -43,13 +41,6 @@ function head(): Promise<string> {
   return headCache;
 }
 
-export function reportHtml(model: PdfModel, headCss: string): string {
-  return `<!doctype html>${renderToStaticMarkup(createElement(ReportDocument, { model, head: headCss }))}`;
-}
-
-const escapeHtml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-
 async function launch() {
   const { chromium } = await import('playwright-core');
   if (process.env.VERCEL) {
@@ -61,7 +52,7 @@ async function launch() {
 
 /** The PDF bytes for one report. */
 export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
-  const html = reportHtml(model, await head());
+  const html = reportDocument(model, await head());
   const browser = await launch();
   try {
     const context = await browser.newContext({ javaScriptEnabled: false, colorScheme: 'light' });
@@ -76,7 +67,7 @@ export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
       format: 'A4',
       printBackground: true,
       displayHeaderFooter: true,
-      headerTemplate: `<div style="${small}display:flex;justify-content:space-between"><span>${escapeHtml(model.header)}</span><span>DxT</span></div>`,
+      headerTemplate: `<div style="${small}display:flex;justify-content:space-between"><span>${esc(model.header)}</span><span>DxT</span></div>`,
       footerTemplate: `<div style="${small}text-align:right">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
       margin: { top: '18mm', bottom: '18mm', left: '15mm', right: '15mm' },
     });

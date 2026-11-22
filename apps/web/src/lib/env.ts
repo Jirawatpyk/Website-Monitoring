@@ -32,6 +32,8 @@ const serverEnvSchema = z.object({
   HEALTHCHECKS_PING_URL_EXPIRY: z.url().optional(),
   /** S14 (D-056): pinged once the 09:00 digest is posted; a missing ping by 09:05 alerts Tao. */
   HEALTHCHECKS_PING_URL_REPORTS: z.url().optional(),
+  /** S20 (D-073 item 13): the hourly client report drafts; optional until the plan has room. */
+  HEALTHCHECKS_PING_URL_REPORT_DRAFTS: z.url().optional(),
   /**
    * D-042: shared-list and crawler-view findings raise PROBLEM only when `on`; `off` logs them in
    * the engine summary. Production is on since S09c's week without a false positive (21 Oct 2026).
