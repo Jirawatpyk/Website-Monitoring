@@ -293,7 +293,8 @@ export function ReportsView({
                         <ReportCell r={r} />
                       </Td>
                       <Td label="Actions">
-                        <span className="flex flex-nowrap gap-1">
+                        {/* side by side where there is room; stacked at 1280 so the table never scrolls sideways (D-018, /verify S20) */}
+                        <span className="flex flex-wrap justify-end gap-1">
                           {canOpen ? (
                             <Button
                               variant="ghost"
