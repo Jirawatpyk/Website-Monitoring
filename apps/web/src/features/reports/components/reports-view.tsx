@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Badge,
@@ -136,6 +136,7 @@ export function ReportsView({
       label="Month"
       size="sm"
       fullWidth={fullWidth}
+      touchHeight={fullWidth ? 'always' : true}
       options={[closed, running]}
       value={data.running ? running : closed}
       onChange={(v) =>
@@ -144,11 +145,16 @@ export function ReportsView({
     />
   );
 
+  const [focusCard, setFocusCard] = useState<string | null>(null);
+  // back to the card it came from once the sheet is gone (after React rendered: apps/web CLAUDE.md → Testing)
+  useEffect(() => {
+    if (sheet || !focusCard) return;
+    cards.current.get(focusCard)?.focus();
+    setFocusCard(null);
+  }, [sheet, focusCard]);
   const closeSheet = () => {
-    const id = sheet?.clientId;
+    setFocusCard(sheet?.clientId ?? null);
     setSheet(null);
-    // back to the card it came from once the sheet is gone
-    if (id) setTimeout(() => cards.current.get(id)?.focus(), 0);
   };
 
   return (
@@ -186,12 +192,14 @@ export function ReportsView({
       </div>
 
       <section className="flex flex-col gap-3" aria-labelledby="reports-table">
-        <h2 id="reports-table" className="m-0 flex flex-wrap items-baseline gap-x-3 text-lg font-semibold">
-          {`Client reports · ${data.label}`}
+        <div className="flex flex-col gap-0.5">
+          <h2 id="reports-table" className="m-0 text-lg font-semibold">
+            {`Client reports · ${data.label}`}
+          </h2>
           {data.running && (
-            <span className="text-sm font-normal text-fg-secondary">Preview draft · generated on demand</span>
+            <span className="text-sm text-fg-secondary">Preview draft · generated on demand</span>
           )}
-        </h2>
+        </div>
         <RuleNote />
 
         {data.rows.length === 0 ? (
@@ -303,7 +311,7 @@ export function ReportsView({
             </div>
             <ul className="m-0 grid list-none grid-cols-1 gap-2.5 p-0 md:grid-cols-2 xl:hidden">
               {data.rows.map((r) => (
-                <li key={r.clientId}>
+                <li key={r.clientId} className="flex">
                   <button
                     type="button"
                     ref={(el) => {
@@ -351,7 +359,9 @@ export function ReportsView({
         title={shown?.client ?? ''}
         description={
           shown
-            ? [data.label, shown.tier1 ? 'Tier 1' : null, `AM ${shown.am}`].filter(Boolean).join(' · ')
+            ? [monthLabel(data.month), shown.tier1 ? 'Tier 1' : null, `AM ${shown.am}`]
+                .filter(Boolean)
+                .join(' · ')
             : ''
         }
       >

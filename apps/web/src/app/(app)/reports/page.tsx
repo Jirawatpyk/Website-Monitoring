@@ -16,14 +16,16 @@ export default async function ReportsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const access = await getAccess();
-  if (access.status !== 'active' || access.profile.role === 'client') {
+  // staff only, as an allow-list: a role added later sees nothing by default (security review S20)
+  const STAFF = ['admin', 'responder', 'stakeholder', 'viewer'];
+  if (access.status !== 'active' || !STAFF.includes(access.profile.role)) {
     return (
       <Container>
         <div className="flex flex-col gap-6">
           <PageHeader titleHideBelow="lg" eyebrow="REPORTS" title="Uptime reports" />
           <NoAccess
-            title="Uptime reports are for the DxT team"
-            description="Ask an Admin if you need them."
+            title="Reports are for the DxT team"
+            description="Your monthly report comes by email from your account manager."
           />
         </div>
       </Container>

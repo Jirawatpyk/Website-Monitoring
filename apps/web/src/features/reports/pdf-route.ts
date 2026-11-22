@@ -25,6 +25,11 @@ import { pdfModel, reportId } from './words';
  * Nothing is written, so no audit row (apps/web/audit-coverage.json: exempt).
  */
 
+/** Who opens a PDF (PRD §3, D-073 item 14). */
+const PDF_ROLES = new Set(['admin', 'responder', 'stakeholder']);
+
+const tooMany = () => text('Too many previews in a minute — try again shortly.', 429);
+
 const paramsSchema = z.object({ clientId: z.uuid(), month: reportMonthSchema });
 
 export const PREVIEW_LIMIT = { count: 4, windowMs: 60_000 };
@@ -83,9 +88,9 @@ export function reportPdfHandler(deps: PdfRouteDeps = {}) {
   ): Promise<Response> {
     const who = await access();
     if (who.status !== 'active') return text('Sign in first.', 401);
-    if (who.profile.role === 'client') return text('Reports are for DxT staff.', 403);
-    // PRD §3 "Download uptime reports": Admin, Responder, Stakeholder; a Viewer sees the figures on the page only
-    if (who.profile.role === 'viewer')
+    // PRD §3 "Download uptime reports": Admin, Responder, Stakeholder — an allow-list, so a new role gets
+    // nothing by default (security review S20); a Viewer sees the figures on the page only
+    if (!PDF_ROLES.has(who.profile.role))
       return text('Opening the PDF is for Admins, Responders and Stakeholders.', 403);
     const parsed = paramsSchema.safeParse(await ctx.params);
     if (!parsed.success) return text('No such report.', 404);
@@ -116,17 +121,18 @@ export function reportPdfHandler(deps: PdfRouteDeps = {}) {
         );
       }
     }
+    // the limit before the month's reads, so a refused request costs nothing (security review S20)
+    if (!takePreview(who.profile.id, now.getTime())) return tooMany();
     const f = (await liveFigures(db, month, now, [client])).get(client.id);
     if (!f) return text('No such report.', 404);
-    return printed(
-      who.profile.id,
-      pdfModel(f),
+    return pdfResponse(
+      await render(pdfModel(f)),
       `${reportId(f)} ${client.name}${f.running ? ' (preview)' : ''}.pdf`,
     );
 
     async function printed(userId: string, model: ReturnType<typeof pdfModel>, filename: string) {
       if (!takePreview(userId, now.getTime())) {
-        return text('Too many previews in a minute — try again shortly.', 429);
+        return tooMany();
       }
       return pdfResponse(await render(model), filename);
     }

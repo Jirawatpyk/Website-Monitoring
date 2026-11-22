@@ -1,7 +1,7 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { bangkokMonth, aggregateUptime } from '@dxt/engine';
-import { formatDuration, formatPercent } from '@dxt/shared';
+import { formatDay, formatDuration, formatPercent, formatTime } from '@dxt/shared';
 import type { ReportFigures } from './figures';
 import { monthLabel, reportMonths } from './month';
 import { liveFigures, loadDrafts, loadReportClients } from './queries';
@@ -35,8 +35,10 @@ export async function loadReportsPage(db: DbClient, month: string, now: Date): P
   const months = reportMonths(now);
   const running = month === months.running;
   const { to } = bangkokMonth(month, now);
-  const clients = await loadReportClients(db, to);
-  const drafts = running ? new Map() : await loadDrafts(db, month);
+  const [clients, drafts] = await Promise.all([
+    loadReportClients(db, to),
+    running ? Promise.resolve(new Map()) : loadDrafts(db, month),
+  ]);
   const missing = clients.filter((c) => running || !drafts.get(c.id)?.figures);
   const live = await liveFigures(db, month, now, missing);
 
@@ -61,13 +63,26 @@ export async function loadReportsPage(db: DbClient, month: string, now: Date): P
     closed: months.closed,
     runningMonth: months.running,
     rows,
-    tiles: tilesOf(figures, month, running),
+    tiles: tilesOf(figures, month, running, now),
   };
 }
 
 /** Uptime (every client site, time-weighted), downtime (outages only) and incidents across clients. */
-function tilesOf(all: readonly ReportFigures[], month: string, running: boolean): ReportsPage['tiles'] {
+function tilesOf(
+  all: readonly ReportFigures[],
+  month: string,
+  running: boolean,
+  now: Date,
+): ReportsPage['tiles'] {
   const sites = all.flatMap((f) => f.sites).filter((s) => s.uptime !== null);
+  const uptimeLabel = `Uptime · ${running ? `${monthLabel(month, { short: true }).split(' ')[0]} so far` : monthLabel(month, { short: true })}`;
+  // an empty month (MReports "Empty month")
+  if (!sites.length)
+    return [
+      { label: uptimeLabel, value: '—', caption: 'No client sites watched' },
+      { label: 'Downtime', value: '—', caption: '—' },
+      { label: 'Incidents', value: '0', caption: '—' },
+    ];
   // time-weighted over every client site, as a client's own figure (spec §5, D-073 item 9)
   const uptime = sites.length
     ? aggregateUptime(
@@ -84,9 +99,10 @@ function tilesOf(all: readonly ReportFigures[], month: string, running: boolean)
   const open = sum('open') ? `${sum('open')} still open` : null;
   return [
     {
-      label: `Uptime · ${running ? `${monthLabel(month, { short: true }).split(' ')[0]} so far` : monthLabel(month, { short: true })}`,
+      label: uptimeLabel,
       value: uptime === null ? '—' : formatPercent(uptime),
-      caption: `${sites.length} client site${sites.length === 1 ? '' : 's'} · maintenance excluded`,
+      // the running month says how far it runs (board: "11 client sites · to Fri 25 Sep 10:07")
+      caption: `${sites.length} client site${sites.length === 1 ? '' : 's'} · ${running ? `to ${formatDay(now, { weekday: true })} ${formatTime(now)}` : 'maintenance excluded'}`,
     },
     {
       label: 'Downtime',

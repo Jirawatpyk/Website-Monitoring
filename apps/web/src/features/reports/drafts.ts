@@ -95,7 +95,7 @@ export async function runReportDrafts(
       if (stored) out.refreshed++;
       else out.made++;
     } catch (err) {
-      // one client's failure never stops the others; the next hour tries again
+      // one client's failure never stops the others; the next run (10 min) tries again
       out.failed++;
       out.ok = false;
       console.error(
