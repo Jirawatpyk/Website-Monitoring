@@ -4,6 +4,19 @@ What to do when DxT Monitor itself needs attention. Each section starts from the
 
 **v1 (G1, 14 Oct 2026).** Written for the two Admins. G1 asks the second Admin to walk through it once (see the **Walk-through** at the end).
 
+**v2 (S19, 21 Nov 2026).** Adds what Phase 2 built:
+
+- [hand check, manual incident and Escalate now](#the-engine-is-stopped-hand-check-manual-incident-escalate-now);
+- [on-call](#on-call-swaps-and-hand-over);
+- [the client-update track](#client-update-due);
+- [SSL and domain expiry](#ssl-or-domain-expiring);
+- [page change](#page-change-accept-a-new-baseline);
+- [people and access](#people-and-access);
+- [settings](#settings-hours-holidays-forbidden-words-alert-channels);
+- [the audit log](#who-changed-what-audit-log);
+- [backups and the restore drill](#backups-and-the-restore-drill);
+- the [S19 drill](#drill-s19).
+
 ## Start here
 
 ### What you need access to
@@ -45,7 +58,7 @@ Who each check tells, as set on production on 4 Nov 2026 (D-053):
 - **Email only:** `notifier`, `browser-verifier` and `vps-watchdog`.
 - **Dashboard only:** the three `probe-*` checks. A missing location is reported by our own PROBE MISSING email instead, which stays quiet during an engine fault and reports the location once.
 
-Until S19 the emails go to Tao only (D-054).
+Until S19 closes the emails go to Tao only (D-054); S19 adds every active Admin (`docs/test-plan-results.md` → Healthchecks).
 
 | Check | Expected | When it goes down | First look | Section |
 | --- | --- | --- | --- | --- |
@@ -122,7 +135,7 @@ From the app as an Admin: **/maintenance** → **Schedule maintenance or mute**,
 
 - **Planned work on a client site** (hosting move, deploy): **maintenance** for the window. While it runs nothing opens; if the site is still down at the end, an incident opens from the window's end. Over 24 h needs an Admin's approval (Admins' own windows are approved on create).
 - **Something is already wrong and you're on it:** **mute** for up to 24 h. New alerts for that site stop, but an open incident keeps escalating until someone acknowledges it. End it early with **End now**.
-- **Our own production deploys after G1:** every production deploy happens inside a maintenance window (G1 rule). Open it before `pnpm pr:merge` and end it once the deploy is live and the next round looks right.
+- **Our own production deploys** need no maintenance window (D-071 item 6): Vercel swaps versions with no downtime. Watch the next rounds after the deploy is live.
 - **There is no global "stop all alerts" switch.** If DxT Monitor itself is sending false alerts for many sites at once, mute the affected sites and fix the cause. Turning off Vercel Cron Jobs stops monitoring entirely, so do it only with the other Admin's agreement.
 
 ## Rotate a secret
@@ -254,6 +267,153 @@ A summary row `queued` with `hold_until` in the future is waiting for 15 min of 
 - **Switch off or remove a key page:** resolve its open incident first; the save is refused while one is open.
 - **Every change** is one `audit_log` row per site / monitor / client row (`entity` = site, monitor or client).
 - **"This address points inside a private network":** the URL resolves to a private, loopback or metadata address — the probes never check those (SSRF guard).
+
+## The engine is stopped: hand check, manual incident, Escalate now
+
+Since S12b (D-053, D-055). This is what to do when the `engine` check is down, MONITOR FAULT is posted, and the Overview shows the fault banner.
+
+1. **Confirm it's real.**
+   - `/probes` shows each heartbeat's age.
+   - Vercel → `dxt-monitor` → Cron Jobs → `/api/cron/engine` → View Logs.
+   - If the last run errored, read its `failures`. If no run is listed, check the Cron Jobs **Enabled** toggle.
+2. **Hand-check the Tier 1 sites.**
+   - Under the banner, the Overview lists every Tier 1 site with **Loads OK** and **Down — open incident**.
+   - Open each site in a browser and press one. Anyone who may acknowledge that site can press.
+   - **Down — open incident** opens a manual incident (Trigger "Manual (hand check)"). It posts L0 to the Alerts Space from the request itself, not the notifier. It also starts the client-update track. Its email keeps the 5-min grace (D-047).
+   - On a site whose incident has recovered, or is a PROBLEM, the row offers **Down again…** instead (D-055 item 7).
+3. **Escalate by hand.**
+   - An incident offers **Escalate now** (one level per press, with a confirm) and **Send client-update reminder now** only while no engine run has happened for 3 min (`engine-run` beat).
+   - Nothing escalates on its own meanwhile, so press it when the next level is due.
+4. **When the engine is back.**
+   - Its first run writes "Status engine back — automatic escalation running again" on every incident someone acted on by hand.
+   - The timers carry on from there.
+   - A manual incident is judged only on rounds after it opened, so it recovers on its own once the site is OK.
+5. **Fix the cause**:
+   - a failed deploy → **Promote** the last good one ([Vercel crons and logs](#vercel-crons-and-function-logs));
+   - a rotated `CRON_SECRET` → [Rotate a secret](#rotate-a-secret);
+   - a Vercel incident → wait, and keep hand-checking every 15 min.
+
+## On-call: swaps and hand-over
+
+S10 (D-048 item 4–5). The On-call page is `/oncall`.
+
+- **The week changes on Monday at 09:00.** The person on call answers Tier 1 outside response hours and on company holidays. Inside response hours, the site owner answers.
+- **Swap a future week.**
+  1. The person on call asks from On-call.
+  2. The person asked accepts or declines there.
+  3. An Admin approves.
+
+  Nothing changes until all three have happened. A swap still open when its week starts expires. Every step writes `audit_log`.
+
+- **The live shift can't be swapped.** An Admin uses **Hand over…** on the live row of On-call, for example when the person on call is sick. SHIFT HANDED OVER posts in Chat.
+- **Nobody on call:** Tier 1 alerts outside response hours go to the site owners. Every Admin is on every Tier 1 DOWN ladder as the backstop.
+
+## Client update due
+
+S11 (FR-20, D-052). CLIENT UPDATE DUE posts in the incident's thread, @mentioning the site's AM, who also gets an email.
+
+- **When it fires:**
+  - Tier 1 DOWN reaching 15 min;
+  - Tier 2 DOWN reaching 60 min, counted inside response hours;
+  - Tier 3 never.
+
+  The minutes are the DOWN drops added up.
+
+- **No active AM:** every Admin gets it ("no AM").
+- **What to do:** on the incident's Client update card, copy the TH / EN draft and contact the client. Then press **Mark client updated** (optional note), or **Not needed…** with a reason.
+- **Resolve waits for it.** Resolve stays blocked until the update is marked, or marked not needed.
+
+## SSL or domain expiring
+
+S13 (D-066–D-068). The Expiry page is `/expiry`.
+
+- **When a PROBLEM opens:**
+  - "SSL expiring" under 14 days;
+  - "Domain expiring" under 30 days.
+
+  It opens only inside response hours and follows the PROBLEM ladder.
+
+- **Renew it** (the client or the hosting provider), then press **Check now** on `/expiry`. Check now is refused for 60 s after the last read.
+- **The incident recovers** on the next good read that is no longer under the line. A failed read never opens or clears one. The dates come from `/api/cron/expiry` (hourly; every site at 06:00 Bangkok).
+- **A read keeps failing** (the site's row shows no date): read `"job":"expiry"` in the logs. Hosting subdomains have no domain half; that is not a failure.
+
+## Page change: accept a new baseline
+
+S09d (D-046). PROBLEM · Page change means the home page's title, description, h1, canonical or script / iframe domains changed against the accepted baseline.
+
+- **A new script domain alerts on the first fetch.** Any other change alerts once 3 fetches in a row differ.
+- **The client changed the site on purpose:**
+  - an Admin presses **Accept as new baseline** on the incident (10 s Undo);
+  - or resolves with root cause "Client-side change", which can accept and resolve at once.
+- **Not expected:** treat it as a possible defacement. Check the page as Googlebot and in a browser, tell the owner, and don't accept it.
+- **Gates:** `PAGE_CHANGE_ALERTS` and `DEFACEMENT_ALERTS` are `on` in production. A new site records for 14 days before it can alert.
+
+## People and access
+
+S16 (D-062, D-007). Settings › Users is `/settings/users`, Admins only.
+
+- **Add someone:** add their company address. That allowlist row is the invite: there's no link and no expiry. They sign in with Google, and Google Workspace enforces their 2-step.
+- **Change a role or deactivate:**
+  - The dialog lists where the person is used: site owner or backup, client AM, on-call places, shifts and open swaps. Reassign each one first.
+  - The last active Admin can't be demoted or deactivated.
+  - Deactivating signs them out everywhere and removes their allowlist row.
+  - The person gets an email saying what changed.
+- **When an Admin joins or leaves:**
+  - add or remove their Healthchecks Email integration (Start here);
+  - add or remove their access to Vercel, Supabase, the VPS and GitHub;
+  - remove their real phone number from the Admins' contact lists.
+- **Their Chat id** is set on My profile by the person or an Admin. Without it, they get no @mentions.
+
+## Settings: hours, holidays, forbidden words, alert channels
+
+S17 (D-069). Admins only; view only on phones.
+
+- **Response hours** (Settings › Organisation): one setting for the Tier 2–3 timers and for the Tier 1 owner / on-call hand-over. Saving it needs a note, and the next engine run uses it, for open incidents too.
+- **Company holidays** (the same page): add one before the day. The engine and notifier read the calendar on each run.
+- **Shared forbidden words** (the same page):
+  - Add a phrase with a group and a note. **Check phrase** first refuses a single word, and refuses a phrase found on a live site's last clean page.
+  - Remove a phrase with a note.
+  - The probes, the crawler and the VPS agent use the list on their next run.
+- **Alert channels** (Settings › Alert channels):
+  - It shows each channel's state and the delivery log.
+  - **Send test card** / **Send test email** posts a TEST card or email (once a minute per channel). Use it after rotating a webhook URL.
+
+## Who changed what (audit log)
+
+S15 (D-061). The Audit log is `/audit`, Admins only.
+
+- Every change to config or incident state is one row, with before and after. Rows can't be edited or deleted.
+- Filter by when, who, category or entity. **Export CSV** gives every filtered row.
+- Use it first when a setting "changed by itself", or when someone asks who acknowledged, resolved or muted something.
+
+## Backups and the restore drill
+
+D-005: Supabase Pro daily backups, kept 7 days, no PITR.
+
+- **Where:** Supabase → the production project → Database → Backups → Scheduled. Each day should show one backup.
+- **Restore drill** (S19, then every quarter; Tao):
+  1. Database → Backups → **Restore to a New Project**, pick the latest daily backup. Read the cost the dialog shows: the new project mirrors production's compute and is billed while it exists. Keep it for an hour or less.
+  2. **At once, in the new project:** disable `pg_cron` jobs (`select cron.unschedule(jobid) from cron.job;`) and leave `pg_net` unused. The copy has the same jobs as production, and nothing in it may run against the real world.
+  3. Check the copy, read-only, in its SQL editor:
+     ```sql
+     select (select count(*) filter (where is_active) from sites) live_sites, (select max(number) from incidents) last_incident, (select max(at) from audit_log) last_audit, (select max(checked_at) from check_results) last_check;
+     ```
+     The figures should match production as of the backup's time. Storage files (screenshots) aren't in a backup, as expected.
+  4. **Delete the scratch project** (Settings → General → Delete project). Write the date, the backup's time and the four figures in `docs/test-plan-results.md` → Restore drill, never a key or URL.
+- **A real restore** replaces production's data with the backup's (up to a day lost), and the project is down while it runs. Decide it with the other Admin. Open maintenance on every site first, then restore. Then check the Overview and that the crons run.
+
+## Drill (S19)
+
+On **staging**, with the Test target on `ok` (so the engine, still run by Bangkok batches, opens nothing itself) and no open incident. Run `pnpm staging:resume` first. Turning the crons off and on, and stopping the agent, follow `verifier-staging` → Monitor fault. Ask Tao before turning the crons off.
+
+| # | Step | Expect |
+| --- | --- | --- |
+| 1 | Turn the staging crons off | — |
+| 2 | Wait 3 min | Healthchecks staging `engine` down; the staging VPS watchdog posts MONITOR FAULT once; the Overview shows the fault banner and the hand-check card |
+| 3 | Hand check: **Loads OK** on the Test target, then **Down — open incident** with a note | "Checked OK · …", then a manual incident (Trigger "Manual (hand check)"), its L0 posted from the request |
+| 4 | Stop `dxt-agent@staging` on the VPS (as root over SSH, `verifier-staging` → Monitor fault), wait 3 min (no engine run of any kind, D-055) → the incident → **Escalate now** | `ESCALATED · L1 … sent by hand` in the thread; one `step_fired` (`byHand`) |
+| 5 | Start the agent; turn the crons on | "Status engine back — automatic escalation running again" on the timeline; the incident recovers on the next OK rounds |
+| 6 | If the Client update card fired (the manual incident counts as Tier 1 DOWN, so it does after 15 min): **Not needed…** with a reason ("drill"). Then root cause (False alarm (monitor), "S19 drill") + Resolve; `pnpm staging:pause` | Resolved; staging asleep |
 
 ## Walk-through (G1)
 

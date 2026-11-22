@@ -40,8 +40,8 @@
 | S16 | Users & access | 2 · P1 | M | — | S10 | 5 | Done |
 | S17 | Alert channels & organisation settings | 2 · P1 | M | — | S10, S11 | 5 | Done |
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Done |
-| S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | Todo |
-| G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov) | Todo |
+| S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | In progress |
+| G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov; re-baselined 21 Nov: ≈ Fri 27 Nov, D-071) | Todo |
 | S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 | 6 | Todo |
 | S21 | Client status page | 3 · P2 | L | FR-16 | S20 | 7 | Todo |
 | S22 | Post-incident review | 3 · P2 | M | FR-18 | G2 | 8 | Todo |
@@ -68,7 +68,7 @@ Every slice also meets the [Definition of Done](workflow.md#definition-of-done) 
 
 The dates skip the Thai public holidays on Tue 13 Oct and Fri 23 Oct. The order, dependencies and gates don't change. Fixed waits that the pace doesn't shorten:
 - **G1:** all 17 sites entered on production through the UI (S05 Done-when 1). This needs the Site Registration Checklist completed by owners and AMs, and is G1's long pole. G1 also needs a second Admin and the runbook.
-- **G2:** UAT with owners on phones, the game day and the restore drill (S19), then the 2-week parallel run against the CEO's checks, which can't be compressed.
+- **G2:** UAT at 390 px on staging, the game day and the restore drill (S19, D-071), then the 2-week parallel run against the CEO's checks, which can't be compressed.
 - **G3:** P2 scope is confirmed with the CEO at G2. A smaller P2 lands earlier.
 
 Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if screen slices run longer than 1.5 days.
@@ -448,7 +448,7 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - DOWN จำลองแล้ว alert ถึงภายใน 3 นาที — on staging, against the test target (Tier 1), run by Claude (D-048). **Done 29 Oct 2026:** mode `error` at 05:10:21 UTC, first failed check 05:10:46, INC-0048 DOWN posted to Chat 05:11:35.96 (`notification_attempts.ok`, provider message id) — 49 s.
 - A second Admin is active, with their 2-Step Verification page confirmed per D-007 (PRD §9: "ต้องมี admin คนที่ 2 ก่อน Phase 2"), and Healthchecks alerts go to both Admins. No second code reviewer: Tao works solo with Claude (D-048 — no CODEOWNERS line).
 - `docs/runbook.md` v1 exists and the second Admin has walked through it once: what each heartbeat / Healthchecks alert means, restarting the VPS agent, checking Vercel Cron and function logs, pausing alerts with maintenance, rotating `CRON_SECRET` / `INGEST_TOKEN` / webhook URLs, and who to call (PRD §13 bus-factor mitigation).
-- From here every production deploy happens inside a maintenance window, and the parallel run with the CEO's hourly monitor starts; S19 keeps its log.
+- From here the parallel run with the CEO's hourly monitor starts; S19 keeps its log. (The maintenance window for every production deploy was dropped, D-071 item 6.)
 
 ## Phase 2 — Team go-live, P1
 
@@ -776,12 +776,13 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
 - **Test plan:** T06, T07
 - **Depends on:** S10–S18
 - **Done when:**
-  1. **T06:** two UAT rounds with owners on phones (ack, mute, maintenance), findings fixed or logged.
-  2. **T07:** game day — a real test site taken down; MTTD ≤ 3 min (Tier 1) and MTTA ≤ 15 min recorded (PRD §2).
+  1. **T06:** two UAT rounds at 390 px (ack, mute, maintenance), findings fixed or logged in `docs/uat.md` — on staging, run by Claude (D-071).
+  2. **T07:** game day — the staging Test target taken down; MTTD ≤ 3 min (Tier 1) and MTTA ≤ 15 min recorded in `docs/game-day.md` (PRD §2; MTTA is Claude's, D-071).
   3. All 12 test-plan items (T01–T12) re-run and ticked in `docs/test-plan-results.md`.
   4. `docs/parallel-run-log.md` covers two weeks and shows no incident seen by the hourly monitor that DxT Monitor missed.
-  5. The second Admin has run the updated runbook in a drill (engine heartbeat stopped → fault mode → hand check), and a restore from backup into a scratch project succeeded.
+  5. The updated runbook has been run in a drill on staging (engine heartbeat stopped → fault mode → hand check; Claude, D-071), and a restore from backup into a scratch project succeeded (Tao).
   6. (D-054, from S12a) Every active Admin is an Email integration on the production Healthchecks `engine` check (and the other checks D-053 has emailing the Admins), and each confirmed it by receiving a test notification.
+- **Decisions:** D-071
 - **Review:** slice-verifier, Tao sign-off.
 
 ### G2 · Team go-live gate (PRD §12 Phase 2 exit)
@@ -1021,7 +1022,7 @@ Tables the plan adds beyond PRD §11: organisation settings and company holidays
 | T03 | Verifier off → hard fail still DOWN; blocked → PROBLEM (unverified) | S03 |
 | T04 | Vercel Cron off → Healthchecks alerts 2 people, VPS watchdog alerts | S12a |
 | T05 | No ack → L0–L3 on time | S10 |
-| T06 | UAT with owners twice on mobile | S19 |
+| T06 | UAT twice at 390 px on staging (D-071) | S19 |
 | T07 | Game day, MTTD / MTTA measured | S19 |
 | T08 | Ack → Undo within 10 s → nothing sent | S02b |
 | T09 | Mute with open incident → escalation, L3 FYI, client update continue | S09 |

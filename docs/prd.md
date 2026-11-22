@@ -1,5 +1,5 @@
 <!--
-Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 168)
+Source: Claude Doc "PRD — DxT Website Monitoring Platform" https://claude.ai/artifact/Mz596TqTLewVQ3EjRBqudL (rev 175)
 Converted to Markdown: 2026-09-28. The Claude Doc is the source of truth — re-export this file when it changes.
 Settled conflicts: docs/decisions.md wins over this file and the design spec.
 Precedence: on scope, priority, architecture and budget this PRD wins; on screen behaviour, status logic, UI copy and formats docs/dxt-monitor-design-spec.md wins.
@@ -411,8 +411,8 @@ incidents.state = unacked / escalated / acknowledged / monitoring / needs_root_c
 |---|---|---|---|
 | 0 — Prep | Week 1 (เต็มสัปดาห์) | ปิด decision กับ CEO (Section 13); ทำ Site Registration Checklist: URL + key pages, Primary/Backup owner, ลูกค้า, hosting, WAF status, credential reference; สร้าง Google Chat Space + webhook; ทดสอบ Tubtong/Cando Asia; ขอ allowlist กับเว็บที่มี WAF | CEO approve Tier + escalation; checklist ครบทุกเว็บ Tier 1 |
 | 1 — MVP | Week 2–3 | วันที่ 1–3: thin slice 1 เว็บ (probe → engine → incident → Google Chat → Ack); จากนั้น FR-01 – FR-10a ครบ 17 เว็บ (รวม escalation L0 + L1 และ maintenance แบบครั้งเดียว) | ข้อมูล 17 เว็บครบ 100% ก่อน go-live; DOWN จำลองแล้ว alert ถึงภายใน 3 นาที |
-| 2 — Team go-live | Week 4–5 | FR-09b – FR-14: escalation เต็ม, on-call, recurring maintenance, SSL/domain, digest, audit log, mute; VPS watchdog; runbook + admin คนที่ 2; ทุก deploy ระหว่าง parallel run ต้องตั้ง maintenance window | Parallel run 2 สัปดาห์ไม่พลาด incident → ปิด monitor รายชั่วโมง |
-| Buffer | 3–5 วัน ก่อนปิด Phase 2 | Game day + UAT กับ owner 2 รอบ | ผ่าน test plan ครบทุกข้อ |
+| 2 — Team go-live | Week 4–5 | FR-09b – FR-14: escalation เต็ม, on-call, recurring maintenance, SSL/domain, digest, audit log, mute; VPS watchdog; runbook + admin คนที่ 2 | Parallel run 2 สัปดาห์ไม่พลาด incident → ปิด monitor รายชั่วโมง |
+| Buffer | 3–5 วัน ก่อนปิด Phase 2 | Game day + UAT 2 รอบบน staging (D-071) | ผ่าน test plan ครบทุกข้อ |
 | 3 — Client-facing | Week 6–10 | FR-15 – FR-19: monthly report, client status page, synthetic transactions, post-incident review, API | Report เดือนแรกส่งลูกค้า Tier 1 ได้ |
 
 **Test plan ก่อน go-live**
@@ -422,8 +422,8 @@ incidents.state = unacked / escalated / acknowledged / monitoring / needs_root_c
 - [ ] ปิด browser verifier → เว็บทดสอบที่ hard fail ต้องยังขึ้น DOWN ตามเวลา; เว็บที่ blocked ขึ้น PROBLEM (unverified) ทันที + Admin ได้ alert เรื่อง verifier
 - [ ] Disable Vercel Cron → Healthchecks.io แจ้ง 2 คน และ VPS watchdog ส่ง alert เอง
 - [ ] ไม่ ack → escalation ไล่ครบ L0–L3 ตามเวลา
-- [ ] UAT กับ owner 2 รอบ: ack, mute, maintenance บนมือถือ
-- [ ] Game day: ปิดเว็บทดสอบจริง 1 เว็บ วัด MTTD / MTTA ของทีม
+- [ ] UAT 2 รอบที่ 390 px บน staging (D-071): ack, mute, maintenance
+- [ ] Game day: ปิดเว็บทดสอบจริง 1 เว็บ วัด MTTD / MTTA บน staging (MTTA ของทีมวัดได้หลัง G2, D-071)
 - [ ] Ack → Undo ภายใน 10 วินาที → ไม่มี Chat, email หรือ webhook หลุดออกไป
 - [ ] Mute เว็บที่มี incident เปิดอยู่ → escalation, L3 FYI และ client update ยังทำงานตามเวลา
 - [ ] Resolve ไม่ได้จนกว่าจะครบ 3 เงื่อนไข (root cause "Unknown" ไม่ผ่าน)
