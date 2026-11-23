@@ -42,7 +42,7 @@
 | S18 | User guide | 2 · P1 | S | FR-22 | S16 | 5 | Done |
 | S19 | Go-live readiness: UAT, game day, parallel run | 2 | M | — | S10–S18 | buffer + 2-week run | In progress |
 | G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov; re-baselined 21 Nov: ≈ Fri 27 Nov, D-071) | Todo |
-| S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 (waived, D-072) | 6 | In review |
+| S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 (waived, D-072) | 6 | Done |
 | S20b | Client report sending | 3 · P2 | M | FR-15 | S20, G2 | 7 | Todo |
 | S21 | Client status page | 3 · P2 | L | FR-16 | S20 | 7 | Todo |
 | S22 | Post-incident review | 3 · P2 | M | FR-18 | G2 | 8 | Todo |
@@ -804,6 +804,12 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   3. spec-checker passes the boards (Reports, ReportPDF, MReports); nav "Uptime reports" live.
 - **Guide (D-070):** update the "Reports & client status page" topic in `features/guide/content.ts` for the Reports page and the PDF.
 - **Review:** spec-checker, security-reviewer (client data isolation).
+- **Notes (evidence):** Done 23 Nov 2026 — #224 (built and merged 22 Nov), hotfix #226 (one browser per PDF on Vercel, a deadline on every Chromium step, a 240 s print budget), close-out here; slice-verifier: all three lines Met.
+  - **Done-when 1 ✓** `figures.test.ts` "spec §5 September so far … (S20 Done-when 1)": the page row and the PDF tiles give BA 99.98% / 11 min, MuvMi 1 h 41 min, Cando 12 min, ORCA 8 min; BA's SSL PROBLEM and the false alarm are absent from the list, the PDF lines and the day cells. Engine `client-report.test.ts` 55/55.
+  - **Done-when 2 ✓** `docs/evidence/S20/report-sample.pdf`: three A4 pages (595.92 × 842.88 pt), nothing clipped, Thai marks intact, "Page n of 3". Production, 23 Nov: Bangkok Airways October → 200 `application/pdf`, 313,843 B, two pages, Thai running head on page 2.
+  - **Done-when 3 ✓** spec-checker ×3 + a re-check on Reports, ReportPDF and MReports (findings fixed; the remaining board gaps settled in D-073 item 15); nav `uptime` live; e2e `reports.spec.ts` and `layout-consistency` green. `/verify` on staging PASS (22 Nov: stored draft served, 429 after four previews a minute, 404 / 405 probes, Thai running head, 1280 / 820 / 390 light and dark).
+  - **Production, 23 Nov:** all six clients' October drafts made ("Draft ready"); every drafts run since reports `unchanged: 6, failed: 0, deferred: 0`. The hotfix's several-prints-per-run path is proven on staging (two drafts in ~6 s) and runs first on production the next time two or more clients' figures change — at the latest the November drafts, 1 Dec 06:00: read that run's `made` / `failed` / `deferred`.
+  - **Left open:** `render.smoke.test.ts` is opt-in (`PDF_SMOKE=1`, not in CI); the Overview table's sideways scroll at 1280 px has no slice yet (a task).
 
 ### S20b · Client report sending
 
