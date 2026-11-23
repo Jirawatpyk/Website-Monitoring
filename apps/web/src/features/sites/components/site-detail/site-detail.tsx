@@ -340,7 +340,9 @@ export function SiteDetailView({
             <MonitorsTable detail={detail} />
             {pageFingerprint}
 
-            <div className="grid grid-cols-1 gap-4 max-md:hidden xl:grid-cols-2">
+            {/* 3 : 2 from xl, not halves: Incident history's five one-line columns need ~544 px and
+                half of 1280 is 478 (it scrolled sideways, 23 Nov 2026); the Check log truncates */}
+            <div className="grid grid-cols-1 gap-4 max-md:hidden xl:grid-cols-5 [&>*:first-child]:xl:col-span-3 [&>*:last-child]:xl:col-span-2">
               <IncidentHistory detail={detail} />
               <CheckLog detail={detail} now={now} />
             </div>

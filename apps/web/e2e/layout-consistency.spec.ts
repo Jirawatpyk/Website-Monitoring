@@ -9,7 +9,8 @@ import {
 } from './support/local-supabase';
 
 /**
- * Rules every signed-in page shares, measured in the browser at 390 / 820 / 1440 — the things a
+ * Rules every signed-in page shares, measured in the browser at 390 / 820 / 1280 / 1440 (1280 = xl,
+ * where xl tables are narrowest: Overview and Reports scrolled there, 22 Nov 2026) — the things a
  * per-board review misses because they live across pages (docs/retro.md, 7 Oct 2026):
  * - page header rhythm (D-018): 4 px between breadcrumb or eyebrow, title and meta line (all inside
  *   AURA PageHeader's text block since 5.33's breadcrumb slot);
@@ -24,7 +25,7 @@ import {
  * Signs in as the seeded Admin to see every page. Local Supabase only (E2E_LOCAL_SUPABASE=1).
  */
 const ADMIN = { email: 'tao@example.test', name: 'Tao' };
-const WIDTHS = [390, 820, 1440] as const;
+const WIDTHS = [390, 820, 1280, 1440] as const;
 const LG = 1024;
 const MD = 768;
 const GAP = 4;
