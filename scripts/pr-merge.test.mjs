@@ -206,6 +206,24 @@ test('deployVerdict: production counts only once migrate-production succeeded (1
   });
   assert.equal(skipped.kind, 'failed');
   assert.match(skipped.why, /didn't run.*billing/);
+  // 23 Nov (#226): the code went live while the migration was skipped — the message says it's live.
+  const live = { ...redeployed, state: 'READY', aliasAssigned: 1 };
+  const skippedLive = deployVerdict({
+    migrate: migrate('completed', 'skipped'),
+    deployments: [live],
+    elapsedMs: 0,
+  });
+  assert.equal(skippedLive.kind, 'failed');
+  assert.match(
+    skippedLive.why,
+    /^Vercel put it live \(https:\/\/.+\), but migrate-production didn't run.*old schema/,
+  );
+  const notLive = deployVerdict({
+    migrate: migrate('completed', 'skipped'),
+    deployments: [{ ...live, aliasAssigned: null }],
+    elapsedMs: 0,
+  });
+  assert.match(notLive.why, /^migrate-production didn't run/);
   // Deployed but the migration is still running (or hasn't started): keep waiting, then fail at 40 min.
   assert.equal(
     deployVerdict({ migrate: migrate('in_progress'), deployments: [redeployed], elapsedMs: 0 }).kind,

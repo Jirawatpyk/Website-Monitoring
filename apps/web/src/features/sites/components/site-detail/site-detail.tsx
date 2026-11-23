@@ -340,9 +340,14 @@ export function SiteDetailView({
             <MonitorsTable detail={detail} />
             {pageFingerprint}
 
-            <div className="grid grid-cols-1 gap-4 max-md:hidden xl:grid-cols-2">
-              <IncidentHistory detail={detail} />
-              <CheckLog detail={detail} now={now} />
+            {/* halves as the board draws (1440: ~559 px each); 3 : 2 while the pair is under 64rem (1280,
+                no board): Incident history's one-line columns need ~538 px with Trigger at its
+                narrowest, half of 1280 is 478 (it scrolled sideways, 23 Nov 2026) */}
+            <div className="@container max-md:hidden">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:@max-5xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <IncidentHistory detail={detail} />
+                <CheckLog detail={detail} now={now} />
+              </div>
             </div>
           </>
         )}
@@ -653,10 +658,17 @@ function IncidentHistory({ detail }: { detail: SiteDetail }) {
                 <Td numeric className="whitespace-nowrap">
                   {h.open ? 'Open' : h.minutes === null ? '—' : formatDuration(h.minutes)}
                 </Td>
-                <Td>
-                  <span className="flex flex-col leading-tight">
-                    <span>{triggerWord(h.trigger)}</span>
-                    <span className="text-xs text-fg-secondary">{severityLine(h.severity, h.trigger)}</span>
+                {/* the flexible column, as the board draws it (flex 1, ellipsis): the others stay on one
+                    line, so a half at 1280 (478 px) never scrolls sideways (23 Nov 2026) */}
+                <Td className="w-full max-w-0">
+                  <span
+                    className="flex min-w-0 flex-col leading-tight"
+                    title={`${triggerWord(h.trigger)} · ${severityLine(h.severity, h.trigger)}`}
+                  >
+                    <span className="truncate">{triggerWord(h.trigger)}</span>
+                    <span className="truncate text-xs text-fg-secondary">
+                      {severityLine(h.severity, h.trigger)}
+                    </span>
                   </span>
                 </Td>
                 <Td>
