@@ -52,7 +52,7 @@ const FAILED = 'Couldn’t reach Monitor. Check your connection and try again.';
 const DEVICES_SUB =
   'You stay signed in on this device, so the Ack link opens straight to the incident. Signing out a device takes effect now.';
 
-const TEXT_LINK = 'inline-flex min-h-11 items-center text-sm text-fg-link';
+const TEXT_LINK = 'inline-flex min-h-11 items-center text-sm';
 
 /**
  * My profile (boards Profile, MProfile; spec §22.6, §10; S16 PR 3, D-062 items 6, 12). Every role: how
@@ -223,7 +223,7 @@ function Channels({ data }: { data: ProfileData }) {
               key={c.key}
               className="flex items-start gap-3 border-b border-border-subtle py-3 last:border-b-0"
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-aura-md bg-bg-subtle text-fg-secondary">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-aura-sm bg-bg-canvas text-fg-secondary">
                 {CHANNEL_ICON[c.key]}
               </span>
               {/* Below lg: name, then the badge and Edit under it; from lg one line (Profile board). */}
@@ -356,7 +356,7 @@ function OncallCard({ data, now }: { data: ProfileData; now: Date }) {
             </span>
           )}
           {swap?.note && <span className="text-sm">{swap.note}</span>}
-          <Link href="/oncall" className="flex min-h-11 items-center justify-between text-sm text-fg-link">
+          <Link href="/oncall" className="flex min-h-11 items-center justify-between text-sm">
             Rotation and phone readiness
             <IconChevronRight size="sm" aria-hidden />
           </Link>
@@ -459,7 +459,7 @@ function Escalation({ data, now }: { data: ProfileData; now: Date }) {
             <IconTriangleAlert size="sm" aria-hidden className="mt-0.5 text-fg-warning" />
             <span>
               {only} is the only active Admin — add a second one in{' '}
-              <Link href="/settings/users" className="text-fg-link underline">
+              <Link href="/settings/users" className="underline">
                 Users
               </Link>
             </span>
