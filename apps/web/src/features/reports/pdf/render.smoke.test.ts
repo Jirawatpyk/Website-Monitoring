@@ -4,12 +4,12 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildFigures, type FigureIncident } from '../figures';
 import { pdfModel } from '../words';
-import { pdfPrinter, renderReportPdf } from './render';
+import { pdfPrinter, printIn, renderReportPdf } from './render';
 
 /**
  * S20 Done-when 2: prints a long, Thai-heavy sample to A4 with the real Chromium. Opt-in (it launches a
- * browser): `PDF_SMOKE=1 pnpm --filter @dxt/web exec vitest run src/features/reports/pdf`. Writes
- * `apps/web/test-results/report-smoke.pdf` for the PR.
+ * browser): `PDF_SMOKE=1 pnpm --filter @dxt/web exec vitest run src/features/reports/pdf`; CI's
+ * `check` job runs it after installing Chromium. Writes `apps/web/test-results/report-smoke.pdf`.
  */
 const run = process.env.PDF_SMOKE === '1' ? describe : describe.skip;
 
@@ -71,5 +71,27 @@ run('renderReportPdf (smoke)', () => {
     } finally {
       await printer.close();
     }
-  }, 90_000);
+
+    // Vercel's way (production, 22 Nov 2026): Chromium with @sparticuz/chromium's flags, among them
+    // --single-process, where a second page in one browser never opens. Each print gets its own browser
+    // (`reuse: false`, as on Vercel); a regression to one shared browser hangs here until `withTimeout`.
+    const { chromium } = await import('playwright-core');
+    const vercelArgs = (await import('@sparticuz/chromium')).default.args.filter(
+      (a: string) => !a.startsWith('--headless'),
+    );
+    const vercel = pdfPrinter({
+      launch: () => chromium.launch({ headless: true, args: vercelArgs }),
+      print: printIn,
+      reuse: false,
+    });
+    try {
+      const t2 = Date.now();
+      const prints = [];
+      for (let i = 0; i < 3; i++) prints.push(await vercel.render(pdfModel(f)));
+      expect(prints.every((b) => b.subarray(0, 5).toString() === '%PDF-')).toBe(true);
+      console.info(JSON.stringify({ printedWithVercelArgs: prints.length, ms: Date.now() - t2 }));
+    } finally {
+      await vercel.close();
+    }
+  }, 150_000);
 });
