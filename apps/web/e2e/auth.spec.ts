@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ensureUser, localSupabaseEnabled, setActive, signIn } from './support/local-supabase';
+import { ensurePerson, ensureUser, localSupabaseEnabled, setActive, signIn } from './support/local-supabase';
 
 /** On a phone the side nav (and its account footer) sits behind "Open navigation". */
 async function openNavOnPhone(page: Page) {
@@ -82,15 +82,19 @@ test.describe('signed in (local Supabase)', () => {
     await expect(page).toHaveURL(/\/login/); // the session is gone
   });
 
+  // Both tests below end a person's access, so each uses a person of its own (per project): with the
+  // seeded Mint and Arm, the Viewer and Responder specs running beside them saw "Account deactivated" or
+  // a signed-out page (23 Nov 2026).
   test('a deactivated account is signed out with "Account deactivated"', async ({
     page,
     context,
     baseURL,
-  }) => {
-    const id = await ensureUser('mint@example.test');
+  }, info) => {
+    const email = `e2e-auth-off-${info.project.name}@example.test`;
+    const { id } = await ensurePerson(email, 'viewer');
     await setActive(id, false);
     try {
-      await signIn(context, baseURL!, 'mint@example.test');
+      await signIn(context, baseURL!, email);
       await page.goto('/');
       await expect(page).toHaveURL(/\/login\?error=deactivated$/);
       await expect(page.getByRole('heading', { name: 'Account deactivated' })).toBeVisible();
@@ -99,9 +103,10 @@ test.describe('signed in (local Supabase)', () => {
     }
   });
 
-  test('Sign out ends the session', async ({ page, context, baseURL }) => {
-    await ensureUser('arm@example.test');
-    await signIn(context, baseURL!, 'arm@example.test');
+  test('Sign out ends the session', async ({ page, context, baseURL }, info) => {
+    const email = `e2e-auth-out-${info.project.name}@example.test`;
+    await ensurePerson(email, 'responder');
+    await signIn(context, baseURL!, email);
     await page.goto('/');
     await openNavOnPhone(page);
     await page.getByRole('button', { name: 'Sign out' }).filter({ visible: true }).click();

@@ -6,6 +6,8 @@ const isCI = Boolean(process.env.CI);
 /**
  * Browser flows (e2e/). Two projects match the design's canvas sizes: desktop 1440 and phone 390.
  * Locally Playwright starts `pnpm dev` (or reuses one already on :3500); in CI it runs the built app.
+ * Signed-in specs locally: run `pnpm dev:e2e` first (the built app, as CI) — under parallel specs the
+ * dev server drops the stream a server action returns (apps/web/CLAUDE.md → Testing).
  * Placeholder Supabase values are enough for signed-out flows; signed-in flows need a local stack.
  */
 const DESKTOP = { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } };
@@ -23,12 +25,18 @@ export default defineConfig({
   // The monitor-fault specs' shared beats are cleared once, after every project (S12b).
   globalTeardown: './e2e/global-teardown.ts',
   fullyParallel: true,
+  // A laptop runs the database, the app and the browsers together: half its cores (the default; 6 on a
+  // 12-core machine) streamed heavy pages past their waits (23 Nov 2026). CI keeps the default.
+  workers: isCI ? undefined : 4,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
   // Fail the run instead of hanging a CI runner.
   // Under the db step's 10 min: every signed-in spec now runs there (S09 review), with a retry.
   globalTimeout: isCI ? 9 * 60_000 : 0,
   reporter: isCI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
+  // A laptop running every spec at once against `pnpm dev:e2e` streams a heavy page past 5 s now and
+  // then (the audit log, 23 Nov 2026); CI's runner keeps the default.
+  expect: { timeout: isCI ? 5_000 : 10_000 },
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: 'on-first-retry',
@@ -39,7 +47,9 @@ export default defineConfig({
     { name: 'desktop', testIgnore: FAULT_SPECS, use: DESKTOP },
     { name: 'mobile', testIgnore: FAULT_SPECS, use: MOBILE },
     { name: 'fault-desktop', testMatch: FAULT_SPECS, dependencies: ['desktop', 'mobile'], use: DESKTOP },
-    { name: 'fault-mobile', testMatch: FAULT_SPECS, dependencies: ['desktop', 'mobile'], use: MOBILE },
+    // After fault-desktop, not beside it: both age the same beat row, and one project's 10-min beat
+    // broke the other's "Heartbeat missed 2x min" (23 Nov 2026).
+    { name: 'fault-mobile', testMatch: FAULT_SPECS, dependencies: ['fault-desktop'], use: MOBILE },
   ],
   webServer: {
     // In CI run Next directly: behind `pnpm start` the Next process didn't exit when Playwright stopped

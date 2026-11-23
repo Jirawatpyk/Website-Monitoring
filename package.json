@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "pnpm --filter @dxt/web dev",
     "dev:agent": "pnpm --filter @dxt/vps-agent dev",
+    "dev:e2e": "node scripts/web-e2e-server.mjs",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",

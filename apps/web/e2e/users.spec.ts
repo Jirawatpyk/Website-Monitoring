@@ -1,8 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ensureUser, localSupabaseEnabled, setRole, signIn } from './support/local-supabase';
+import { ensurePerson, ensureUser, localSupabaseEnabled, setRole, signIn } from './support/local-supabase';
 
 // S16 (D-062): Settings › Users & roles. Local Supabase only (E2E_LOCAL_SUPABASE=1). Everything a test
-// changes it puts back (Mint goes back to Viewer, the invited address is removed again).
+// changes it puts back (its Viewer goes back to Viewer, the invited address is removed again). A role
+// change is made on a person of this spec's own, never a seeded one: Mint is the Viewer other specs sign
+// in as, and changing Mint's role beside them showed them "Account deactivated" (23 Nov 2026).
 test.describe('users & roles (local Supabase)', () => {
   test.skip(!localSupabaseEnabled, 'needs the local Supabase stack: E2E_LOCAL_SUPABASE=1');
 
@@ -50,8 +52,9 @@ test.describe('users & roles (local Supabase)', () => {
     baseURL,
   }, info) => {
     test.skip(info.project.name === 'mobile', 'view only on phones (§22.5)');
-    // A run that stopped half way may have left Mint a Stakeholder.
-    await setRole('mint@example.test', 'viewer');
+    const viewer = await ensurePerson('e2e-users-viewer@example.test', 'viewer');
+    // A run that stopped half way may have left them a Stakeholder.
+    await setRole('e2e-users-viewer@example.test', 'viewer');
     await ensureUser('tao@example.test');
     await signIn(context, baseURL!, 'tao@example.test');
     await page.goto('/settings/users');
@@ -67,28 +70,28 @@ test.describe('users & roles (local Supabase)', () => {
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toBeHidden();
 
-    // Mint (a Viewer, used nowhere) → Stakeholder saves, says it becomes the CEO, then goes back.
-    await rowMenu(page, 'Mint', 'Change role…');
-    const mint = page.getByRole('dialog', { name: 'Change Mint’s role' });
+    // A Viewer used nowhere → Stakeholder saves, says it becomes the CEO, then goes back.
+    await rowMenu(page, viewer.name, 'Change role…');
+    const mint = page.getByRole('dialog', { name: `Change ${viewer.name}’s role` });
     await choose(page, 'New role', 'Stakeholder');
     await expect(mint.getByText(/gets the CEO step on Tier 1 DOWN/)).toBeVisible();
     await mint.getByRole('button', { name: 'Change to Stakeholder' }).click();
     await expect(page.getByTestId('users-count')).toHaveText(
-      'Mint is now Stakeholder · reassignments applied · logged',
+      `${viewer.name} is now Stakeholder · reassignments applied · logged`,
     );
     // The refreshed row before reopening: the dialog starts from the role the page has.
     await expect(
-      page.getByRole('row', { name: /Mint/ }).getByText('Stakeholder', { exact: true }),
+      page.getByRole('row', { name: new RegExp(viewer.name) }).getByText('Stakeholder', { exact: true }),
     ).toBeVisible();
 
-    await rowMenu(page, 'Mint', 'Change role…');
+    await rowMenu(page, viewer.name, 'Change role…');
     await choose(page, 'New role', 'Viewer');
     await page
-      .getByRole('dialog', { name: 'Change Mint’s role' })
+      .getByRole('dialog', { name: `Change ${viewer.name}’s role` })
       .getByRole('button', { name: 'Change to Viewer' })
       .click();
     await expect(page.getByTestId('users-count')).toHaveText(
-      'Mint is now Viewer · reassignments applied · logged',
+      `${viewer.name} is now Viewer · reassignments applied · logged`,
     );
 
     await page.goto('/audit?cat=access&when=today');
