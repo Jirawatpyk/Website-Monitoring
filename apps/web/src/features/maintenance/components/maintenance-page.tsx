@@ -239,6 +239,9 @@ function columns(recent: boolean, open: Show, openSeries: ShowSeries): DataTable
     {
       key: 'site',
       label: 'Site',
+      // AURA's flexible-column minimum is 160 px: with Reason that made the row 1048 px, past 1280's
+      // 974 px box (it scrolled sideways, 23 Nov 2026); both wrap, so 112 each fits from xl
+      minWidth: 112,
       render: ({ item }) => {
         const p = fieldsOf(item);
         return (
@@ -271,6 +274,7 @@ function columns(recent: boolean, open: Show, openSeries: ShowSeries): DataTable
     {
       key: 'why',
       label: 'Reason',
+      minWidth: 112,
       render: ({ item }) => {
         const p = fieldsOf(item);
         return (

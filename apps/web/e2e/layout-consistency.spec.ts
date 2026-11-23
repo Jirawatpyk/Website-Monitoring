@@ -278,8 +278,9 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
   test.skip(({ isMobile }) => isMobile, 'widths are set inside the test');
 
   test('header rhythm, phone shell, touch targets, no sideways scroll', async ({ browser, baseURL }) => {
-    // every live page at three widths: well past the 30 s default once the focus-ring walk joined (S07)
-    test.setTimeout(120_000);
+    // every live page at four widths: well past the 30 s default once the focus-ring walk joined (S07);
+    // 1280 added a fourth pass (23 Nov 2026)
+    test.setTimeout(180_000);
     await ensureUser(ADMIN.email);
     // the longest copy the pages must fit: an incident left unacked for a day ("1 d 2 h unacked",
     // "since Thu 9 Oct 05:10") — the Overview's Live issues scrolled at 820 with one
