@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import type { PdfModel } from '../words';
-import { pdfPrinter } from './render';
+import { pdfPrinter, withTimeout } from './render';
 
 // The drafts cron prints every changed client in one browser (S20 code review); a failed launch or a
 // crashed browser must cost that one client only (advisor, S20).
@@ -60,5 +60,30 @@ describe('pdfPrinter', () => {
     const launch = vi.fn();
     await pdfPrinter({ launch, print: vi.fn() }).close();
     expect(launch).not.toHaveBeenCalled();
+  });
+
+  it('without reuse (Vercel) each print gets its own browser, closed after it', async () => {
+    const browsers: ReturnType<typeof fakeBrowser>[] = [];
+    const launch = vi.fn(async () => {
+      const b = fakeBrowser(browsers.length + 1);
+      browsers.push(b);
+      return b;
+    });
+    const p = pdfPrinter({ launch, print: async () => Buffer.from('%PDF-'), reuse: false });
+    await p.render(model);
+    await p.render(model);
+    expect(launch).toHaveBeenCalledTimes(2);
+    expect(browsers.map((b) => b.close.mock.calls.length)).toEqual([1, 1]);
+    await p.close();
+    expect(browsers.map((b) => b.close.mock.calls.length)).toEqual([1, 1]);
+  });
+});
+
+describe('withTimeout', () => {
+  it('passes a value through; a step that never answers fails with its name', async () => {
+    await expect(withTimeout(Promise.resolve(3), 50, 'x')).resolves.toBe(3);
+    await expect(withTimeout(new Promise(() => {}), 20, 'newPage')).rejects.toThrow(
+      'newPage timed out after 20 ms',
+    );
   });
 });

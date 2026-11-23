@@ -44,6 +44,20 @@ function head(): Promise<string> {
   return headCache;
 }
 
+/** A Chromium step that never answers fails after `ms` instead of hanging the whole run (production, 22 Nov). */
+export function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${what} timed out after ${ms} ms`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+const STEP_MS = 30_000;
+const CLOSE_MS = 10_000;
+
 async function launch() {
   const { chromium } = await import('playwright-core');
   if (process.env.VERCEL) {
@@ -56,31 +70,39 @@ async function launch() {
 type Browser = Awaited<ReturnType<typeof launch>>;
 
 /** One report printed in an open browser: its own context, JavaScript off, every request but data: refused. */
-async function printIn(browser: Browser, model: PdfModel): Promise<Buffer> {
+export async function printIn(browser: Browser, model: PdfModel): Promise<Buffer> {
   const html = reportDocument(model, await head());
-  const context = await browser.newContext({ javaScriptEnabled: false, colorScheme: 'light' });
+  const context = await withTimeout(
+    browser.newContext({ javaScriptEnabled: false, colorScheme: 'light' }),
+    STEP_MS,
+    'newContext',
+  );
   try {
     await context.route('**/*', (route) =>
       route.request().url().startsWith('data:') ? route.continue() : route.abort(),
     );
-    const page = await context.newPage();
+    const page = await withTimeout(context.newPage(), STEP_MS, 'newPage');
     await page.setContent(html, { waitUntil: 'load', timeout: 20_000 });
     // Chromium's header/footer templates are separate documents that can't read the page's CSS
     // variables; #52525b = zinc-600 = --aura-fg-secondary
     // eslint-disable-next-line aura/no-hardcoded-color -- see above
     const muted = '#52525b';
     const small = `font-family:Inter,sans-serif;font-size:8px;color:${muted};width:100%;padding:0 15mm;`;
-    return await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      displayHeaderFooter: true,
-      // the header strip is in the page (document.ts); the footer template holds only digits and words in Latin
-      headerTemplate: '<span></span>',
-      footerTemplate: `<div style="${small}text-align:right">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
-      margin: { top: '13mm', bottom: '18mm', left: '15mm', right: '15mm' },
-    });
+    return await withTimeout(
+      page.pdf({
+        format: 'A4',
+        printBackground: true,
+        displayHeaderFooter: true,
+        // the header strip is in the page (document.ts); the footer template holds only digits and words in Latin
+        headerTemplate: '<span></span>',
+        footerTemplate: `<div style="${small}text-align:right">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
+        margin: { top: '13mm', bottom: '18mm', left: '15mm', right: '15mm' },
+      }),
+      STEP_MS,
+      'pdf',
+    );
   } finally {
-    await context.close();
+    await withTimeout(context.close(), CLOSE_MS, 'close context').catch(() => {});
   }
 }
 
@@ -90,7 +112,7 @@ export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
   try {
     return await printIn(browser, model);
   } finally {
-    await browser.close();
+    await withTimeout(browser.close(), CLOSE_MS, 'close browser').catch(() => {});
   }
 }
 
@@ -98,30 +120,41 @@ export async function renderReportPdf(model: PdfModel): Promise<Buffer> {
 export interface PrinterDeps<B extends { close: () => Promise<void> }> {
   launch: () => Promise<B>;
   print: (browser: B, model: PdfModel) => Promise<Buffer>;
+  /**
+   * Keep one browser for every print. Off on Vercel: `@sparticuz/chromium` runs Chromium with
+   * `--single-process`, where a second page in the same browser never opens (production, 22 Nov:
+   * one draft made, then the run hung to its 300 s limit).
+   */
+  reuse?: boolean;
 }
 
 /**
- * For many reports in one run (the drafts cron): Chromium starts on the first print, not before — a run
- * where nothing changed launches nothing — and every print reuses it until `close`. A failed launch or
- * print drops that browser, so the next client starts a fresh one instead of failing too (advisor, S20).
+ * For many reports in one run (the drafts cron). Locally one browser serves every print; on Vercel each
+ * print gets its own. Nothing launches until a print. A failed launch or print (a step past its
+ * deadline too) drops that browser, so the next client starts a fresh one instead of failing too.
  */
 export function pdfPrinter<B extends { close: () => Promise<void> } = Browser>(
-  deps: PrinterDeps<B> = { launch, print: printIn } as unknown as PrinterDeps<B>,
+  deps: PrinterDeps<B> = { launch, print: printIn, reuse: !process.env.VERCEL } as unknown as PrinterDeps<B>,
 ): { render: (model: PdfModel) => Promise<Buffer>; close: () => Promise<void> } {
+  const reuse = deps.reuse ?? true;
   let browser: Promise<B> | null = null;
   const drop = async () => {
     const was = browser;
     browser = null;
-    await (await was?.catch(() => null))?.close().catch(() => {});
+    const b = await was?.catch(() => null);
+    // a browser that hung may never close either: bounded, so the run goes on
+    if (b) await withTimeout(b.close(), CLOSE_MS, 'close browser').catch(() => {});
   };
   return {
     render: async (model) => {
-      const current = (browser ??= deps.launch());
+      const current = (browser ??= withTimeout(deps.launch(), STEP_MS, 'launch'));
       try {
         return await deps.print(await current, model);
       } catch (err) {
         if (browser === current) await drop();
         throw err;
+      } finally {
+        if (!reuse && browser === current) await drop();
       }
     },
     close: drop,

@@ -13,7 +13,7 @@ export const maxDuration = 300;
 export const GET = cronHandler(() =>
   runCronJob('report-drafts', serverEnv().HEALTHCHECKS_PING_URL_REPORT_DRAFTS, () =>
     (async () => {
-      // one Chromium for every changed client, started only if one changed (code review S20)
+      // a Chromium only if a client changed; one per PDF on Vercel (--single-process), each step with a deadline
       const printer = pdfPrinter();
       try {
         return await runReportDrafts(serviceDb(), new Date(), printer.render);
