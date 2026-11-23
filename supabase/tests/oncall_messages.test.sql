@@ -97,8 +97,13 @@ select is(pg_temp.chat_people('swap_withdrawn'), (select i.name from ids i where
   'withdrawn: the person asked');
 
 -- ── Hand over ───────────────────────────────────────────────────────────
+-- the hand-over falls inside the live shift: before 09:00 on a Monday it ends in under an hour
+create temp table ho (at timestamptz, ends timestamptz) on commit drop;
+grant select on ho to authenticated, service_role;
+insert into ho select now() + least(interval '1 hour', (s.ends_at - now()) / 2), s.ends_at
+  from public.oncall_shifts s where s.id = (select id from wk where n = 1);
 select tests.authenticate_as(pg_temp.uid('tao'));
-select public.hand_over_oncall_shift((select id from wk where n = 1), pg_temp.uid('nok'), now() + interval '1 hour', 'Ploy is ill tonight');
+select public.hand_over_oncall_shift((select id from wk where n = 1), pg_temp.uid('nok'), (select at from ho), 'Ploy is ill tonight');
 reset role;
 select is(pg_temp.chat_people('handed_over'), 'nok:new ploy:previous', 'a hand-over: the new person and the one who had it');
 select is(pg_temp.emailed('handed_over'), 'nok ploy', 'both emailed');
