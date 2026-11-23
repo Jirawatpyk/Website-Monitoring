@@ -120,6 +120,11 @@ reset role;
 select is((select status from public.oncall_swaps where id = (select id from sw)), 'withdrawn', 'withdrawn');
 
 -- ── Hand over the live shift ─────────────────────────────────────────────
+-- the hand-over falls inside the live shift: before 09:00 on a Monday it ends in under an hour
+create temp table ho (at timestamptz, ends timestamptz) on commit drop;
+grant select on ho to authenticated, service_role;
+insert into ho select now() + least(interval '1 hour', (s.ends_at - now()) / 2), s.ends_at
+  from public.oncall_shifts s where s.id = (select id from wk where n = 1);
 select tests.authenticate_as((select id from ids where name = 'ploy'));
 select throws_ok($$ select public.hand_over_oncall_shift((select id from wk where n = 1), (select id from ids where name = 'nok'), now(), 'Sick') $$,
   '42501', null, 'only an Admin hands a shift over');
@@ -127,11 +132,11 @@ reset role;
 select tests.authenticate_as((select id from ids where name = 'tao'));
 select throws_ok($$ select public.hand_over_oncall_shift((select id from wk where n = 1), (select id from ids where name = 'nok'), now(), ' ') $$,
   '22023', 'Add a short reason — both of them see it', 'a reason is required');
-select lives_ok($$ select public.hand_over_oncall_shift((select id from wk where n = 1), (select id from ids where name = 'nok'), now() + interval '1 hour', 'Ploy is sick') $$,
-  'the Admin hands the live shift to Nok from an hour from now');
+select lives_ok($$ select public.hand_over_oncall_shift((select id from wk where n = 1), (select id from ids where name = 'nok'), (select at from ho), 'Ploy is sick') $$,
+  'the Admin hands the live shift to Nok from an hour from now (or sooner, before it ends)');
 reset role;
-select is(public.oncall_person_at(now() + interval '2 hours'), (select id from ids where name = 'nok'), 'Nok has it from then');
-select is(public.oncall_person_at(now() + interval '30 minutes'), (select id from ids where name = 'ploy'), 'Ploy until then');
+select is(public.oncall_person_at((select at + (ends - at) / 2 from ho)), (select id from ids where name = 'nok'), 'Nok has it from then');
+select is(public.oncall_person_at((select now() + (at - now()) / 2 from ho)), (select id from ids where name = 'ploy'), 'Ploy until then');
 
 -- ── Checklist and test link ──────────────────────────────────────────────
 select tests.authenticate_as((select id from ids where name = 'ploy'));
