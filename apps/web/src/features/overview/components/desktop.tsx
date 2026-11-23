@@ -352,7 +352,7 @@ export function LiveIssuesTable({
     <section
       aria-labelledby={`${LIVE_ISSUES_ID}-title`}
       id={LIVE_ISSUES_ID}
-      className="flex scroll-mt-4 flex-col gap-3"
+      className="@container flex scroll-mt-4 flex-col gap-3"
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -387,7 +387,9 @@ export function LiveIssuesTable({
               <Th>Since</Th>
               <Th className="max-xl:hidden">Owner</Th>
               <Th>BKK SIN TYO</Th>
-              <Th className="max-xl:hidden">Response 24h</Th>
+              {/* hidden while the table is under 64rem (1280, no board): with a day-old incident's longer
+                  copy the row needed 1013 px of 974 (CI, 23 Nov 2026); 1440 keeps it as drawn */}
+              <Th className="max-xl:hidden @max-5xl:hidden">Response 24h</Th>
               <Th align="end">Next step</Th>
             </Tr>
           </THead>
@@ -471,7 +473,7 @@ export function LiveIssuesTable({
                   <Td>
                     <GlyphRow locations={site.locations} />
                   </Td>
-                  <Td className="whitespace-nowrap max-xl:hidden">
+                  <Td className="whitespace-nowrap max-xl:hidden @max-5xl:hidden">
                     <ResponseCell site={site} />
                   </Td>
                   <Td align="end">
