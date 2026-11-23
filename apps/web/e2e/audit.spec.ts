@@ -16,7 +16,9 @@ test.describe('audit log (local Supabase)', () => {
     await page.goto('/audit?when=all');
     await expect(page.getByRole('heading', { name: 'Audit log', level: 1 })).toBeAttached();
     // A longer range alone narrows nothing inside it: no "filtered from" yet (spec-checker L4).
-    await expect(page.getByText(/entr(y|ies) · all time/)).toBeVisible();
+    // The page streams the newest 500 rows while every other spec writes audit rows: on a busy laptop
+    // the first paint took past 10 s (23 Nov 2026).
+    await expect(page.getByText(/entr(y|ies) · all time/)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/filtered from/)).toHaveCount(0);
 
     if (info.project.name === 'mobile') {
@@ -25,9 +27,12 @@ test.describe('audit log (local Supabase)', () => {
       await page.locator('select.aura-select__native').first().selectOption({ label: 'Maintenance & mute' });
     } else await page.getByRole('radio', { name: 'Maintenance & mute' }).click();
     await expect(page).toHaveURL(/cat=maintenance/);
-    const count = page.getByText(/^\d[\d,]* entr(y|ies) · all time/);
-    await expect(count).toBeVisible();
-    const shown = Number((await count.textContent())!.match(/^([\d,]+)/)![1]!.replace(/,/g, ''));
+    // "No entries" when no maintenance spec has run yet (a fresh `db:reset`: this spec ran first and
+    // failed on "No entries · all time · filtered from 99", 23 Nov 2026)
+    const count = page.getByText(/^(No|\d[\d,]*) entr(y|ies) · all time/);
+    await expect(count).toBeVisible({ timeout: 20_000 }); // the filtered page streams again
+    const head = (await count.textContent())!.match(/^(No|[\d,]+)/)![1]!;
+    const shown = head === 'No' ? 0 : Number(head.replace(/,/g, ''));
     await expect(
       page.getByRole('link', { name: `Export ${shown} ${shown === 1 ? 'row' : 'rows'}` }),
     ).toBeVisible();
@@ -52,7 +57,8 @@ test.describe('audit log (local Supabase)', () => {
     // Every exported row is in the category, and there are as many as the page counts.
     const actions = lines.slice(1).map((l) => l.split(',')[2]);
     expect(actions.every((a) => /^(maintenance\.|site\.mute)/.test(a ?? ''))).toBe(true);
-    expect(lines.length - 1).toBe(shown);
+    // at least what the page counted: maintenance specs running beside this one may add rows in between
+    expect(lines.length - 1).toBeGreaterThanOrEqual(shown);
 
     await page.getByRole('button', { name: 'Clear filters' }).first().click();
     await expect(page).toHaveURL(/\/audit$/);
@@ -62,7 +68,7 @@ test.describe('audit log (local Supabase)', () => {
     await ensureUser('arm@example.test');
     await signIn(context, baseURL!, 'arm@example.test');
     await page.goto('/audit');
-    await expect(page.getByText('Only Admins can see the audit log')).toBeVisible();
+    await expect(page.getByText('Only Admins can see the audit log')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('table')).toHaveCount(0);
     const res = await page.request.get('/audit/export');
     expect(res.status()).toBe(403);

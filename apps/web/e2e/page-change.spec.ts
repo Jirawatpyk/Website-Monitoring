@@ -66,10 +66,14 @@ test.describe('page change (local Supabase)', () => {
       await dialog.getByLabel('Reason').fill('Client added the partner script (ticket 4821)');
       await confirm.click();
       // the action re-renders the page (revalidatePath): slow under next dev
-      await expect(page.getByText('Accepting as the new baseline').first()).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByText('Accepting as the new baseline').filter({ visible: true }).first(),
+      ).toBeVisible({ timeout: 20_000 });
       await page.getByRole('button', { name: /^Undo · \d+ s$/ }).click();
       // The card, the toast and the timeline can all say it at once (main CI 16 Oct: 3 matches).
-      await expect(page.getByText('Undone — the baseline is unchanged').first()).toBeVisible();
+      await expect(
+        page.getByText('Undone — the baseline is unchanged').filter({ visible: true }).first(),
+      ).toBeVisible();
       expect(await baselineAudit(monitorId)).toEqual([
         'page_baseline.auto',
         'page_baseline.accept',
@@ -81,7 +85,9 @@ test.describe('page change (local Supabase)', () => {
       await dialog.getByLabel('Reason').fill('Client added the partner script (ticket 4821)');
       await dialog.getByRole('button', { name: 'Accept as baseline' }).click();
       // the action re-renders the page (revalidatePath): slow under next dev
-      await expect(page.getByText('Accepting as the new baseline').first()).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByText('Accepting as the new baseline').filter({ visible: true }).first(),
+      ).toBeVisible({ timeout: 20_000 });
       await expect
         .poll(() => baselineAudit(monitorId))
         .toEqual([

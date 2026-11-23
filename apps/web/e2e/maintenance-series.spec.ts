@@ -7,6 +7,8 @@ import { ensureUser, localSupabaseEnabled, openTestIncident, signIn, siteOf } fr
 test.describe('repeating maintenance (local Supabase)', () => {
   test.skip(!localSupabaseEnabled, 'needs the local Supabase stack: E2E_LOCAL_SUPABASE=1');
 
+  test.describe.configure({ timeout: 75_000 });
+
   test('an Admin schedules a weekly series; Cancel series → Undo', async ({
     page,
     context,
@@ -98,7 +100,12 @@ test.describe('repeating maintenance (local Supabase)', () => {
       page.getByText(new RegExp(`^${site.name} series cancelled · \\d+ windows? cancelled$`)),
     ).toBeVisible();
     await page.getByRole('button', { name: /^Undo · \d+ s$/ }).click();
-    await expect(page.getByText(`${site.name} series cancelled — undone`)).toBeVisible();
+    const undone = page.getByText(`${site.name} series cancelled — undone`);
+    await expect(undone).toBeVisible();
+    // the toast sits over the next dialog's buttons until it goes (it intercepted the click, 23 Nov 2026);
+    // the pointer left on it (Undo was pressed there) pauses its timer, so move away first
+    await page.mouse.move(0, 0);
+    await expect(undone).toBeHidden({ timeout: 15_000 });
     await expect(
       (info.project.name === 'mobile'
         ? series.getByRole('button', { name: new RegExp(site.name) })
@@ -155,7 +162,10 @@ test.describe('repeating maintenance (local Supabase)', () => {
     await expect(confirm.getByText(/^Windows are created 14 days ahead — the first \d now: /)).toBeVisible();
     await confirm.getByRole('button', { name: 'Approve series' }).click();
     await admin.getByRole('button', { name: /^Undo · \d+ s$/ }).click();
-    await expect(admin.getByText(`${site.name} series approval undone`)).toBeVisible();
+    const undone = admin.getByText(`${site.name} series approval undone`);
+    await expect(undone).toBeVisible();
+    await admin.mouse.move(0, 0); // off the toast, whose timer a pointer on it pauses
+    await expect(undone).toBeHidden({ timeout: 15_000 }); // it covers the confirm's buttons till then
     await expect(row.getByRole('button', { name: 'Approve' })).toBeVisible();
     await row.getByRole('button', { name: 'Approve' }).click();
     await confirm.getByRole('button', { name: 'Approve series' }).click();

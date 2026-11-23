@@ -47,7 +47,9 @@ export default defineConfig({
     { name: 'desktop', testIgnore: FAULT_SPECS, use: DESKTOP },
     { name: 'mobile', testIgnore: FAULT_SPECS, use: MOBILE },
     { name: 'fault-desktop', testMatch: FAULT_SPECS, dependencies: ['desktop', 'mobile'], use: DESKTOP },
-    { name: 'fault-mobile', testMatch: FAULT_SPECS, dependencies: ['desktop', 'mobile'], use: MOBILE },
+    // After fault-desktop, not beside it: both age the same beat row, and one project's 10-min beat
+    // broke the other's "Heartbeat missed 2x min" (23 Nov 2026).
+    { name: 'fault-mobile', testMatch: FAULT_SPECS, dependencies: ['fault-desktop'], use: MOBILE },
   ],
   webServer: {
     // In CI run Next directly: behind `pnpm start` the Next process didn't exit when Playwright stopped
