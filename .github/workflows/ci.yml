@@ -45,6 +45,12 @@ jobs:
           restore-keys: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm build
       - run: pnpm --filter @dxt/web exec playwright install --with-deps chromium
+      # the monthly PDF printed by the real Chromium, also with Vercel's flags (--single-process):
+      # a second page in one browser hung production's drafts run on 22 Nov 2026
+      - run: pnpm --filter @dxt/web exec vitest run src/features/reports/pdf/render.smoke.test.ts
+        env:
+          PDF_SMOKE: '1'
+        timeout-minutes: 4
       - run: pnpm test:e2e
         timeout-minutes: 8
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
