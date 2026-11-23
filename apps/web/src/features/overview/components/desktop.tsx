@@ -402,8 +402,10 @@ export function LiveIssuesTable({
                   key={site.id}
                   className="relative hover:bg-bg-surface-hover has-[a.overview-row:focus-visible]:outline-2 has-[a.overview-row:focus-visible]:-outline-offset-2 has-[a.overview-row:focus-visible]:outline-focus-ring"
                 >
-                  {/* 14rem at 820 (Owner and Response hidden); 11rem from xl so Site · why keeps its room */}
-                  <Td className="min-w-56 xl:min-w-44">
+                  {/* 14rem at 820 (Owner and Response hidden); 9rem from xl (the badge + incident link
+                      need ~8.5) so Site · why keeps its room at 1280 (it was squeezed to 104 px and the
+                      table scrolled 6–11 px, 23 Nov 2026) */}
+                  <Td className="min-w-56 xl:min-w-36">
                     <span className="flex flex-col items-start gap-1">
                       {site.status ? (
                         <SiteStatusBadge status={site.status} />
@@ -455,7 +457,7 @@ export function LiveIssuesTable({
                       <span className="text-fg-secondary">—</span>
                     )}
                   </Td>
-                  <Td className="w-44 min-w-44 max-xl:hidden">
+                  <Td className="w-36 min-w-36 max-xl:hidden">
                     {site.ownerName ? (
                       <span className="flex items-center gap-2">
                         <Avatar name={site.ownerName} size="sm" />

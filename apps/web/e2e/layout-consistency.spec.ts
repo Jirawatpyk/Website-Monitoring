@@ -9,7 +9,8 @@ import {
 } from './support/local-supabase';
 
 /**
- * Rules every signed-in page shares, measured in the browser at 390 / 820 / 1440 — the things a
+ * Rules every signed-in page shares, measured in the browser at 390 / 820 / 1280 / 1440 (1280 = xl,
+ * where xl tables are narrowest: Overview and Reports scrolled there, 22 Nov 2026) — the things a
  * per-board review misses because they live across pages (docs/retro.md, 7 Oct 2026):
  * - page header rhythm (D-018): 4 px between breadcrumb or eyebrow, title and meta line (all inside
  *   AURA PageHeader's text block since 5.33's breadcrumb slot);
@@ -24,7 +25,7 @@ import {
  * Signs in as the seeded Admin to see every page. Local Supabase only (E2E_LOCAL_SUPABASE=1).
  */
 const ADMIN = { email: 'tao@example.test', name: 'Tao' };
-const WIDTHS = [390, 820, 1440] as const;
+const WIDTHS = [390, 820, 1280, 1440] as const;
 const LG = 1024;
 const MD = 768;
 const GAP = 4;
@@ -277,8 +278,9 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
   test.skip(({ isMobile }) => isMobile, 'widths are set inside the test');
 
   test('header rhythm, phone shell, touch targets, no sideways scroll', async ({ browser, baseURL }) => {
-    // every live page at three widths: well past the 30 s default once the focus-ring walk joined (S07)
-    test.setTimeout(120_000);
+    // every live page at four widths: well past the 30 s default once the focus-ring walk joined (S07);
+    // 1280 added a fourth pass (23 Nov 2026)
+    test.setTimeout(180_000);
     await ensureUser(ADMIN.email);
     // the longest copy the pages must fit: an incident left unacked for a day ("1 d 2 h unacked",
     // "since Thu 9 Oct 05:10") — the Overview's Live issues scrolled at 820 with one
