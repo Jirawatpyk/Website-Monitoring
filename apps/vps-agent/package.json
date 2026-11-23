@@ -17,7 +17,7 @@
     "@dxt/probe": "workspace:*",
     "@dxt/shared": "workspace:*",
     "playwright": "1.64.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
