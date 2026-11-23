@@ -306,9 +306,21 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
 
     for (const width of WIDTHS) {
       const page = await signedInAt(browser, baseURL!, width);
+      // No page calls a route handler by itself: next/link prefetches in a production build (CI runs
+      // `next start`), and S20's PDF links printed a PDF per row on every view until they became plain
+      // anchors (`linkComponent="a"`, retro 22 Nov 2026). Exports and PDFs answer only a click.
+      const origin = new URL(baseURL!).origin;
+      let current = '';
+      const handlerCalls: string[] = [];
+      page.on('request', (r) => {
+        const u = new URL(r.url());
+        if (u.origin === origin && /^\/api\/|\.(csv|pdf)$|\/export$/.test(u.pathname))
+          handlerCalls.push(`${u.pathname} (on ${current})`);
+      });
 
       for (const path of pages) {
         await test.step(`${path} at ${width} px`, async () => {
+          current = path;
           await page.goto(path);
           // Every page keeps its h1; below lg most show their title in the top bar instead (D-045).
           await expect(page.locator('main h1')).toBeAttached();
@@ -359,6 +371,7 @@ test.describe('layout consistency on every live page (local Supabase)', () => {
           }
         });
       }
+      expect(handlerCalls, `no page calls a route handler by itself (prefetch) at ${width} px`).toEqual([]);
       await page.context().close();
     }
   });
