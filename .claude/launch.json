@@ -22,6 +22,12 @@
       }
     },
     {
+      "name": "web-local-e2e",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:e2e"],
+      "port": 3500
+    },
+    {
       "name": "web-local-cron",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@dxt/web", "dev"],
