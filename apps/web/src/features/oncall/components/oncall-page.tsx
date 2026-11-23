@@ -285,7 +285,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
             onDecline={() => show({ kind: 'decline', phone: true })}
           />
         )}
-        <div className="flex flex-col gap-1.5 rounded-aura-card bg-bg-surface-strong px-4.5 py-3.5 text-fg-inverted">
+        <div className="flex flex-col gap-1.5 rounded-aura-card-radius bg-bg-surface-strong px-4.5 py-3.5 text-fg-inverted">
           <span className="font-mono text-xs opacity-70">{hero.phoneEyebrow}</span>
           <span className="font-display text-2xl leading-tight font-semibold">{hero.phoneTitle}</span>
           <span className="text-sm opacity-80">{hero.phoneText}</span>
@@ -351,7 +351,7 @@ export function OncallPageView({ data, testToken }: { data: OncallData; testToke
 
 function DesktopHero({ hero, now }: { hero: ReturnType<typeof heroOf>; now: Date }) {
   return (
-    <div className="col-span-2 flex items-center gap-5 rounded-aura-card bg-bg-surface-strong p-6 text-fg-inverted">
+    <div className="col-span-2 flex items-center gap-5 rounded-aura-card-radius bg-bg-surface-strong p-6 text-fg-inverted">
       {hero.avatar ? (
         <Avatar name={hero.avatar} size="lg" />
       ) : (

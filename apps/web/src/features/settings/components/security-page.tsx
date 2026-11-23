@@ -304,7 +304,7 @@ function EventsCard({ events }: { events: SigninEvent[] }) {
           title="Recent sign-in events"
           headingLevel={2}
           actions={
-            <Link href="/audit?cat=access" className="inline-flex min-h-11 items-center text-sm text-fg-link">
+            <Link href="/audit?cat=access" className="inline-flex min-h-11 items-center text-sm">
               Audit log
             </Link>
           }
@@ -367,10 +367,7 @@ function PeopleCards({ data, rows, now }: { data: SecurityData; rows: SecurityRo
             <IconEye size="sm" aria-hidden className="mt-0.5" />
             <span>
               Signing someone out happens on a larger screen. Your own devices:{' '}
-              <Link href="/profile" className="text-fg-link">
-                My profile
-              </Link>
-              .
+              <Link href="/profile">My profile</Link>.
             </span>
           </span>
           <Button variant="secondary" fullWidth onClick={() => setOpen(null)}>
