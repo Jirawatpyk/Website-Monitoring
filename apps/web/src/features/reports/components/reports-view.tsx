@@ -93,7 +93,7 @@ function RuleNote() {
             aria-expanded={open}
             aria-controls={id}
             onClick={() => setOpen((o) => !o)}
-            className="min-h-11 min-w-11 shrink-0 rounded-aura-sm px-1 font-medium text-fg-link hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            className="min-h-11 min-w-11 shrink-0 rounded-aura-sm px-1 font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             {open ? 'Less' : 'More'}
           </button>

@@ -53,6 +53,8 @@ export default tseslint.config(
     rules: {
       'dxt/feature-boundaries': 'error',
       'dxt/no-hardcoded-design-values': 'error',
+      // an AURA-looking class names a token that exists (S17 PR 3a: bg-bg-subtle emitted nothing)
+      'dxt/known-aura-token-classes': 'error',
       // Icons as components from @jirawatpyk/aura-react/icons (AURA 6.0 drops the string map;
       // docs/design/aura.md). S02b slipped string names past review.
       'no-restricted-syntax': [
