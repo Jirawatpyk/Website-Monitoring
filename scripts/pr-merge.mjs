@@ -57,10 +57,13 @@ export function deployVerdict({
   // migrate-production runs on every push to main (it needs `check` and `db`), so `skipped` means those
   // never passed — on 14 Oct GitHub didn't start them (billing) while Vercel deployed anyway, and this
   // said "production is live" with no migration run. Production counts only once the migration ran.
+  // Vercel deploys `main` whatever CI says: say whether the new code is live, or this reads as "nothing
+  // deployed" when it did (23 Nov, #226: live from the merge, only the migration skipped).
   if (migrate?.status === 'completed' && migrate.conclusion === 'skipped') {
+    const live = deployments[0]?.state === 'READY' && deployments[0].aliasAssigned;
     return {
       kind: 'failed',
-      why: "migrate-production didn't run: check / db on main failed or never started (Actions billing?). Fix that, re-run the main workflow, and check migrate-production succeeds",
+      why: `${live ? `Vercel put it live (https://${deployments[0].url}), but ` : ''}migrate-production didn't run: check / db on main failed or never started (Actions billing?)${live ? ' — the new code runs on the old schema until it does' : ''}. Fix that, re-run the main workflow, and check migrate-production succeeds`,
     };
   }
   if (migrate?.status === 'completed' && !['success', 'neutral'].includes(migrate.conclusion)) {
@@ -285,7 +288,7 @@ async function waitForProduction(number, web) {
       );
     }
     if (v.kind === 'failed') {
-      console.error(`pr:merge — merged, but production did NOT deploy: ${v.why}`);
+      console.error(`pr:merge — merged, but production isn't right: ${v.why}`);
       if (!/Build it from git/.test(v.why))
         console.error('  Redeploy: vercel --scope <team> redeploy <deployment url> --target production');
       process.exit(1);
