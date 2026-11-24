@@ -44,6 +44,7 @@
 | G2 | **Team go-live gate** | 2 | — | — | S19 | end 5 + run (≈ 18–20 Nov; re-baselined 21 Nov: ≈ Fri 27 Nov, D-071) | Todo |
 | S20 | Uptime reports & monthly PDF | 3 · P2 | L | FR-15 | G2 (waived, D-072) | 6 | Done |
 | S20b | Client report sending | 3 · P2 | M | FR-15 | S20, G2 | 7 | Todo |
+| S20c | PROBLEM ladder restarts from L0 on a new cause | 3 · P1 | M | — | S13 | 7 | Todo |
 | S21 | Client status page | 3 · P2 | L | FR-16 | S20 | 7 | Todo |
 | S22 | Post-incident review | 3 · P2 | M | FR-18 | G2 | 8 | Todo |
 | S23 | Synthetic transactions | 3 · P2 | L | FR-17 | G2 | 8–9 | Todo |
@@ -827,6 +828,24 @@ Re-measure after S06 / S06b (the first slices heavy on screens) and adjust if sc
   3. spec-checker passes Reports and MReports in their S20b state.
 - **Guide (D-070):** the "Reports & client status page" topic and the role matrix's "Send client reports" row.
 - **Review:** security-reviewer (outbound email to clients, contacts), message-checker, spec-checker.
+
+### S20c · PROBLEM ladder restarts from L0 on a new cause
+
+- **Scope:** follow-up to S13 PR 2 (D-067). Today a more urgent PROBLEM on an incident open for an SSL / domain expiry takes it as its new cause, sets aside the expiry ack (`expiry_ack_at` / `expiry_ack_by`) and keeps the ladder at its level: a backup already paged at L1 for the expiry isn't paged again for the new cause, and the Escalation card still shows that L1 as Sent. Tao decided on 18 Nov 2026 that the PROBLEM ladder restarts from L0 and pages L1 again; it was split out of S13 because the step accounting must understand a restart.
+  - **What blocks a plain reset** (engine-reviewer): resetting `escalation_level = 0` and `alerted_at` doesn't re-page L1.
+    - `engine_fire_step` (latest in `20261029070216_escalation_fyi_after_ack.sql`) counts `v_told` from every `step_fired` of the same severity, not only those after the restart.
+    - The step's Chat row (dedupe key `<severity>:L<n>`) collides with the earlier L1 in `notifications_once_per_incident`.
+    - `escalation-card.ts` reads the old L1 as Sent.
+  - **PROBLEM only:** on a DOWN incident a reset would drop the carried DOWN minutes (`ladderClockOf`, `clientUpdateDueAt`).
+  - **Before the expiries:** on 24 Nov three SSL certificates are under 60 days (WeCare Studio, ORCA Thailand, Cando Asia); land this before one reaches the 14-day PROBLEM.
+- **Boards:** none of its own (the Incident board's Escalation card, ChatAlert's ESCALATED / new-cause lines).
+- **Depends on:** S13 (Done). Not on G2: it changes internal escalation only.
+- **Done when:**
+  1. A new migration (the S13 one is never edited) restarts a PROBLEM incident's ladder on a new cause; pgTAP: an SSL incident with a sent L1, acked, then a new cause → `engine_fire_step(L1, alerted_at + 60 s)` gives the backup a fresh step, under a key that doesn't collide with the first.
+  2. Table-driven engine tests: a restart on a PROBLEM incident pages L1 again after its delay; a DOWN incident's ladder clock and client-update due time are unchanged.
+  3. The Escalation card shows the restarted ladder (the earlier L1 kept in the history), and the Chat / email wording passes message-checker.
+  4. D-067 records the restart (amended), with the 18 Nov date.
+- **Review:** engine-reviewer, message-checker, db-reviewer (the migration).
 
 ### S21 · Client status page
 
