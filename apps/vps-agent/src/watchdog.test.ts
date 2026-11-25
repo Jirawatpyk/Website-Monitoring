@@ -106,4 +106,30 @@ describe('createWatchdog (S12a, D-053)', () => {
     expect(await dog.tick(min(6))).toBe('fault');
     expect(post).toHaveBeenCalledTimes(1);
   });
+
+  it('refused (403, 25 Nov: Vercel’s firewall denied the VPS): blocked, nobody paged (D-074)', async () => {
+    const { post, dog } = setup();
+    dog.contact({ at: min(0), engineSweepAt: iso(min(0)), onCall: ploy });
+    for (const m of [1, 2, 3, 4, 5]) dog.refused(min(m));
+    expect(await dog.tick(min(5))).toBe('blocked');
+    dog.refused(min(30));
+    expect(await dog.tick(min(30))).toBe('blocked'); // still refused half an hour on: still nobody paged
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('refusals stop and nothing answers for 3 min: unreachable again, one MONITOR FAULT', async () => {
+    const { post, dog } = setup();
+    dog.contact({ at: min(0), engineSweepAt: iso(min(0)), onCall: ploy });
+    dog.refused(min(1));
+    expect(await dog.tick(min(3))).toBe('blocked');
+    expect(await dog.tick(min(4) + 1)).toBe('posted'); // the last refusal is 3 min old: a real gap
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  it('a stale sweep the app still reports is a fault, refusals or not', async () => {
+    const { post, dog } = setup();
+    for (const m of [0, 1, 2, 3]) dog.contact({ at: min(m), engineSweepAt: iso(T0), onCall: ploy });
+    expect(await dog.tick(min(3))).toBe('posted');
+    expect(post).toHaveBeenCalledTimes(1);
+  });
 });

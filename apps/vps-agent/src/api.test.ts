@@ -158,4 +158,12 @@ describe('ping (Healthchecks)', () => {
       ),
     ).resolves.toBeUndefined();
   });
+
+  it('a 403 from GET /api/ingest tells the watchdog the app refused this VPS (D-074)', async () => {
+    const fetchImpl = vi.fn(async () => new Response('Forbidden', { status: 403 }));
+    const onRefused = vi.fn();
+    const api = createApi('https://monitor.example.test', TOKEN, fetchImpl, undefined, onRefused);
+    await expect(api.dueMonitors()).rejects.toThrow('/api/ingest answered 403');
+    expect(onRefused).toHaveBeenCalledTimes(1);
+  });
 });

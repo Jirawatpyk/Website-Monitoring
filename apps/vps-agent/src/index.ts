@@ -1,8 +1,8 @@
-import { createApi } from './api';
+import { ApiError, createApi } from './api';
 import { launchBrowser } from './browser';
 import { loadConfig } from './config';
 import { ping } from './healthchecks';
-import { runProbeRound, untilNextTick } from './probe-loop';
+import { pollDelay, runProbeRound, untilNextTick } from './probe-loop';
 import { createVerifierPool } from './verifier';
 import { createWatchdog } from './watchdog';
 import { postChatMessage } from '@dxt/notifier';
@@ -50,7 +50,13 @@ async function main() {
       return res.ok;
     },
   });
-  const api = createApi(config.API_BASE_URL, config.INGEST_TOKEN, fetch, (c) => watchdog.contact(c));
+  const api = createApi(
+    config.API_BASE_URL,
+    config.INGEST_TOKEN,
+    fetch,
+    (c) => watchdog.contact(c),
+    (at) => watchdog.refused(at),
+  );
   const value = config.PROBE_SECRET_HEADER_VALUE;
   const secretHeader = value ? { name: config.PROBE_SECRET_HEADER_NAME, value } : undefined;
   const browser = await launchBrowser();
@@ -79,7 +85,9 @@ async function main() {
       }
       // The watchdog judges after every round, whatever the round did (S12a).
       const watch = await watchdog.tick(Date.now());
-      if (watch !== 'ok') console.warn(JSON.stringify({ event: 'monitor_fault', outcome: watch }));
+      if (watch === 'blocked')
+        console.warn(JSON.stringify({ event: 'app_refused_vps', note: 'not a monitor fault, nobody paged' }));
+      else if (watch !== 'ok') console.warn(JSON.stringify({ event: 'monitor_fault', outcome: watch }));
       await ping(config.HEALTHCHECKS_PING_URL_WATCHDOG, watch === 'post_failed' ? 'fail' : 'ok');
     }
   };
@@ -88,11 +96,14 @@ async function main() {
     let lastPing = 0;
     // One ping a minute: ok when any poll in that minute got through, /fail only when none did.
     let okSincePing = false;
+    let refusals = 0;
     while (!signal.aborted) {
       try {
         await pool.poll();
         okSincePing = true;
+        refusals = 0;
       } catch (err) {
+        if (err instanceof ApiError && err.status === 403) refusals++;
         console.error(JSON.stringify({ event: 'verifier_poll_failed', error: String(err) }));
       }
       if (Date.now() - lastPing >= VERIFIER_PING_EVERY_MS) {
@@ -100,7 +111,7 @@ async function main() {
         await ping(config.HEALTHCHECKS_PING_URL_VERIFIER, okSincePing ? 'ok' : 'fail');
         okSincePing = false;
       }
-      await sleep(config.VERIFIER_POLL_MS);
+      await sleep(pollDelay(config.VERIFIER_POLL_MS, refusals));
     }
     await pool.drain();
   };

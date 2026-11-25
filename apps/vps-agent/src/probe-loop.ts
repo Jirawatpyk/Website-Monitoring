@@ -142,3 +142,8 @@ export async function runProbeRound({
 export function untilNextTick(now: number, intervalMs: number, offsetMs = 1_000): number {
   return intervalMs - (now % intervalMs) + offsetMs;
 }
+
+/** The verifier's poll gap: its own interval, doubled per 403 in a row up to 60 s (D-074). */
+export function pollDelay(intervalMs: number, refusals: number): number {
+  return refusals <= 0 ? intervalMs : Math.min(intervalMs * 2 ** refusals, 60_000);
+}

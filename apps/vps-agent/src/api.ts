@@ -48,6 +48,8 @@ export function createApi(
   fetchImpl: typeof fetch = fetch,
   /** Each answer to GET /api/ingest, for the watchdog (S12a): when, the engine's sweep, who is on call. */
   onContact?: (contact: Contact) => void,
+  /** GET /api/ingest answered 403: the app is up but refuses this VPS (D-074). */
+  onRefused?: (at: number) => void,
 ): Api {
   const call = async (route: string, init: RequestInit = {}) => {
     const res = await fetchImpl(new URL(route, baseUrl), {
@@ -71,7 +73,10 @@ export function createApi(
   return {
     async dueMonitors() {
       // D-051: this agent echoes the confirm flag, so it may be given confirm checks.
-      const due = await json('/api/ingest?confirm=1', dueMonitorsResponseSchema);
+      const due = await json('/api/ingest?confirm=1', dueMonitorsResponseSchema).catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 403) onRefused?.(Date.now());
+        throw err;
+      });
       onContact?.({ at: Date.now(), engineSweepAt: due.engineSweepAt, onCall: due.onCall });
       return due.forbidden
         ? { monitors: due.monitors, forbidden: due.forbidden }

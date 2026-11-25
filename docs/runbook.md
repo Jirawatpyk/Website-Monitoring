@@ -181,6 +181,20 @@ Names and phone numbers are kept with the Admins, not in the repo (no real conta
 
 **Fix:** a VPS network problem is the provider's; a bad control URL is fixed in `CONTROL_URLS` in the env file, followed by a restart. It clears by itself once a round's control check passes.
 
+## The VPS is refused by the app (403)
+
+**Alert:** Healthchecks emails that probe-bkk, browser-verifier and vps-watchdog all missed at once; sites behind a WAF (Bangkok Airways China / Taiwan) open PROBLEM "Blocked, not verified"; the Probes page shows a BKK gap. Since D-074 nobody is paged for it.
+
+**Check:**
+- On the VPS, `journalctl -u dxt-agent@production -n 30 --no-pager`: `/api/ingest answered 403`, `/api/jobs answered 403`, `app_refused_vps`.
+- From the VPS: `curl -sI https://monitor.dxtspace.com/login | grep -iE "^HTTP|x-vercel-mitigated"`. `x-vercel-mitigated: deny` is Vercel's firewall; a plain 403 on `/api/*` only is the token.
+- Another project from the same VPS (`curl -sI https://dxt-test-target.vercel.app/`) answers 200 when only dxt-monitor denies it.
+
+**Fix:**
+- Firewall: `vercel --scope <team> firewall overview --project dxt-monitor`. With no custom rules, it's the automatic DDoS mitigation (on 25 Nov it lifted by itself after 30 min). The VPS IP has a System Bypass on monitor.dxtspace.com (`vercel firewall system-bypass list --project dxt-monitor`); if it's gone, add it back: `vercel firewall system-bypass add <VPS IP> --project dxt-monitor --domain monitor.dxtspace.com --notes "Thai VPS agent"`. The bypass skips only Vercel's firewall; every VPS route still checks `INGEST_TOKEN`.
+- Token: rotate `INGEST_TOKEN` on both sides (Rotate a secret).
+- Afterwards: the incidents it opened recover on their own; resolve them with root cause "False alarm (monitor)", so they stay out of the client report.
+
 ## Browser verifier
 
 **Alert:** email "DxT Monitor · System · Browser verifier unavailable · <start>" (Admins), or the Healthchecks check `browser-verifier` / `probe-bkk` is down (Tao).
