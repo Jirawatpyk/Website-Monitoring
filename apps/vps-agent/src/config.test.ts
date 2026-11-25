@@ -132,5 +132,6 @@ describe('the bundle (tsup.config.ts)', () => {
       (d) => !isBundled(d) && !(d in runtime.dependencies),
     );
     expect(missing).toEqual([]);
-  });
+    // importing tsup.config loads tsup itself: past the 5 s default on a busy machine (pre-push, 25 Nov)
+  }, 20_000);
 });
