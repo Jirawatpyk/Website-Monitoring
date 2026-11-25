@@ -11,7 +11,7 @@ export interface Contact {
   onCall?: DueMonitorsResponse['onCall'];
 }
 
-export type WatchOutcome = 'ok' | 'fault' | 'posted' | 'post_failed';
+export type WatchOutcome = 'ok' | 'fault' | 'posted' | 'post_failed' | 'blocked';
 
 export interface WatchdogDeps {
   /** Posts the line to the Alerts Space; true when it landed. */
@@ -28,6 +28,10 @@ export interface WatchdogDeps {
  * again only after the sweep came back and stopped again. A failed post is tried on the next tick.
  * A server that didn't send the sweep (an older build, a failed read) leaves it unknown, not missed;
  * a sweep that never ran (`null`, a fresh database) is no fault. "Back" posts nothing (spec §15.3).
+ *
+ * Refused (25 Nov 2026, D-074): the app answering 403 — Vercel's firewall denying this VPS, or a
+ * bad token — means the app is up but won't talk to us. The engine can't be judged from here, so it
+ * is `blocked`, not a fault: nobody is paged. The Admins still get Healthchecks' probe-bkk email.
  */
 export function createWatchdog({ post, startedAt, graceMs = WATCH_GRACE_MS }: WatchdogDeps) {
   let lastContactAt = startedAt;
@@ -37,8 +41,14 @@ export function createWatchdog({ post, startedAt, graceMs = WATCH_GRACE_MS }: Wa
   let onCallChatId: string | null = null;
   /** The fault the line was posted for (its `since`), so one fault posts once. */
   let postedFor: number | null = null;
+  /** The last 403 from the Ingest API (`refused`); newer than the last contact = blocked now. */
+  let refusedAt: number | null = null;
 
   return {
+    refused(at: number) {
+      refusedAt = at;
+    },
+
     contact(c: Contact) {
       lastContactAt = c.at;
       sweepKnown = c.engineSweepAt !== undefined;
@@ -48,7 +58,9 @@ export function createWatchdog({ post, startedAt, graceMs = WATCH_GRACE_MS }: Wa
     },
 
     async tick(now: number): Promise<WatchOutcome> {
-      const unreachable = now - lastContactAt >= graceMs;
+      const refusedNow = refusedAt !== null && refusedAt > lastContactAt && now - refusedAt < graceMs;
+      const unreachable = now - lastContactAt >= graceMs && !refusedNow;
+      if (refusedNow && now - lastContactAt >= graceMs) return postedFor !== null ? 'fault' : 'blocked';
       if (!sweepKnown && !unreachable) return postedFor !== null ? 'fault' : 'ok';
       const sweepMissed = sweepAt !== null && now - sweepAt >= graceMs;
       if (!sweepMissed && !unreachable) {

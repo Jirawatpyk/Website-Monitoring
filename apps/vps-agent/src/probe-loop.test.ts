@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { HttpCheckResult } from '@dxt/probe';
 import type { DueMonitor } from '@dxt/shared';
 import type { Api } from './api';
-import { runProbeRound, untilNextTick } from './probe-loop';
+import { pollDelay, runProbeRound, untilNextTick } from './probe-loop';
 
 const result = (outcome: HttpCheckResult['outcome'], statusCode: number | null = 200): HttpCheckResult => ({
   outcome,
@@ -293,5 +293,11 @@ describe('untilNextTick', () => {
   it('waits for the next UTC minute plus a second', () => {
     expect(untilNextTick(Date.parse('2026-10-07T03:00:59.500Z'), 60_000)).toBe(1_500);
     expect(untilNextTick(Date.parse('2026-10-07T03:01:00.000Z'), 60_000)).toBe(61_000);
+  });
+
+  it('pollDelay: the interval, doubled per 403 in a row, at most 60 s (D-074)', () => {
+    expect([0, 1, 2, 3, 4, 10].map((n) => pollDelay(5_000, n))).toEqual([
+      5_000, 10_000, 20_000, 40_000, 60_000, 60_000,
+    ]);
   });
 });
