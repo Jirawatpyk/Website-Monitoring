@@ -357,6 +357,21 @@ describe('KPIs (D-032 MTTA mean, D-033 MTTR median, Unacked until S08)', () => {
       });
     const k = listKpis([eneos, unacked(65, '25'), unacked(66, '26')], new Date('2026-11-27T04:00:00Z'));
     expect(k).toMatchObject({ mttaEnough: true, mttaSeconds: 361, mttaAckedCaption: '1 of 3 acknowledged' });
+
+    // D-076: on 5 Dec INC-0038's outage began 33 days back, but its acked drop (10 Nov) is in the 30 days
+    const dec5 = new Date('2026-12-05T04:00:00Z');
+    const later = listKpis([eneos, unacked(65, '25'), unacked(66, '26')], dec5);
+    expect(later).toMatchObject({
+      mttaEnough: true,
+      mttaSeconds: 361,
+      mttaAckedCaption: '1 of 3 acknowledged',
+    });
+    // MTTR keeps its own gate: only 2 outages began in the 30 days (D-033)
+    expect(later.mttrMinutes).toBeNull();
+    // and the empty-state line never names an incident from before the 30 days
+    expect(lastOneLine([{ ...eneos, resolvedAt: '2026-11-10T06:01:00Z' }], dec5)).toBe(
+      'No incidents in the last 30 days.',
+    );
   });
 });
 

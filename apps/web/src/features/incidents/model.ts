@@ -6,6 +6,7 @@
 import {
   canResolve,
   metricDropsOf,
+  MIN_DOWN_INCIDENTS,
   mttrMinutes,
   outageMinutes,
   episodesFromTimeline,
@@ -432,8 +433,9 @@ export function nextLine(
 
 /** EmptyStates panel 2: with nothing open, what was last true ("Last one: …, N in the last 7 days"). */
 export function lastOneLine(all: readonly ListIncident[], now: Date): string {
-  // auto-resolved PROBLEMs are hidden everywhere (D-033): not the "last one", not in the count
-  const list = all.filter((i) => !i.autoResolved);
+  // auto-resolved PROBLEMs are hidden everywhere (D-033): not the "last one", not in the count; the list
+  // also holds older incidents resolved in the 30 days, for MTTA (D-076) — the 30-day period, as the views
+  const list = all.filter((i) => !i.autoResolved && inPeriod(i, 30, now));
   const last = [...list].sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
   if (!last) return 'No incidents in the last 30 days.';
   const week = list.filter((i) => Date.parse(i.startedAt) >= now.getTime() - 7 * 86_400_000).length;
@@ -526,22 +528,24 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
     mttaSeconds: kpis.mttaSeconds,
     mttaEnough: kpis.enough,
     mttaAckedCaption: formatAckedCount(kpis.ackedCount, kpis.downCount),
-    mttrMinutes: kpis.enough
-      ? mttrMinutes(
-          recent.map((i) => ({
-            severity: i.severity,
-            minutes: settledOutageMinutes(
-              i.drops.map((d) => ({
-                start: new Date(d.start),
-                end: d.end ? new Date(d.end) : null,
-                severity: d.severity,
-              })),
-              !isOpen(i),
-              now,
-            ),
-          })),
-        )
-      : null,
+    // its own sample's gate: outages that began in the 30 days (D-033); MTTA's N goes by drop (D-076)
+    mttrMinutes:
+      recent.filter((i) => i.severity === 'down').length >= MIN_DOWN_INCIDENTS
+        ? mttrMinutes(
+            recent.map((i) => ({
+              severity: i.severity,
+              minutes: settledOutageMinutes(
+                i.drops.map((d) => ({
+                  start: new Date(d.start),
+                  end: d.end ? new Date(d.end) : null,
+                  severity: d.severity,
+                })),
+                !isOpen(i),
+                now,
+              ),
+            })),
+          )
+        : null,
   };
 }
 
