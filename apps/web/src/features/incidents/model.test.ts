@@ -562,6 +562,7 @@ describe('timelineOf (§16.11, §19.7)', () => {
         category: 'hosting',
         what: 'Host rebooted the app server',
         fix: 'Host restarted it',
+        prevent: 'Disk alert at 80% on the host',
         state: 'monitoring',
         first: false,
       },
@@ -599,7 +600,10 @@ describe('timelineOf (§16.11, §19.7)', () => {
     expect(t[7]!.detail).toBe('Host says the app server is restarting');
     expect(t[8]!.detail).toBe('Hosting / server · “Host rebooted the app server”');
     expect(t[10]!.detail).toBe('Root cause already written — ready to resolve');
-    expect(t[11]!.detail).toBe('Hosting / server · “Host rebooted the app server” · Fix: Host restarted it');
+    // D-077: the preventive action closes the line
+    expect(t[11]!.detail).toBe(
+      'Hosting / server · “Host rebooted the app server” · Fix: Host restarted it · Prevent: Disk alert at 80% on the host',
+    );
   });
   it('same time: RECOVERED before PROBLEM AGAIN (§19.7)', () => {
     const t = timelineOf(

@@ -146,7 +146,13 @@ export interface IncidentDetail {
   escalation?: EscalationCardView | null;
   /** "Send client-update reminder now" while the engine is stopped (§30.7, D-055 item 3); else null. */
   reminder?: ReminderView | null;
-  rootCause: { category: string | null; what: string | null; fix: string | null };
+  rootCause: {
+    category: string | null;
+    what: string | null;
+    fix: string | null;
+    /** D-077: internal; absent from fixtures written before it. */
+    prevent?: string | null;
+  };
   gate: Gate;
   /**
    * The latest resolve, while its messages may still be held (Undo). `notifies` is false when nothing
@@ -197,6 +203,7 @@ interface DetailRow extends IncidentRow {
   root_cause_category: string | null;
   root_cause: string | null;
   root_cause_fix: string | null;
+  preventive_action: string | null;
   alerted_at: string | null;
   escalation_plan: unknown;
   l0: { is_active: boolean; role: string } | null;
@@ -446,7 +453,7 @@ export async function loadIncident(
       `id, number, state, severity, trigger, escalation_level, started_at, detected_at, acked_at, acked_by,
        recovered_at, resolved_at, resolved_by, auto_resolved, client_update_required, client_updated_at,
        client_update_due_at, client_updated_by, client_update_note, client_update_not_needed,
-       root_cause_category, root_cause, root_cause_fix, site_id, monitor_id, l0_user_id, alerted_at, escalation_plan,
+       root_cause_category, root_cause, root_cause_fix, preventive_action, site_id, monitor_id, l0_user_id, alerted_at, escalation_plan,
        l0:profiles!incidents_l0_user_id_fkey(is_active, role),
        sites!inner(name, tier, primary_owner_id, backup_owner_id,
          monitors(id, url, is_primary, timeout_ms, allowed_redirect_domains),
@@ -783,7 +790,12 @@ export async function loadIncident(
     // 08:04) keeps its own words; an incident a mute held (`alerted_at`, D-036) isn't this.
     ackInHoursMin: mutedAtDetection ? null : ackInHoursOf(i, hours),
     canAct: canAcknowledge(actor, i),
-    rootCause: { category: i.root_cause_category, what: i.root_cause, fix: i.root_cause_fix },
+    rootCause: {
+      category: i.root_cause_category,
+      what: i.root_cause,
+      fix: i.root_cause_fix,
+      prevent: i.preventive_action,
+    },
     gate: pendingClientUpdate(
       byHand.reminder,
       resolveGate(
@@ -937,6 +949,7 @@ interface ListRow {
   root_cause_category: string | null;
   root_cause: string | null;
   root_cause_fix: string | null;
+  preventive_action: string | null;
   l0_user_id: string | null;
   acker: { display_name: string } | null;
   sites: {
@@ -968,7 +981,7 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
           .select(
             `id, number, site_id, severity, trigger, state, escalation_level, started_at, detected_at,
              acked_at, recovered_at, resolved_at, auto_resolved, is_flapping, is_manual,
-             root_cause_category, root_cause, root_cause_fix, l0_user_id,
+             root_cause_category, root_cause, root_cause_fix, preventive_action, l0_user_id,
              acker:profiles!incidents_acked_by_fkey(display_name),
              sites!inner(name, tier, primary_owner_id, backup_owner_id,
                owner:profiles!sites_primary_owner_id_fkey(display_name))`,
@@ -1068,6 +1081,7 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
         rootCauseCategory: r.root_cause_category,
         rootCause: r.root_cause,
         rootCauseFix: r.root_cause_fix,
+        preventiveAction: r.preventive_action,
         drops: dropsOf(r),
       };
       const events = (dropEvents.get(r.id) ?? []).map((e) => ({

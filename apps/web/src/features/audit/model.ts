@@ -385,6 +385,7 @@ const KEY_WORDS: Record<string, string> = {
   occurrences_cancelled: 'cancelled',
   notified: 'told',
   fix: 'what fixed it',
+  prevent: 'preventive action',
   what: 'what happened',
   thresholds_slowMs: 'slow threshold',
   timeout_ms: 'timeout',

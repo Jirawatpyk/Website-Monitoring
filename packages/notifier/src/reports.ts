@@ -63,6 +63,8 @@ export interface ReportIncident {
   clientUpdate: { by: string; at: Date } | null;
   /** The root cause in a few words ("cert renewed"); null while there is none. */
   rootCause: string | null;
+  /** D-077: the preventive action in a few words (internal: the weekly summary only); null with none. */
+  prevention?: string | null;
 }
 
 export interface ReportWindow {
@@ -426,6 +428,7 @@ function weeklyWhat(i: ReportIncident): string {
     parts.push(`client updated by ${plainName(i.clientUpdate.by)} ${formatTime(i.clientUpdate.at)}`);
   if (i.rootCause) parts.push(i.rootCause);
   else if (i.state === 'needs_root_cause' || i.state === 'monitoring') parts.push('no root cause yet');
+  if (i.prevention) parts.push(`prevent: ${midSentence(i.prevention)}`);
   // Last, so a root cause never reads as having fixed it (message-checker).
   if (i.stillProblem) parts.push(`home page back, still failing: ${midSentence(i.stillProblem)}`);
   return parts.join(' · ');

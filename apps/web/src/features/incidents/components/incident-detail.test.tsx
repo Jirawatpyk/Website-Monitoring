@@ -277,6 +277,7 @@ describe('Incident page — Resolve (T10, D-033)', () => {
       category: 'hosting',
       what: 'Host rebooted the app server',
       fix: '',
+      prevent: '',
     });
     const done = await screen.findByRole('dialog', { name: 'Incident resolved' });
     // the pressed button is gone: focus is on the outcome (WCAG 2.4.3)
@@ -432,7 +433,7 @@ describe('Incident page — Resolve (T10, D-033)', () => {
   it('resolved: the card says who, how long and why (MIncident)', () => {
     const d = detail({
       events: settled,
-      rootCause: { category: 'hosting', what: 'Host rebooted', fix: null },
+      rootCause: { category: 'hosting', what: 'Host rebooted', fix: null, prevent: 'Disk alert at 80%' },
     });
     show({
       ...d,
@@ -444,6 +445,8 @@ describe('Incident page — Resolve (T10, D-033)', () => {
       screen.getAllByText('Resolved by Tao · ORCA Thailand was down 8 min · root cause: Hosting / server.')
         .length,
     ).toBeGreaterThan(0);
+    // D-077: the preventive action under it
+    expect(screen.getAllByText('Preventive action: Disk alert at 80%').length).toBeGreaterThan(0);
   });
 
   it('auto-resolved: no conditions listed as "Not met", only the line that none were needed (/verify, 15 Oct)', () => {

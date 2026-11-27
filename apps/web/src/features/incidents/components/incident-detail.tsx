@@ -170,6 +170,7 @@ export function IncidentDetailView({
     category: d.rootCause.category ?? '',
     what: d.rootCause.what ?? '',
     fix: d.rootCause.fix ?? '',
+    prevent: d.rootCause.prevent ?? '',
   };
   const dialogIncident: DialogIncident = {
     incidentId: v.incidentId,
@@ -791,6 +792,10 @@ function ResolvedCard({
           .filter(Boolean)
           .join(' · ') + '.'}
       </span>
+      {d.rootCause.prevent ? (
+        // D-077: what stops it happening again (internal)
+        <span className="min-w-0 text-sm break-words text-fg-secondary">{`Preventive action: ${d.rootCause.prevent}`}</span>
+      ) : null}
       {/* the visible line is the live region: each phase is announced once (the count isn't) */}
       <span className="flex items-center gap-1.5 text-xs text-fg-secondary">
         {r.posted ? (
