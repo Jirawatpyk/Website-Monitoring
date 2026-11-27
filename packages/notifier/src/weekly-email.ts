@@ -238,7 +238,7 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
       const count = mttaAckedCount(m);
       const v =
         m.seconds === null
-          ? m.tier === 1 || m.down === 0
+          ? m.tier === 1
             ? '— (no DOWN)'
             : f.incidents.some((i) => i.severity === 'down')
               ? '— (no DOWN in hours)'

@@ -309,7 +309,26 @@ describe('MTTA from a stored timeline (D-075, engine review)', () => {
       { type: 'recovered', at: `2026-11-${day}T23:44:01` },
     ]);
 
-  it('INC-0038 (production rows): down again 10 Nov, acked 6 min later → 6 min 1 s', () => {
+  it('INC-0133 VOCA (spec §19.4): four drops, acked 03:40 in the third (confirmed 03:38) → 2 min', () => {
+    // Mon 21 Sep 2026 Bangkok = Sun 20 Sep UTC: 03:12–03:19 · 03:24–03:35 · 03:38–03:52 · 03:55–04:04.
+    const t = (hm: string) =>
+      `2026-09-20T${String(Number(hm.slice(0, 2)) + 17).padStart(2, '0')}${hm.slice(2)}:00`;
+    const voca = fromTimeline(t('03:12'), t('03:40'), [
+      { type: 'detected', at: t('03:12') },
+      { type: 'recovered', at: t('03:19') },
+      { type: 'relapsed', at: t('03:24'), payload: { severity: 'down', startedAt: `${t('03:24')}Z` } },
+      { type: 'recovered', at: t('03:35') },
+      { type: 'relapsed', at: t('03:38'), payload: { severity: 'down', startedAt: `${t('03:38')}Z` } },
+      { type: 'recovered', at: t('03:52') },
+      { type: 'relapsed', at: t('03:55'), payload: { severity: 'down', startedAt: `${t('03:55')}Z` } },
+      { type: 'recovered', at: t('04:04') },
+    ]);
+    const k = responseKpis([voca, voca, voca], new Date('2026-09-01T00:00:00Z'), NOW);
+    expect(formatDurationSeconds(k.mttaSeconds!)).toBe('2 min');
+    expect(k).toMatchObject({ ackedCount: 3, downCount: 3 });
+  });
+
+  it('INC-0038 (its DOWN drops, simplified): down again 10 Nov, acked 6 min later → 6 min 1 s', () => {
     const eneos = fromTimeline('2026-11-02T14:59:44', '2026-11-10T05:23:39', [
       { type: 'detected', at: '2026-11-02T15:05:14' },
       { type: 'recovered', at: '2026-11-02T15:07:01' },
