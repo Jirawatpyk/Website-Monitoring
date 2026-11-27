@@ -137,6 +137,20 @@ describe('Incident page — Resolve (T10, D-033)', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('resolved on a stopped site while still down: "monitoring stopped", never "recovered" (D-079)', () => {
+    show(
+      detail({
+        state: 'resolved',
+        recoveredAt: null,
+        resolvedAt: at('24T23:00:00'),
+        stoppedAt: at('24T22:40:00'),
+        rootCause: { category: 'hosting', what: 'Client-hosted', fix: null },
+      }),
+    );
+    expect(screen.getAllByText('ORCA Thailand — monitoring stopped').length).toBeGreaterThan(0);
+    expect(screen.queryByText('ORCA Thailand recovered')).toBeNull();
+  });
+
   it('home page back, /booking still failing: the §37 page (D-064)', () => {
     // INC-0140 VOCA (the §37 board sample): DOWN Thu 23:41 → home page back Fri 09:35, /booking 404.
     const cell = (text: string, glyph: 'pass' | 'fail') => ({ text, glyph });

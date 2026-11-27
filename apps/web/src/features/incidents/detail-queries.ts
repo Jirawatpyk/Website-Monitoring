@@ -101,6 +101,11 @@ export interface IncidentDetail {
   /** When the drop in progress started (ISO); the incident's start without one. */
   nowSince: string;
   /**
+   * D-079: resolved on a stopped site while still in a drop — when monitoring stopped (ISO). The page
+   * then never says "recovered": nobody saw it come back.
+   */
+  stoppedAt?: string | null;
+  /**
    * §37: the home page came back while a key page (or the certificate chain) still fails — the DOWN is
    * over, the incident carries on as a PROBLEM. Null otherwise.
    */
@@ -761,6 +766,7 @@ export async function loadIncident(
     severity: i.severity,
     nowSeverity: current,
     nowSince,
+    stoppedAt: i.recovered_at ? null : (events.find((e) => e.type === 'monitoring_stopped')?.at ?? null),
     stillFailing,
     state: i.state,
     escalationLevel: i.escalation_level,

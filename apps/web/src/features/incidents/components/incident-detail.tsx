@@ -218,7 +218,9 @@ export function IncidentDetailView({
   const title =
     stillDown && !resolved
       ? v.title
-      : `${d.siteName} ${d.severity === 'down' ? 'recovered' : 'is back to normal'}`;
+      : d.stoppedAt
+        ? `${d.siteName} — monitoring stopped` // D-079: closed while still failing, never seen back
+        : `${d.siteName} ${d.severity === 'down' ? 'recovered' : 'is back to normal'}`;
 
   // S09d (§26.4): a Page change incident shows What changed where Evidence / Latest round sit.
   const whatChanged = d.pageChange ? (
