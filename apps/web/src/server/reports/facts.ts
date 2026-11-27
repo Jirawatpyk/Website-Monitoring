@@ -1,6 +1,7 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
 import {
+  DROP_EVENT_TYPES,
   aggregateUptime,
   metricDropsOf,
   episodesFromTimeline,
@@ -52,7 +53,7 @@ const DAY_MS = 86_400_000;
 /** The window a site is judged on against its uptime target (D-059): the standard table is per month. */
 const MONTH_DAYS = 30;
 // D-067: `new_cause` too — the reports word the drop by its newest cause.
-const EPISODE_EVENTS = ['detected', 'relapsed', 'escalated_to_down', 'recovered', 'new_cause'];
+const EPISODE_EVENTS = [...DROP_EVENT_TYPES, 'new_cause'];
 
 const must = <T>(r: { data: T | null; error: { message: string } | null }, what: string): T => {
   if (r.error) throw new Error(`${what}: ${r.error.message}`);

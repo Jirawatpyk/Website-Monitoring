@@ -143,12 +143,108 @@ begin
   insert into public.incident_events (incident_id, type, actor_id, payload, at)
   values (p_incident_id, 'resolved', auth.uid(),
           v_rc || jsonb_build_object('prevent', v_prevent, 'by', v_name, 'from', v_inc.state,
-            'posts_at', v_hold, 'accepted_check', p_accept_check_id,
+            'posts_at', v_hold, 'accepted_check', p_accept_check_id, 'monitoring_stopped', v_end_drop,
             'notifies', exists (select 1 from public.notifications
                                 where incident_id = p_incident_id and template = 'resolved'
                                   and status = 'queued')),
           v_now);
 
   return v_hold;
+end;
+$$;
+
+-- D-079: Undo refuses a resolve that ended a stopped site's drop. Body as 20261015053442_page_change.sql otherwise.
+create or replace function public.undo_resolve(p_incident_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_inc public.incidents%rowtype;
+  v_from public.incident_state;
+  v_accepted uuid;
+begin
+  select * into v_inc from public.incidents where id = p_incident_id for no key update;
+  if not found then
+    raise exception 'incident not found' using errcode = 'P0002';
+  end if;
+  if v_inc.state <> 'resolved' or v_inc.resolved_by is null or v_inc.auto_resolved then
+    raise exception 'Nothing to undo' using errcode = '55000';
+  end if;
+  if v_inc.resolved_by is distinct from auth.uid() then
+    raise exception 'Only the person who resolved it can undo it' using errcode = '42501';
+  end if;
+  -- D-079 (engine review M1): a resolve that ended a stopped site's drop can't be undone — the incident
+  -- would reopen with its drop closed at the stop, and a restart would never relapse it (no recovery).
+  if exists (
+    select 1 from public.incident_events
+    where incident_id = p_incident_id and type = 'resolved'
+      and coalesce((payload ->> 'monitoring_stopped')::boolean, false)
+      and at = v_inc.resolved_at
+  ) then
+    raise exception 'This resolve closed the outage of a site whose monitoring is stopped — it can''t be undone'
+      using errcode = '55000';
+  end if;
+  if now() >= v_inc.resolved_at + interval '10 seconds' then
+    raise exception 'The undo window has closed' using errcode = '55000';
+  end if;
+
+  perform 1 from public.notifications
+    where incident_id = p_incident_id and template = 'resolved' and status = 'queued'
+    for update;
+  if exists (
+    select 1 from public.notifications
+    where incident_id = p_incident_id and template = 'resolved'
+      and (status = 'sent' or (status = 'queued' and attempts > 0))
+  ) then
+    raise exception 'The undo window has closed' using errcode = '55000';
+  end if;
+  if exists (
+    select 1 from public.incidents
+    where site_id = v_inc.site_id and id <> p_incident_id
+      and state not in ('resolved', 'in_review', 'closed')
+  ) then
+    raise exception 'The site has a new incident — this one stays resolved' using errcode = '55000';
+  end if;
+
+  update public.notifications
+    set status = 'cancelled', next_retry_at = null
+    where incident_id = p_incident_id and template = 'resolved' and status = 'queued';
+
+  update public.notifications
+    set status = 'queued', error = null, next_retry_at = null
+    where incident_id = p_incident_id and template = 'flap_summary' and status = 'cancelled'
+      and error = 'Superseded: resolved';
+
+  select (payload->>'from')::public.incident_state, (payload->>'accepted_check')::uuid
+    into v_from, v_accepted
+  from public.incident_events
+  where incident_id = p_incident_id and type = 'resolved'
+  order by at desc
+  limit 1;
+  v_from := coalesce(v_from, 'needs_root_cause');
+
+  if v_accepted is not null then
+    perform private.undo_baseline(c.monitor_id, p_incident_id)
+      from public.crawler_checks c where c.id = v_accepted;
+  end if;
+
+  begin
+    update public.incidents
+      set state = v_from, resolved_at = null, resolved_by = null
+      where id = p_incident_id;
+  exception when unique_violation then
+    -- The engine opened a new incident for the site between the check above and here.
+    raise exception 'The site has a new incident — this one stays resolved' using errcode = '55000';
+  end;
+
+  insert into public.incident_events (incident_id, type, actor_id, payload)
+  values (p_incident_id, 'resolve_undone', auth.uid(), jsonb_build_object('state', v_from));
+
+  insert into public.audit_log (actor_id, action, entity, entity_id, before, after)
+  values (auth.uid(), 'incident.resolve_undone', 'incident', p_incident_id,
+          jsonb_build_object('state', 'resolved', 'resolved_at', v_inc.resolved_at),
+          jsonb_build_object('state', v_from));
 end;
 $$;

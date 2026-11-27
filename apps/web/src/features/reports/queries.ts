@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import { bangkokMonth, type Span } from '@dxt/engine';
+import { DROP_EVENT_TYPES, bangkokMonth, type Span } from '@dxt/engine';
 import type { Tier } from '@dxt/shared';
 import { maintenanceSpansBySite } from '@/features/sites/server';
 import { fetchAllPages } from '@/lib/csv';
@@ -20,7 +20,7 @@ import {
  */
 
 // D-067: `new_cause` carries every cause change (the cause-back function writes it too).
-const EVENTS = ['detected', 'relapsed', 'escalated_to_down', 'recovered', 'new_cause'];
+const EVENTS = [...DROP_EVENT_TYPES, 'new_cause'];
 const MAX_ROWS = 50_000;
 
 const must = <T>(r: { data: T | null; error: { message: string } | null }, what: string): T => {

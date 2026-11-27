@@ -1,5 +1,6 @@
 import 'server-only';
 import {
+  DROP_EVENT_TYPES,
   aggregateUptime,
   metricDropsOf,
   episodesFromTimeline,
@@ -109,7 +110,7 @@ export async function loadOverview(
         )
         .eq('severity', 'down')
         // the drops, so MTTA counts from the one the ack answered (D-075)
-        .in('incident_events.type', ['detected', 'relapsed', 'escalated_to_down', 'recovered'])
+        .in('incident_events.type', [...DROP_EVENT_TYPES])
         // a PROBLEM raised to DOWN may have started before the window its outage falls in; an older
         // incident still open, or resolved in the 60 days, may have a DOWN drop in them (D-076)
         .or(

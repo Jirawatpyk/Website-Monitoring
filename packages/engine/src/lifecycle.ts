@@ -198,6 +198,18 @@ export interface EpisodeEvent {
 }
 
 /**
+ * Every `incident_events` type `episodesOf` reads (D-079 adds `monitoring_stopped`). A query that loads
+ * events for drops selects these — `drop-events.test.ts` in the web app holds every such list to it.
+ */
+export const DROP_EVENT_TYPES = [
+  'detected',
+  'relapsed',
+  'escalated_to_down',
+  'recovered',
+  'monitoring_stopped',
+] as const;
+
+/**
  * The drops of one incident (spec §19.4 summary: "Down 4 times: 03:12–03:19 · … — 41 min down in
  * total"). A drop starts at `detected`, a `relapsed`, or an escalation after a recovery; it ends at
  * the next `recovered`. Events in any order.

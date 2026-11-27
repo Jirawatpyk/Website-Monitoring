@@ -1,9 +1,10 @@
+import { DROP_EVENT_TYPES } from '@dxt/engine';
 import 'server-only';
 import type { DbClient, Json } from '@dxt/db';
 import { fetchAllPages } from '@/lib/csv';
 
 /** The timeline rows a drop is read from (`episodesFromTimeline`). */
-export const DROP_EVENTS = ['detected', 'relapsed', 'escalated_to_down', 'recovered'];
+export const DROP_EVENTS: readonly string[] = DROP_EVENT_TYPES;
 
 export interface DropEventRow {
   incident_id: string;

@@ -1174,9 +1174,10 @@ export function timelineOf(
         return;
       case 'monitoring_stopped':
         // D-079: written by the resolve, at the stop — the drop in progress ends here.
+        // neutral, not a green "ok": the site was not seen back (engine review L5, spec §11)
         item(
           e,
-          'ok',
+          'note',
           'Monitoring stopped',
           'Nobody watched the site after this — the outage counts until here',
           'between',

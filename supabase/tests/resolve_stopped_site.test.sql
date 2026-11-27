@@ -2,7 +2,7 @@
 -- a drop still in progress ends at the stop. Everything else in the gate still holds.
 begin;
 \ir _helpers.psql
-select plan(9);
+select plan(10);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -30,9 +30,20 @@ select tests.authenticate_as((select id from ids where name = 'admin'));
 select throws_ok(format($$select public.resolve_incident(%L, 'hosting', 'x', null)$$, (select id from inc where name = 'p')),
   '55000', 'It needs 2 OK rounds in a row before it can be resolved', 'a monitored site still needs its 2 OK rounds');
 
--- ── Monitoring stopped (audit_log is append-only: the stop is stamped now, in this transaction) ──
+-- ── Monitoring stopped an hour ago, after a stop → start two hours ago (the latest stop counts) ──
+-- audit_log is append-only and the row trigger stamps now(): write the stop with triggers off and its
+-- audit rows by hand, backdated, as the trigger would have.
 reset role;
+set local session_replication_role = replica;
 update public.sites set is_active = false where id = '00000000-0000-0000-0000-0000000000a1';
+set local session_replication_role = origin;
+insert into public.audit_log (action, entity, entity_id, before, after, at) values
+  ('site.update', 'site', '00000000-0000-0000-0000-0000000000a1', '{"is_active": true}', '{"is_active": false}',
+   now() - interval '150 minutes'),
+  ('site.update', 'site', '00000000-0000-0000-0000-0000000000a1', '{"is_active": false}', '{"is_active": true}',
+   now() - interval '120 minutes'),
+  ('site.update', 'site', '00000000-0000-0000-0000-0000000000a1', '{"is_active": true}', '{"is_active": false}',
+   now() - interval '60 minutes');
 
 select tests.authenticate_as((select id from ids where name = 'nok'));
 select throws_ok(format($$select public.resolve_incident(%L, 'hosting', 'x', null)$$, (select id from inc where name = 'p')),
@@ -51,9 +62,13 @@ select is((select state::text from public.incidents where id = (select id from i
 select is(
   (select at from public.incident_events where incident_id = (select id from inc where name = 'p')
      and type = 'monitoring_stopped'),
-  (select at from public.audit_log where entity = 'site' and entity_id = '00000000-0000-0000-0000-0000000000a1'
-     and (after ->> 'is_active') = 'false'),
-  'the open drop ends at the stop, not at the resolve');
+  now() - interval '60 minutes',
+  'the open drop ends at the latest stop, not at the resolve');
+select tests.authenticate_as((select id from ids where name = 'admin'));
+select throws_ok(format($$select public.undo_resolve(%L)$$, (select id from inc where name = 'p')),
+  '55000', 'This resolve closed the outage of a site whose monitoring is stopped — it can''t be undone',
+  'Undo refuses a resolve that ended a stopped site''s drop');
+reset role;
 select is(
   (select count(*)::int from public.audit_log where entity_id = (select id from inc where name = 'p')
      and action = 'incident.resolved'),
