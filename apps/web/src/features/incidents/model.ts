@@ -797,6 +797,12 @@ export interface GatePage {
   differsSince: string | null;
 }
 
+/**
+ * D-079: the recovery condition on a stopped site. Its resolve can't be undone (`undo_resolve` refuses),
+ * so the Resolve dialog shows no Undo when it reads this.
+ */
+export const STOPPED_DETAIL = 'Not needed — monitoring of this site is stopped';
+
 /** The three conditions in the boards' words (Incident, MIncident, Resolve; §15.4, §16.1–3). */
 export function resolveGate(
   i: GateIncident & { siteName: string },
@@ -820,7 +826,7 @@ export function resolveGate(
     label: 'OK for 2 rounds',
     met: !!okAt || stopped,
     detail: stopped
-      ? 'Not needed — monitoring of this site is stopped'
+      ? STOPPED_DETAIL
       : okAt
         ? `OK since ${formatTime(new Date(i.recoveredAt!))} · 2 rounds done ${formatTime(new Date(okAt))}`
         : recovered
