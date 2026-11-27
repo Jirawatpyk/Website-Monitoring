@@ -22,11 +22,14 @@ import {
 } from './chat-alerts';
 import { downtime } from './downtime';
 import {
+  FYI_NEXT_UPDATE,
   formatResume,
   nextRow,
+  statusWords,
   stoppedWords,
   type LadderFacts,
   type LadderStopped,
+  type StatusNote,
 } from './escalation-alerts';
 import { flapCounts, timesWord, type Drop, type KeyPageFacts } from './relapse-alerts';
 import { resolvedLasted } from './resolve-alerts';
@@ -1260,6 +1263,8 @@ export interface StepEmailInput extends EmailBaseInput {
   stopped?: string;
   /** Sent with Escalate now while the engine was stopped (S12b, D-055): who sent it. */
   byHand?: string | null;
+  /** The FYI's Status (D-078): the incident's latest note. */
+  status?: StatusNote | null;
 }
 
 const andList = (names: readonly string[]) =>
@@ -1343,8 +1348,10 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
               ],
             ]
           : []),
+        // D-078 (Bua's item 3): the latest note as the status, and when they hear next.
+        ['Status', statusWords(input.status, sentAt)],
         ...(input.clientUpdate ? [['Client update', input.clientUpdate] as [string, string]] : []),
-        ['Next step', 'Recovery email when it’s back · no more escalation'],
+        ['Next update', FYI_NEXT_UPDATE],
       ],
       buttons: [{ label: 'Open incident', href: input.incidentUrl, primary: false }],
     });

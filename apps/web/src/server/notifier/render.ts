@@ -36,6 +36,7 @@ import {
   type EmailReason,
   type KeyPageFacts,
   type ProblemFacts,
+  type StatusNote,
   type StillExpiry,
   type VerifierDownReason,
   expiryNow,
@@ -268,6 +269,24 @@ function expiryBefore(i: IncidentFacts, before: Date, asOf: Date): string | null
     if (hit) return hit.cause;
   }
   return null;
+}
+
+/**
+ * The FYI's Status (D-078): the newest note written at or before `asOf` (the message's queue time, so a
+ * retry later doesn't show a note the first attempt couldn't have).
+ */
+export function latestNoteOf(i: IncidentFacts, asOf: Date): StatusNote | null {
+  const t = (at: string | null | undefined) => (at ? Date.parse(at) : Number.NaN);
+  let best: StatusNote | null = null;
+  for (const e of i.incident_events ?? []) {
+    if (e.type !== 'note') continue;
+    const at = t(e.at);
+    if (!(at <= asOf.getTime()) || (best && best.at.getTime() >= at)) continue;
+    const p = contextOf(e.payload);
+    if (typeof p.text !== 'string' || !p.text.trim()) continue;
+    best = { text: p.text, by: typeof p.by === 'string' && p.by ? p.by : 'Someone', at: new Date(at) };
+  }
+  return best;
 }
 
 /** The RECOVERED card's "still SSL expiring" (D-068): whoever acts now — the acker, else L0. */
@@ -531,6 +550,14 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         next: i.state === 'acknowledged' || byHandOf(ctx) ? null : step.next,
         informed: step.informed,
         acked: step.acked,
+        ...(step.kind === 'fyi'
+          ? {
+              cause: causeOf(i, new Date(n.created_at)),
+              since: againAtOf(i, 'down') ?? new Date(i.detected_at),
+              status: latestNoteOf(i, new Date(n.created_at)),
+              sentAt: new Date(n.created_at),
+            }
+          : {}),
       });
     }
     case 'reminder':
@@ -750,6 +777,7 @@ export function renderEmail(
         toldAt: toldAtOf(i),
         fallback: ctx.fallback === true,
         clientUpdate: step.kind === 'fyi' ? clientUpdateFact(i) : null,
+        status: step.kind === 'fyi' ? latestNoteOf(i, new Date(n.created_at)) : null,
       });
     }
     case 'acknowledged':

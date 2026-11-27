@@ -516,7 +516,7 @@ function drafts(f: GuideFacts): Draft[] {
           tone: 'info',
           title: 'Acknowledge stops the escalation — nothing else',
           text: fyi
-            ? `Later levels and reminders stop. The client-update track keeps running, and on Tier 1 DOWN the CEO and the site’s AM still get an FYI (no call) at +${fyi.delayMin} min if the site is still down.`
+            ? `Later levels and reminders stop. The client-update track keeps running, and on Tier 1 DOWN the CEO and the site’s AM still get an FYI (no call) at +${fyi.delayMin} min if the site is still down. The FYI shows your latest note as the status, so add one.`
             : 'Later levels and reminders stop. The client-update track keeps running.',
         },
       },

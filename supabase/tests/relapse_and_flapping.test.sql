@@ -4,7 +4,7 @@
 -- repeats on one incident, the < 5 min auto-resolve, and the engine's read RPCs.
 begin;
 \ir _helpers.psql
-select plan(47);
+select plan(48);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -12,7 +12,8 @@ create temp table ids (name text primary key, id uuid) on commit drop;
 grant select on ids to anon, authenticated;
 insert into ids values
   ('ploy', tests.create_user('ploy@pgtap.test', 'responder')),
-  ('tao',  tests.create_user('tao@pgtap.test', 'admin'));
+  ('tao',  tests.create_user('tao@pgtap.test', 'admin')),
+  ('ceo',  tests.create_user('ceo@pgtap.test', 'stakeholder'));
 
 insert into public.clients (id, name) values ('00000000-0000-0000-0000-0000000000c1', 'Client A');
 insert into public.sites (id, client_id, name, tier, primary_owner_id) values
@@ -132,6 +133,14 @@ select is(
   2, 'the 2nd DOWN AGAIN is its own reply (dedupe key = round)'
 );
 
+-- D-078: the CEO got the Tier 1 FYI email, Tao an ordinary step email (fixtures: the ladder itself
+-- is escalation_l2_l3.test.sql's). The summary is the CEO's "email when it's back"; Tao's isn't one.
+insert into public.notifications (incident_id, user_id, channel, template, thread_key, context, dedupe_key, status)
+values ((select id from inc where name = 'voca'), (select id from ids where name = 'ceo'), 'email', 'step_fired',
+        (select id::text from inc where name = 'voca'), '{"fyiStep": true, "level": 3}', 'down:L3', 'sent'),
+       ((select id from inc where name = 'voca'), (select id from ids where name = 'tao'), 'email', 'step_fired',
+        (select id::text from inc where name = 'voca'), '{"fyiStep": false, "level": 1}', 'down:L1', 'sent');
+
 -- 04:04 last recovery: the summary that will go at 04:19.
 select ok(public.engine_recover_incident((select id from inc where name = 'voca'), 'unacked', 'monitoring',
   '2026-09-21 04:04Z', '2026-09-21 04:04Z', '{}'::jsonb, true, null, null, true, false, true),
@@ -139,7 +148,14 @@ select ok(public.engine_recover_incident((select id from inc where name = 'voca'
 select is(
   (select count(*)::int from public.notifications where incident_id = (select id from inc where name = 'voca')
      and template = 'flap_summary' and status = 'queued' and hold_until = '2026-09-21 04:19Z'),
-  2, 'the summary waits for 04:19'
+  3, 'the summary waits for 04:19'
+);
+select results_eq(
+  $$select i.name from public.notifications n join ids i on i.id = n.user_id
+     where n.incident_id = (select id from inc where name = 'voca') and n.template = 'flap_summary'
+       and n.status = 'queued' order by i.name$$,
+  $$values ('ceo'), ('ploy')$$,
+  'the summary emails the owner and whoever the FYI step emailed, not other step people (D-078)'
 );
 
 -- Flips older than 30 min are dropped.

@@ -165,6 +165,51 @@ describe('render — L2 and the L3 FYI (S10)', () => {
     );
   });
 
+  // D-078: the FYI's Status is the newest note written before it was queued (10:48:42).
+  const fyiCtx = {
+    level: 3,
+    severity: 'down',
+    elapsedMin: 60,
+    mentioned: ['u-ceo', 'u-bua'],
+    fyi: [],
+    fyiStep: true,
+    ackedBy: 'Arm',
+    ackedAt: '2026-09-25T03:07:40Z',
+  };
+  const noted: IncidentFacts = {
+    ...t1,
+    state: 'acknowledged',
+    escalation_level: 3,
+    incident_events: [
+      { type: 'note', payload: { text: 'Looking at the host', by: 'Arm' }, at: '2026-09-25T03:10:00+00:00' },
+      { type: 'note', payload: { text: 'Restarting Redis', by: 'Ploy' }, at: '2026-09-25T03:30:02Z' },
+      { type: 'note', payload: { text: 'Written after the FYI', by: 'Arm' }, at: '2026-09-25T03:50:00Z' },
+      { type: 'acknowledged', payload: {}, at: '2026-09-25T03:40:00Z' },
+    ],
+  };
+  const queued = { created_at: '2026-09-25T03:48:42Z' };
+
+  it('the FYI card shows the latest note before it was queued (D-078)', () => {
+    const m = renderChat(row('step_fired', fyiCtx, queued), noted, appUrl, new Date('2026-09-25T03:55:00Z'))!;
+    const card = JSON.stringify(m.cardsV2);
+    expect(card).toContain('"topLabel":"Status","text":"Ploy 10:30 — Restarting Redis"');
+    expect(card).toContain('"topLabel":"Down for","text":"1 h (since 09:48)"');
+    expect(card).not.toContain('Written after the FYI');
+  });
+
+  it('the FYI email shows the same Status; no note gives "No status note yet" (D-078)', () => {
+    const email = (i: IncidentFacts) =>
+      renderEmail(
+        row('step_fired', { ...fyiCtx, asFyi: false }, { ...queued, channel: 'email', user_id: 'u-ceo' }),
+        i,
+        { id: 'u-ceo', display_name: 'CEO', email: 'ceo@example.test' },
+        appUrl,
+        thread,
+      )!;
+    expect(email(noted).text).toContain('Status: Ploy 10:30 — Restarting Redis');
+    expect(email({ ...noted, incident_events: [] }).text).toContain('Status: No status note yet');
+  });
+
   it('ACKNOWLEDGED · L1–L2 stopped', () => {
     const m = renderChat(
       row('acknowledged', { ackedBy: 'Arm', ackedAt: '2026-09-25T03:07:40Z', escalationLevel: 1 }),

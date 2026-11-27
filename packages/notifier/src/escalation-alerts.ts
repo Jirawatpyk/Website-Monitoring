@@ -1,5 +1,5 @@
 import { formatDay, formatDuration, formatTime, isSameBangkokDay } from '@dxt/shared';
-import { plainName, type ChatMessage, type ChatPerson } from './chat-alerts';
+import { plainName, type ChatMessage, type ChatPerson, type ChatWidget } from './chat-alerts';
 import { buildChatTextLine, type StepLevel } from './chat-text';
 
 /**
@@ -91,8 +91,9 @@ export function stoppedWords(
       : null;
     // §14.1's canonical sentence: "Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at
     // 10:48, CEO + Bua get an FYI (no call)."
+    // D-078: the FYI shows the latest note as the status, so ask for one.
     const fyi = s.fyi
-      ? ` If ${plainName(s.site ?? 'the site')} is still down at ${formatTime(s.fyi.at)}, ${plainName(s.fyi.who)} get an FYI (no call).`
+      ? ` If ${plainName(s.site ?? 'the site')} is still down at ${formatTime(s.fyi.at)}, ${plainName(s.fyi.who)} get an FYI (no call). Add a status note — they see it in the FYI.`
       : '';
     return { line: stopped, body: `${stopped}.${fyi}`, fact };
   }
@@ -145,7 +146,39 @@ export interface StepAlertInput {
   viewUrl?: string;
   /** Sent with Escalate now while the engine was stopped (S12b, D-055): who sent it. */
   byHand?: string | null;
+  /** The FYI card's facts (D-078): the cause line, when the drop was confirmed, the latest note. */
+  cause?: string | null;
+  since?: Date | null;
+  status?: StatusNote | null;
+  /** When the message was queued: a note or start on another day gets its date. */
+  sentAt?: Date;
 }
+
+/** The incident's latest note, the FYI's "Status" (D-078): people's words, cut short where shown. */
+export type StatusNote = { text: string; by: string; at: Date };
+
+/** The FYI's Next update (D-078): RECOVERED (or the flap summary) reaches everyone the FYI emailed. */
+export const FYI_NEXT_UPDATE = 'Email when it’s back · no more escalation';
+export const NO_STATUS_NOTE = 'No status note yet';
+const STATUS_CHARS = 200;
+
+/** "Arm 10:30 — restarting Redis…": one line, at most ~200 characters, cut at a word where there is one. */
+export function statusWords(s: StatusNote | null | undefined, now: Date): string {
+  if (!s) return NO_STATUS_NOTE;
+  const text = s.text.split(/\s+/).join(' ').trim();
+  if (!text) return NO_STATUS_NOTE;
+  let short = text;
+  if (text.length > STATUS_CHARS) {
+    const cut = text.slice(0, STATUS_CHARS);
+    const space = cut.lastIndexOf(' ');
+    short = `${space > STATUS_CHARS / 2 ? cut.slice(0, space) : cut}…`;
+  }
+  return `${plainName(s.by)} ${dayTime(s.at, now)} — ${short}`;
+}
+
+/** "10:30" today, else "Thu 24 Sep 23:10" (spec §13: a date only when it isn't today). */
+const dayTime = (d: Date, now: Date) =>
+  isSameBangkokDay(d, now) ? formatTime(d) : `${formatDay(d, { weekday: true })} ${formatTime(d)}`;
 
 /** The level as the text line names it: L1–L3 (the SQL keeps levels 0–3). */
 const levelOf = (n: number): StepLevel => (n >= 3 ? 3 : n <= 1 ? 1 : 2);
@@ -278,6 +311,22 @@ function stepAlert(input: StepAlertInput): ChatMessage {
   };
 }
 
+const factRow = (topLabel: string, text: string): ChatWidget => ({
+  decoratedText: { topLabel, text: text.replace(/</g, '&lt;'), wrapText: true },
+});
+
+/** The FYI card's facts (D-078, Bua's item 3): what's wrong, since when, the latest status, the next update. */
+function fyiRows(input: StepAlertInput, duration: string): ChatWidget[] {
+  const now = input.sentAt ?? new Date();
+  const since = input.since ? `${duration} (since ${dayTime(input.since, now)})` : duration;
+  return [
+    ...(input.cause ? [factRow('Cause', input.cause)] : []),
+    factRow('Down for', since),
+    factRow('Status', statusWords(input.status, now)),
+    factRow('Next update', FYI_NEXT_UPDATE),
+  ];
+}
+
 /**
  * The S10 steps (ChatAlert rows; D-048 for the FYI nobody acknowledged):
  *   · ceo:      `<users/CEO> ESCALATED · L2 · MuvMi DOWN 30 min, not acknowledged · Arm, Ploy, Tao informed`
@@ -344,6 +393,7 @@ function otherStepAlert(
             {
               widgets: [
                 { textParagraph: { text: body } },
+                ...(kind === 'fyi' ? fyiRows(input, duration) : []),
                 kind === 'reminder'
                   ? openButton(input.incidentUrl)
                   : {
