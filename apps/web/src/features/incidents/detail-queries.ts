@@ -973,7 +973,9 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
              sites!inner(name, tier, primary_owner_id, backup_owner_id,
                owner:profiles!sites_primary_owner_id_fkey(display_name))`,
           )
-          .or(`started_at.gte.${from},state.not.in.(resolved,in_review,closed)`)
+          // + resolved in the 30 days: an older incident down again in them counts toward MTTA (D-076);
+          // the list itself still shows by `inPeriod`
+          .or(`started_at.gte.${from},state.not.in.(resolved,in_review,closed),resolved_at.gte.${from}`)
           .order('started_at', { ascending: false })
           .order('id')
           .range(lo, hi)

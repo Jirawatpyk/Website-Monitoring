@@ -14,7 +14,8 @@ import { isInsideHours, minutesInsideHours } from './response-hours';
  * - MTTD = confirmed down − first failed check of the outage, Tier 1 DOWN incidents, manual ones left out
  *   (a hand-opened incident has no detection to measure). A PROBLEM raised to DOWN (D-021) counts from
  *   `downStartedAt`, not from the PROBLEM's start — the same start uptime uses.
- * An incident falls in a window by when its outage started.
+ * For MTTA an incident falls in every window one of its DOWN drops started in, and its ack in the window
+ * of the drop it answered (D-076); for MTTD, in the window its outage started in.
  * Neither is shown until the window holds `MIN_DOWN_INCIDENTS` DOWN incidents, open or closed.
  */
 export const MIN_DOWN_INCIDENTS = 3;
@@ -35,15 +36,33 @@ export interface MetricIncident {
   drops?: readonly MetricDrop[];
 }
 
-/** A drop as MTTA reads it: when it was confirmed, and at which severity. */
+/** A drop as MTTA reads it: when it started (the window, D-076), was confirmed, and at which severity. */
 export interface MetricDrop {
+  start: Date;
   confirmedAt: Date;
   severity: 'down' | 'problem';
 }
 
 /** The drops of an incident for MTTA (D-075); a drop's start stands in when no confirm is known. */
 export function metricDropsOf(episodes: readonly Episode[]): MetricDrop[] {
-  return episodes.map((e) => ({ confirmedAt: e.confirmedAt ?? e.start, severity: e.severity }));
+  return episodes.map((e) => ({
+    start: e.start,
+    confirmedAt: e.confirmedAt ?? e.start,
+    severity: e.severity,
+  }));
+}
+
+const outageStartOf = (i: MetricIncident) => i.downStartedAt ?? i.startedAt;
+const within = (d: Date, from: Date, to: Date) => d >= from && d < to;
+
+/**
+ * D-076: a DOWN incident falls in every window one of its DOWN drops started in — INC-0038, down 2 Nov
+ * and again 10 Nov, is in the weeks of both. Without drops read, its outage start decides (D-032).
+ */
+function downInWindow(i: MetricIncident, from: Date, to: Date): boolean {
+  if (i.severity !== 'down') return false;
+  if (!i.drops?.length) return within(outageStartOf(i), from, to);
+  return i.drops.some((d) => d.severity === 'down' && within(d.start, from, to));
 }
 
 /**
@@ -53,14 +72,25 @@ export function metricDropsOf(episodes: readonly Episode[]): MetricDrop[] {
  * re-review M1), while one during a PROBLEM drop (after an unacked DOWN recovered, or before any DOWN,
  * D-021) answered no DOWN and is left out, never measured from a DOWN that ended days before.
  */
-function ackedDropConfirm(i: MetricIncident): Date | null {
+function ackedDrop(i: MetricIncident): { start: Date; confirmedAt: Date } | null {
   const acked = i.ackedAt;
   if (!acked) return null;
-  if (!i.drops) return i.detectedAt && acked >= i.detectedAt ? i.detectedAt : null;
+  if (!i.drops?.length)
+    return i.detectedAt && acked >= i.detectedAt
+      ? { start: outageStartOf(i), confirmedAt: i.detectedAt }
+      : null;
   let latest: MetricDrop | null = null;
   for (const d of i.drops)
     if (d.confirmedAt <= acked && (!latest || d.confirmedAt >= latest.confirmedAt)) latest = d;
-  return latest?.severity === 'down' ? latest.confirmedAt : null;
+  return latest?.severity === 'down' ? latest : null;
+}
+
+/** The ack's wait in seconds, if the drop it answered started in [from, to) (D-075, D-076). */
+function ackWait(i: MetricIncident, from: Date, to: Date): { confirmedAt: Date; ackedAt: Date } | null {
+  const d = ackedDrop(i);
+  return d && i.ackedAt && within(d.start, from, to)
+    ? { confirmedAt: d.confirmedAt, ackedAt: i.ackedAt }
+    : null;
 }
 
 export interface ResponseKpis {
@@ -81,21 +111,23 @@ const mean = (values: readonly number[]) =>
 
 const seconds = (from: Date, to: Date) => Math.max(0, (to.getTime() - from.getTime()) / 1000);
 
-/** MTTA / MTTD over the DOWN incidents that started in [from, to). */
+/**
+ * MTTA over the DOWN incidents with a DOWN drop that started in [from, to), each ack in the window of the
+ * drop it answered (D-076); MTTD over the outages that began in it (its first failed check, D-032).
+ */
 export function responseKpis(incidents: readonly MetricIncident[], from: Date, to: Date): ResponseKpis {
-  const outageStart = (i: MetricIncident) => i.downStartedAt ?? i.startedAt;
-  const down = incidents.filter(
-    (i) => i.severity === 'down' && outageStart(i) >= from && outageStart(i) < to,
-  );
+  const down = incidents.filter((i) => downInWindow(i, from, to));
   const acks = down.flatMap((i) => {
-    const confirm = ackedDropConfirm(i);
-    return confirm && i.ackedAt ? [seconds(confirm, i.ackedAt)] : [];
+    const w = ackWait(i, from, to);
+    return w ? [seconds(w.confirmedAt, w.ackedAt)] : [];
   });
   const enough = down.length >= MIN_DOWN_INCIDENTS;
   const counts = { downCount: down.length, ackedCount: acks.length, enough };
   if (!enough) return { ...counts, mttaSeconds: null, mttdSeconds: null };
-  const detections = down.flatMap((i) =>
-    i.tier === 1 && !i.isManual && i.detectedAt ? [seconds(outageStart(i), i.detectedAt)] : [],
+  const detections = incidents.flatMap((i) =>
+    i.severity === 'down' && within(outageStartOf(i), from, to) && i.tier === 1 && !i.isManual && i.detectedAt
+      ? [seconds(outageStartOf(i), i.detectedAt)]
+      : [],
   );
   return { ...counts, mttaSeconds: mean(acks), mttdSeconds: mean(detections) };
 }
@@ -118,20 +150,17 @@ export function mttaByTier(
   tiers: readonly number[],
   hours: ResponseHours,
 ): { tier: number; seconds: number | null; acked: number; down: number }[] {
-  const outageStart = (i: MetricIncident) => i.downStartedAt ?? i.startedAt;
   return tiers.map((tier) => {
-    const down = incidents.filter((i) => {
-      const start = outageStart(i);
-      return i.severity === 'down' && i.tier === tier && start >= from && start < to;
-    });
+    // D-076: the tier's DOWNs with a drop that started this week, each ack in its drop's week
+    const down = incidents.filter((i) => i.tier === tier && downInWindow(i, from, to));
     let acked = 0;
     const acks = down.flatMap((i) => {
-      const confirm = ackedDropConfirm(i);
-      if (!confirm || !i.ackedAt) return [];
+      const w = ackWait(i, from, to);
+      if (!w) return [];
       acked += 1;
-      if (tier === 1) return [seconds(confirm, i.ackedAt)];
-      if (!isInsideHours(confirm, hours)) return [];
-      return [minutesInsideHours(confirm, i.ackedAt, hours) * 60];
+      if (tier === 1) return [seconds(w.confirmedAt, w.ackedAt)];
+      if (!isInsideHours(w.confirmedAt, hours)) return [];
+      return [minutesInsideHours(w.confirmedAt, w.ackedAt, hours) * 60];
     });
     return { tier, seconds: mean(acks), acked, down: down.length };
   });

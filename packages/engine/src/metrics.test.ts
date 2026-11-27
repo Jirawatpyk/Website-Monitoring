@@ -127,6 +127,7 @@ describe('responseKpis (spec §21.3, PRD §2 means, D-032)', () => {
 // not the 7 d 14 h from the first confirm that D-032 showed management.
 /** A drop: its confirm (Bangkok time) and severity; the end is kept for reading only. */
 const drop = (confirmedAt: string, _end?: string, severity: 'down' | 'problem' = 'down') => ({
+  start: at(confirmedAt),
   confirmedAt: at(confirmedAt),
   severity,
 });
@@ -276,9 +277,9 @@ describe('metricDropsOf (D-075)', () => {
         { start: t(30), end: null, severity: 'down' },
       ]),
     ).toEqual([
-      { confirmedAt: t(1), severity: 'down' },
-      { confirmedAt: t(12), severity: 'problem' },
-      { confirmedAt: t(30), severity: 'down' },
+      { start: t(0), confirmedAt: t(1), severity: 'down' },
+      { start: t(10), confirmedAt: t(12), severity: 'problem' },
+      { start: t(30), confirmedAt: t(30), severity: 'down' },
     ]);
   });
 });
@@ -409,13 +410,15 @@ describe('MTTA from a stored timeline (D-075, engine review)', () => {
     expect(k.ackedCount).toBe(expected === null ? 0 : 1);
   });
 
-  it('no drop read: the ack answered no DOWN that can be shown, so it is left out', () => {
+  it('no drop read: the incident’s own confirm stands for its one DOWN drop, as before D-075', () => {
     const k = responseKpis(
       [{ ...none('25'), ackedAt: utc('2026-11-25T23:00:00'), drops: [] }, none('25'), none('26')],
       FROM_NOV,
       NOV,
     );
-    expect(k).toMatchObject({ ackedCount: 0, mttaSeconds: null });
+    // confirmed 05:44:38 (22:44:38 UTC), acked 23:00:00 UTC → 15 min 22 s
+    expect(k.ackedCount).toBe(1);
+    expect(formatDurationSeconds(k.mttaSeconds!)).toBe('15 min 22 s');
   });
 
   it('acked during PROBLEM AGAIN after the DOWN recovered: left out (engine review M1)', () => {
@@ -430,6 +433,61 @@ describe('MTTA from a stored timeline (D-075, engine review)', () => {
     ]);
     const k = responseKpis([later, none('25'), none('26')], FROM_NOV, NOV);
     expect(k).toMatchObject({ mttaSeconds: null, ackedCount: 0, downCount: 3 });
+  });
+});
+
+// D-076: an incident counts in every window one of its DOWN drops started in; its ack counts in the
+// window of the drop it answered. INC-0038 (ENEOS): drops 2 Nov, 4 Nov, 10 Nov (acked 6 min in).
+describe('MTTA windows by DOWN drop (D-076)', () => {
+  const eneos = inc({
+    startedAt: at('2026-11-02T21:59:44'),
+    downStartedAt: at('2026-11-02T22:04:01'),
+    detectedAt: at('2026-11-02T22:05:14'),
+    ackedAt: at('2026-11-10T12:23:39'),
+    drops: [drop('2026-11-02T22:05:14'), drop('2026-11-04T07:43:39'), drop('2026-11-10T12:17:38')],
+  });
+  const one = (day: string): MetricIncident =>
+    inc({
+      startedAt: at(`2026-11-${day}T05:44:01`),
+      detectedAt: at(`2026-11-${day}T05:44:38`),
+      ackedAt: null,
+      drops: [drop(`2026-11-${day}T05:44:38`)],
+    });
+  const W2 = [at('2026-11-02T00:00:00'), at('2026-11-09T00:00:00')] as const;
+  const W9 = [at('2026-11-09T00:00:00'), at('2026-11-16T00:00:00')] as const;
+
+  it.each<[string, readonly [Date, Date], { down: number; acked: number; mtta: string | null }]>([
+    ['2–8 Nov: its first two drops are in it, the ack is not', W2, { down: 3, acked: 0, mtta: null }],
+    ['9–15 Nov: down again 10 Nov and acked 6 min later', W9, { down: 3, acked: 1, mtta: '6 min 1 s' }],
+  ])('%s', (_name, [from, to], expected) => {
+    const k = responseKpis([eneos, one('03'), one('05'), one('10'), one('12')], from, to);
+    expect(k.downCount).toBe(expected.down);
+    expect(k.ackedCount).toBe(expected.acked);
+    expect(k.mttaSeconds === null ? null : formatDurationSeconds(k.mttaSeconds)).toBe(expected.mtta);
+  });
+
+  it('a 30-day tile keeps INC-0038 after 2 Dec, while its acked drop (10 Nov) is in the 30 days', () => {
+    const k = responseKpis(
+      [eneos, one('20'), one('26')],
+      at('2026-11-03T00:00:00'),
+      at('2026-12-03T00:00:00'),
+    );
+    expect(k).toMatchObject({ downCount: 3, ackedCount: 1 });
+    expect(formatDurationSeconds(k.mttaSeconds!)).toBe('6 min 1 s');
+  });
+
+  it('MTTD still reads only outages that began in the window (its first failed check)', () => {
+    const k = responseKpis([eneos, one('10'), one('12')], ...W9);
+    // only the two one-drop incidents: 37 s each; INC-0038's outage began 2 Nov
+    expect(formatDurationSeconds(k.mttdSeconds!)).toBe('37 s');
+  });
+
+  it('weekly: the same window for each tier', () => {
+    const hours = { startMin: 9 * 60, endMin: 18 * 60, days: [1, 2, 3, 4, 5], holidays: new Set<string>() };
+    const [w9] = mttaByTier([eneos, one('10')], ...W9, [1], hours);
+    expect(w9).toEqual({ tier: 1, seconds: 361, acked: 1, down: 2 });
+    const [w2] = mttaByTier([eneos, one('03')], ...W2, [1], hours);
+    expect(w2).toEqual({ tier: 1, seconds: null, acked: 0, down: 2 });
   });
 });
 
