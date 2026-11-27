@@ -13,7 +13,8 @@ grant select on ids to anon, authenticated;
 insert into ids values
   ('ploy', tests.create_user('ploy@pgtap.test', 'responder')),
   ('tao',  tests.create_user('tao@pgtap.test', 'admin')),
-  ('ceo',  tests.create_user('ceo@pgtap.test', 'stakeholder'));
+  ('ceo',  tests.create_user('ceo@pgtap.test', 'stakeholder')),
+  ('am',   tests.create_user('am@pgtap.test', 'stakeholder'));
 
 insert into public.clients (id, name) values ('00000000-0000-0000-0000-0000000000c1', 'Client A');
 insert into public.sites (id, client_id, name, tier, primary_owner_id) values
@@ -140,6 +141,18 @@ values ((select id from inc where name = 'voca'), (select id from ids where name
         (select id::text from inc where name = 'voca'), '{"fyiStep": true, "level": 3}', 'down:L3', 'sent'),
        ((select id from inc where name = 'voca'), (select id from ids where name = 'tao'), 'email', 'step_fired',
         (select id::text from inc where name = 'voca'), '{"fyiStep": false, "level": 1}', 'down:L1', 'sent');
+-- Tao also got the FYI as the D-016 Chat fallback: that's the fallback's promise, not the step's.
+insert into public.notifications (incident_id, user_id, channel, template, thread_key, context, dedupe_key, status)
+values ((select id from inc where name = 'voca'), (select id from ids where name = 'tao'), 'email', 'step_fired',
+        (select id::text from inc where name = 'voca'), '{"fyiStep": true, "fallback": true, "level": 3}', 'down:L3', 'sent');
+-- The AM got the FYI two hours ago and a RECOVERED an hour ago: told it was back already, once is enough.
+insert into public.notifications
+  (incident_id, user_id, channel, template, thread_key, context, dedupe_key, status, created_at)
+values ((select id from inc where name = 'voca'), (select id from ids where name = 'am'), 'email', 'step_fired',
+        (select id::text from inc where name = 'voca'), '{"fyiStep": true, "level": 3}', 'down:L3', 'sent',
+        now() - interval '2 hours'),
+       ((select id from inc where name = 'voca'), (select id from ids where name = 'am'), 'email', 'recovered',
+        (select id::text from inc where name = 'voca'), '{}', 'am-back', 'sent', now() - interval '1 hour');
 
 -- 04:04 last recovery: the summary that will go at 04:19.
 select ok(public.engine_recover_incident((select id from inc where name = 'voca'), 'unacked', 'monitoring',
@@ -155,7 +168,7 @@ select results_eq(
      where n.incident_id = (select id from inc where name = 'voca') and n.template = 'flap_summary'
        and n.status = 'queued' order by i.name$$,
   $$values ('ceo'), ('ploy')$$,
-  'the summary emails the owner and whoever the FYI step emailed, not other step people (D-078)'
+  'the summary emails the owner and the FYI step''s people not yet told it was back — not other step people or the Chat fallback (D-078)'
 );
 
 -- Flips older than 30 min are dropped.

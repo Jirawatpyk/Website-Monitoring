@@ -148,6 +148,14 @@ begin
       where f.incident_id = p_incident_id and f.channel = 'email' and f.template = 'step_fired'
         and f.status <> 'cancelled' and f.user_id is not null
         and coalesce((f.context ->> 'fyiStep')::boolean, false)
+        -- the step's own people, not the D-016 Chat fallback's backup and Admins
+        and not coalesce((f.context ->> 'fallback')::boolean, false)
+        -- one "it's back" email per FYI: not again after a RECOVERED or summary since it
+        and not exists (
+          select 1 from public.notifications b
+          where b.incident_id = p_incident_id and b.channel = 'email' and b.user_id = f.user_id
+            and b.template in ('recovered', 'flap_summary') and b.status <> 'cancelled'
+            and b.created_at > f.created_at)
     ) r
     on conflict do nothing;
   elsif v_notify then
