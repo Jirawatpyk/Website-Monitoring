@@ -6,7 +6,13 @@ import {
   buildFlapSummaryEmail,
   buildStepEmail,
 } from './email-alerts';
-import { buildReminderAlert, buildStepAlert, formatResume, ladderLine } from './escalation-alerts';
+import {
+  buildReminderAlert,
+  buildStepAlert,
+  formatResume,
+  ladderLine,
+  statusWords,
+} from './escalation-alerts';
 import { buildAgainAlert } from './relapse-alerts';
 
 const bkk = (iso: string) => new Date(`${iso}+07:00`);
@@ -200,7 +206,35 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
     expect(msg.text).toBe(
       '<users/CEO> <users/BUA> FYI · L3 · MuvMi still DOWN 1 h · acknowledged by Arm 10:07 · no action needed',
     );
-    expect(JSON.stringify(msg.cardsV2)).toContain('Arm acknowledged at 10:07 and is working on it.');
+    const card = JSON.stringify(msg.cardsV2);
+    expect(card).toContain('Arm acknowledged at 10:07 and is working on it.');
+    // D-078: the text line is unchanged; the card carries Down for, Status and Next update.
+    expect(card).toContain('"topLabel":"Down for","text":"1 h"');
+    expect(card).toContain('"topLabel":"Status","text":"No status note yet"');
+    expect(card).toContain('"topLabel":"Next update","text":"Email when it’s back · no more escalation"');
+    expect(card).not.toContain('"topLabel":"Cause"');
+  });
+
+  it('L3 FYI card with cause, start and the latest note (D-078)', () => {
+    const msg = step({
+      level: 3,
+      elapsedMin: 60,
+      kind: 'fyi',
+      asked: [{ ...ceo, role: 'CEO' }],
+      acked: { by: 'Arm', at: bkk('2026-09-25T10:07:40') },
+      cause: 'HTTP 503 ×3',
+      since: bkk('2026-09-25T09:48:41'),
+      sentAt: bkk('2026-09-25T10:48:41'),
+      status: { text: 'Restarting <b>Redis</b>', by: 'Arm', at: bkk('2026-09-25T10:30:02') },
+    });
+    expect(msg.text).toBe(
+      '<users/CEO> FYI · L3 · MuvMi still DOWN 1 h · acknowledged by Arm 10:07 · no action needed',
+    );
+    const card = JSON.stringify(msg.cardsV2);
+    expect(card).toContain('"topLabel":"Cause","text":"HTTP 503 ×3"');
+    expect(card).toContain('"topLabel":"Down for","text":"1 h (confirmed down 09:48)"');
+    // People's words never carry markup into the card.
+    expect(card).toContain('"topLabel":"Status","text":"Arm 10:30 — Restarting &lt;b>Redis&lt;/b>"');
   });
 
   it('L3 FYI nobody acknowledged (D-048 draft)', () => {
@@ -250,7 +284,7 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
     expect(msg.text).toBe('ACKNOWLEDGED · MuvMi · by Arm 10:07 · L1–L2 stopped');
     // §14.1's canonical sentence.
     expect(JSON.stringify(msg.cardsV2)).toContain(
-      'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).',
+      'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call). Add a status note — they see it in the FYI.',
     );
   });
 
@@ -274,6 +308,30 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
       },
     });
     expect(m.text).toContain('Escalation: L2 cancelled · acked · L3 FYI at 10:48 if still down');
+    expect(m.text).toContain('Add a status note — they see it in the FYI.');
+  });
+
+  it('the AM’s ACKNOWLEDGED email doesn’t ask them for a status note (D-078)', () => {
+    const m = buildAcknowledgedEmail({
+      ...base,
+      recipientId: 'bua',
+      reason: 'emailed',
+      ackedBy: 'Arm',
+      ackedAt: bkk('2026-09-25T10:07:40'),
+      startedAt: bkk('2026-09-25T09:48:12'),
+      confirmedAt: bkk('2026-09-25T09:48:41'),
+      amReader: { marked: null, draftUrl: `${url}#client-update` },
+      stopped: {
+        severity: 'down',
+        backup: 'Ploy',
+        l1Fired: true,
+        stopsThrough: 2,
+        site: 'MuvMi',
+        fyi: { level: 3, at: bkk('2026-09-25T10:48:41'), who: 'CEO + Bua' },
+      },
+    });
+    expect(m.text).toContain('CEO + Bua get an FYI (no call).');
+    expect(m.text).not.toContain('Add a status note');
   });
 });
 
@@ -319,7 +377,54 @@ describe('S10 emails (EmailAlert L2 / L3)', () => {
     expect(m.html).toContain(
       'If the client needs a second update, the draft on the incident page is current.',
     );
-    expect(m.html).toContain('Recovery email when it’s back · no more escalation');
+    expect(m.html).toContain('Email when it’s back · no more escalation');
+    expect(m.html).toContain('No status note yet');
+  });
+  it('L3 FYI to the CEO carries the latest note as Status (D-078)', () => {
+    const m = email({
+      level: 3,
+      elapsedMin: 60,
+      kind: 'fyi',
+      readerIs: 'ceo',
+      sentAt: bkk('2026-09-25T10:48:41'),
+      cause: 'HTTP 503 ×3',
+      acked: { by: 'Arm', at: bkk('2026-09-25T10:07:40') },
+      status: { text: 'Restarting Redis; next update 11:00', by: 'Arm', at: bkk('2026-09-25T10:30:02') },
+    });
+    expect(m.text).toContain('Status: Arm 10:30 — Restarting Redis; next update 11:00');
+    expect(m.text).toContain('Next update: Email when it’s back · no more escalation');
+    expect(m.text).toContain('Cause: HTTP 503 ×3');
+  });
+});
+
+describe('statusWords (D-078)', () => {
+  const now = bkk('2026-09-25T10:48:41');
+  it.each([
+    ['no note', null, 'No status note yet'],
+    ['a blank note', { text: '  ', by: 'Arm', at: now }, 'No status note yet'],
+    [
+      'a note today',
+      { text: 'Restarting  Redis\n now', by: 'Arm', at: bkk('2026-09-25T10:30:00') },
+      'Arm 10:30 — Restarting Redis now',
+    ],
+    [
+      'a note from yesterday gets its day',
+      { text: 'Host ticket opened', by: 'Ploy', at: bkk('2026-09-24T23:10:00') },
+      'Ploy Thu 24 Sep 23:10 — Host ticket opened',
+    ],
+    ['a name with markup is plain', { text: 'ok', by: '<users/X>', at: now }, 'users/X 10:48 — ok'],
+  ])('%s', (_, note, want) => {
+    expect(statusWords(note, now)).toBe(want);
+  });
+  it('a long note is cut at a word near 200 characters', () => {
+    const text = `${'word '.repeat(60)}end`;
+    const got = statusWords({ text, by: 'Arm', at: now }, now);
+    expect(got.endsWith('word…')).toBe(true);
+    expect(got.length).toBeLessThanOrEqual('Arm 10:48 — '.length + 201);
+  });
+  it('a long note with no spaces (Thai) is cut at 200', () => {
+    const got = statusWords({ text: 'ก'.repeat(300), by: 'Arm', at: now }, now);
+    expect(got).toBe(`Arm 10:48 — ${'ก'.repeat(200)}…`);
   });
 });
 

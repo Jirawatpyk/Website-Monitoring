@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { IncidentFacts, Notification } from './facts';
 import { ladderFactsOf, toldAtOf } from './ladder-facts';
-import { renderChat, renderEmail } from './render';
+import { emailReason, renderChat, renderEmail } from './render';
 
 // INC-0142 MuvMi (Tier 1): confirmed 09:48:41 Bangkok; Arm owns, Ploy backs up, Tao the Admin (spec §4).
 const arm = { id: 'u-arm', display_name: 'Arm', google_chat_user_id: 'ARM' };
@@ -163,6 +163,93 @@ describe('render — L2 and the L3 FYI (S10)', () => {
     expect(m.text).toBe(
       '<users/CEO> <users/BUA> FYI · L3 · MuvMi still DOWN 1 h · acknowledged by Arm 10:07 · no action needed',
     );
+  });
+
+  // D-078: the FYI's Status is the newest note written before it was queued (10:48:42).
+  const fyiCtx = {
+    level: 3,
+    severity: 'down',
+    elapsedMin: 60,
+    mentioned: ['u-ceo', 'u-bua'],
+    fyi: [],
+    fyiStep: true,
+    ackedBy: 'Arm',
+    ackedAt: '2026-09-25T03:07:40Z',
+  };
+  const noted: IncidentFacts = {
+    ...t1,
+    state: 'acknowledged',
+    escalation_level: 3,
+    incident_events: [
+      { type: 'note', payload: { text: 'Looking at the host', by: 'Arm' }, at: '2026-09-25T03:10:00+00:00' },
+      { type: 'note', payload: { text: 'Restarting Redis', by: 'Ploy' }, at: '2026-09-25T03:30:02Z' },
+      { type: 'note', payload: { text: 'Written after the FYI', by: 'Arm' }, at: '2026-09-25T03:50:00Z' },
+      { type: 'acknowledged', payload: {}, at: '2026-09-25T03:40:00Z' },
+    ],
+  };
+  const queued = { created_at: '2026-09-25T03:48:42Z' };
+
+  it('the FYI card shows the latest note before it was queued (D-078)', () => {
+    const m = renderChat(row('step_fired', fyiCtx, queued), noted, appUrl, new Date('2026-09-25T03:55:00Z'))!;
+    const card = JSON.stringify(m.cardsV2);
+    expect(card).toContain('"topLabel":"Status","text":"Ploy 10:30 — Restarting Redis"');
+    expect(card).toContain('"topLabel":"Down for","text":"1 h (confirmed down 09:48)"');
+    expect(card).not.toContain('Written after the FYI');
+  });
+
+  it('after a PROBLEM went DOWN (D-021), "since" is the DOWN, not the PROBLEM (D-078)', () => {
+    const escalated: IncidentFacts = {
+      ...noted,
+      detected_at: '2026-09-25T01:00:00Z',
+      incident_events: [
+        { type: 'detected', payload: { severity: 'problem' }, at: '2026-09-25T01:00:00Z' },
+        {
+          type: 'escalated_to_down',
+          payload: { startedAt: '2026-09-25T02:48:41Z' },
+          at: '2026-09-25T02:48:41Z',
+        },
+      ],
+    };
+    const m = renderChat(
+      row('step_fired', fyiCtx, queued),
+      escalated,
+      appUrl,
+      new Date('2026-09-25T03:55:00Z'),
+    )!;
+    expect(JSON.stringify(m.cardsV2)).toContain('"topLabel":"Down for","text":"1 h (confirmed down 09:48)"');
+  });
+
+  it('the FYI email shows the same Status; no note gives "No status note yet" (D-078)', () => {
+    const email = (i: IncidentFacts) =>
+      renderEmail(
+        row('step_fired', { ...fyiCtx, asFyi: false }, { ...queued, channel: 'email', user_id: 'u-ceo' }),
+        i,
+        { id: 'u-ceo', display_name: 'CEO', email: 'ceo@example.test' },
+        appUrl,
+        thread,
+      )!;
+    expect(email(noted).text).toContain('Status: Ploy 10:30 — Restarting Redis');
+    expect(email({ ...noted, incident_events: [] }).text).toContain('Status: No status note yet');
+  });
+
+  it('the CEO’s RECOVERED after an FYI says they were emailed about it, not a Chat fallback (D-078)', () => {
+    const fyied: IncidentFacts = {
+      ...noted,
+      incident_events: [
+        ...noted.incident_events!,
+        {
+          type: 'step_fired',
+          payload: { level: 3, fyiStep: true, notified: ['u-ceo', 'u-bua'] },
+          at: '2026-09-25T03:48:42Z',
+        },
+      ],
+    };
+    expect(emailReason(row('recovered', {}, { channel: 'email', user_id: 'u-ceo' }), fyied)).toBe('emailed');
+    expect(emailReason(row('flap_summary', {}, { channel: 'email', user_id: 'u-ceo' }), fyied)).toBe(
+      'emailed',
+    );
+    // Someone no step told stays the D-016 fallback.
+    expect(emailReason(row('recovered', {}, { channel: 'email', user_id: 'u-x' }), fyied)).toBe('fallback');
   });
 
   it('ACKNOWLEDGED · L1–L2 stopped', () => {

@@ -36,6 +36,7 @@ import {
   type EmailReason,
   type KeyPageFacts,
   type ProblemFacts,
+  type StatusNote,
   type StillExpiry,
   type VerifierDownReason,
   expiryNow,
@@ -123,6 +124,17 @@ function againAtOf(i: IncidentFacts, severity: 'down' | 'problem'): Date | null 
   const drops = dropsOf(i).filter((d) => d.severity === severity);
   const last = drops.at(-1);
   return drops.length > 1 && last ? (last.confirmedAt ?? last.start) : null;
+}
+
+/**
+ * When the latest DOWN drop was confirmed (the FYI's "since", D-078): after a D-021 escalation that is
+ * the DOWN, not the PROBLEM's detection; with no DOWN drop recorded, the incident's detection.
+ */
+function downSinceOf(i: IncidentFacts): Date {
+  const last = dropsOf(i)
+    .filter((d) => d.severity === 'down')
+    .at(-1);
+  return last ? (last.confirmedAt ?? last.start) : new Date(i.detected_at);
 }
 
 /** How long it had been down at `at` (D-033's one number: DOWN drops only), for ACKNOWLEDGED "so far". */
@@ -268,6 +280,24 @@ function expiryBefore(i: IncidentFacts, before: Date, asOf: Date): string | null
     if (hit) return hit.cause;
   }
   return null;
+}
+
+/**
+ * The FYI's Status (D-078): the newest note written at or before `asOf` (the message's queue time, so a
+ * retry later doesn't show a note the first attempt couldn't have).
+ */
+export function latestNoteOf(i: IncidentFacts, asOf: Date): StatusNote | null {
+  const t = (at: string | null | undefined) => (at ? Date.parse(at) : Number.NaN);
+  let best: StatusNote | null = null;
+  for (const e of i.incident_events ?? []) {
+    if (e.type !== 'note') continue;
+    const at = t(e.at);
+    if (!(at <= asOf.getTime()) || (best && best.at.getTime() >= at)) continue;
+    const p = contextOf(e.payload);
+    if (typeof p.text !== 'string' || !p.text.trim()) continue;
+    best = { text: p.text, by: typeof p.by === 'string' && p.by ? p.by : 'Someone', at: new Date(at) };
+  }
+  return best;
 }
 
 /** The RECOVERED card's "still SSL expiring" (D-068): whoever acts now — the acker, else L0. */
@@ -531,6 +561,14 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         next: i.state === 'acknowledged' || byHandOf(ctx) ? null : step.next,
         informed: step.informed,
         acked: step.acked,
+        ...(step.kind === 'fyi'
+          ? {
+              cause: causeOf(i, new Date(n.created_at)),
+              since: downSinceOf(i),
+              status: latestNoteOf(i, new Date(n.created_at)),
+              sentAt: new Date(n.created_at),
+            }
+          : {}),
       });
     }
     case 'reminder':
@@ -615,6 +653,14 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
       (contextOf(e.payload).mention as { id?: unknown } | undefined)?.id === n.user_id,
   );
   if (n.user_id && told) return 'emailed';
+  // Anyone a step told (the Tier 1 FYI's CEO and AM): their RECOVERED / flap summary is the "email when
+  // it's back" the FYI promised (D-078), not a Chat fallback.
+  const stepped = (i.incident_events ?? []).some((e) => {
+    if (e.type !== 'step_fired') return false;
+    const notified = contextOf(e.payload).notified;
+    return Array.isArray(notified) && notified.includes(n.user_id);
+  });
+  if (n.user_id && stepped) return 'emailed';
   // Someone the L0 pencil adds (S10): told at once by email too, then followed up like anyone emailed.
   if (n.user_id && l0PeopleOf(i).includes(n.user_id)) return L0_TEMPLATES.has(n.template) ? 'l0' : 'emailed';
   if (n.template === 'resolved') return 'emailed';
@@ -742,7 +788,8 @@ export function renderEmail(
         // When it was queued: after a relapse the elapsed minutes are the down minutes only (D-058).
         sentAt: new Date(n.created_at),
         downAgainAt: againAtOf(i, ctx.severity === 'problem' ? 'problem' : 'down'),
-        confirmedAt: new Date(i.detected_at),
+        // The FYI's "confirmed down" is the DOWN's own confirmation, not a PROBLEM before it (D-021, D-078).
+        confirmedAt: step.kind === 'fyi' ? downSinceOf(i) : new Date(i.detected_at),
         owner: l0Of(i)?.display_name ?? null,
         asFyi,
         asked: namedIn(i, n.context).askedNames.join(' and ') || null,
@@ -750,6 +797,7 @@ export function renderEmail(
         toldAt: toldAtOf(i),
         fallback: ctx.fallback === true,
         clientUpdate: step.kind === 'fyi' ? clientUpdateFact(i) : null,
+        status: step.kind === 'fyi' ? latestNoteOf(i, new Date(n.created_at)) : null,
       });
     }
     case 'acknowledged':
