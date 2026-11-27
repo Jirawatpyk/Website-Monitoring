@@ -73,6 +73,8 @@ export interface ListIncident {
   rootCauseCategory: string | null;
   rootCause: string | null;
   rootCauseFix: string | null;
+  /** D-077: what stops it happening again (internal); absent from older fixtures. */
+  preventiveAction?: string | null;
   /** Its drops from the timeline (`episodesFromTimeline`), for how long it was down (`outageMinutes`). */
   drops: { start: string; end: string | null; severity: Severity; confirmedAt?: string | null }[];
   /** §37.9: the home page came back with something still failing (`listStillFailing`); else null. */
@@ -1426,11 +1428,18 @@ export function timelineOf(
             : '';
         const what = str(e.payload.what);
         const fix = str(e.payload.fix);
+        const prevent = str(e.payload.prevent);
         item(
           e,
           'root_cause',
           `${verb} by ${by}${suffix}`,
-          [rootCauseLabel(category), what ? `“${what}”` : null, fix ? `Fix: ${fix}` : null]
+          [
+            rootCauseLabel(category),
+            what ? `“${what}”` : null,
+            fix ? `Fix: ${fix}` : null,
+            // D-077: the preventive action (internal)
+            prevent ? `Prevent: ${prevent}` : null,
+          ]
             .filter(Boolean)
             .join(' · ') || null,
         );

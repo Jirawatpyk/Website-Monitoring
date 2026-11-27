@@ -638,6 +638,17 @@ describe('root cause and the MTTA note (message-checker S14)', () => {
     expect(w.sections.find((x) => x.title?.startsWith('INCIDENTS'))!.rows[0]!.text).toBe(
       'ORCA Thailand · Thu 24 Sep 22:14 · Hard fail · provider reboot',
     );
+    // D-077: the preventive action follows the root cause in the weekly summary; the daily digest stays
+    const p = weeklyModel(
+      weekly({ incidents: [incident({ rootCause: 'provider reboot', prevention: 'Disk alert at 80%' })] }),
+    );
+    expect(p.sections.find((x) => x.title?.startsWith('INCIDENTS'))!.rows[0]!.text).toBe(
+      'ORCA Thailand · Thu 24 Sep 22:14 · Hard fail · provider reboot · prevent: disk alert at 80%',
+    );
+    expect(
+      digestModel(digest({ yesterday: [incident({ rootCause: 'cert renewed', prevention: 'Disk alert' })] }))
+        .sections[1]!.rows[0]!.text,
+    ).not.toContain('prevent');
   });
 
   it('Tier 1 with no DOWN says so without "outside response hours" (it is 24/7)', () => {

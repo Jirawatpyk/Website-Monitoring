@@ -84,6 +84,8 @@ function incidentLine(i: ReportIncident): IncidentLine {
       ? [`client updated by ${plainName(i.clientUpdate.by)} ${formatTime(i.clientUpdate.at)}`]
       : []),
     i.rootCause ? `root cause: ${midSentence(i.rootCause)}` : 'no root cause yet',
+    // D-077: internal, the CEO's summary only
+    ...(i.prevention ? [`prevent: ${midSentence(i.prevention)}`] : []),
   ];
   return {
     badge: badgeOf(i),

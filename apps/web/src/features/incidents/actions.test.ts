@@ -178,7 +178,23 @@ describe('note, root cause, resolve (S07, D-033)', () => {
       p_category: 'hosting',
       p_what: 'Host rebooted',
       p_fix: '',
+      p_prevent: '',
     });
+  });
+
+  it('sends the preventive action, trimmed; over 500 characters is refused at its field (D-077)', async () => {
+    m.rpc.mockResolvedValue({ data: null, error: null });
+    expect(await saveRootCause({ ...rc, prevent: '  Disk alert at 80%  ' })).toEqual({ ok: true });
+    expect(m.rpc).toHaveBeenCalledWith(
+      'save_root_cause',
+      expect.objectContaining({ p_prevent: 'Disk alert at 80%' }),
+    );
+    m.rpc.mockClear();
+    expect(await saveRootCause({ ...rc, prevent: 'p'.repeat(501) })).toMatchObject({
+      ok: false,
+      field: 'prevent',
+    });
+    expect(m.rpc).not.toHaveBeenCalled();
   });
 
   it('resolves, then sends RESOLVED once the window closes', async () => {

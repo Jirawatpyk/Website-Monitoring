@@ -36,9 +36,11 @@ export interface RootCauseValue {
   category: string;
   what: string;
   fix: string;
+  /** D-077: internal, optional. */
+  prevent: string;
 }
 
-type Field = 'category' | 'what' | 'fix';
+type Field = 'category' | 'what' | 'fix' | 'prevent';
 
 /** The root-cause fields (Incident "Root cause" dialog and Resolve, D-033): one form, both places. */
 function RootCauseFields({
@@ -89,6 +91,15 @@ function RootCauseFields({
         error={errors.fix}
         placeholder={stillDown ? 'Leave empty while it’s still down' : 'e.g. Host restarted the app server'}
       />
+      <TextField
+        label="Preventive action"
+        optional
+        value={value.prevent}
+        onChange={(e) => onChange({ ...value, prevent: e.target.value })}
+        error={errors.prevent}
+        placeholder="e.g. Alert when the server's disk passes 80%"
+        hint="Internal — what stops it happening again. Not in the client report."
+      />
     </div>
   );
 }
@@ -100,7 +111,8 @@ function check(v: RootCauseValue): Partial<Record<Field, string>> {
   const out: Partial<Record<Field, string>> = {};
   for (const issue of r.error.issues) {
     const f = issue.path[0];
-    if ((f === 'category' || f === 'what' || f === 'fix') && !out[f]) out[f] = issue.message;
+    if ((f === 'category' || f === 'what' || f === 'fix' || f === 'prevent') && !out[f])
+      out[f] = issue.message;
   }
   return out;
 }

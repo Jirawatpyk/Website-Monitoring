@@ -115,6 +115,18 @@ describe('runReportDrafts (D-073 item 13)', () => {
     expect(row.figures.sites.map((s) => s.name)).toEqual(['BA China', 'BA Taiwan']); // the Draft site is left out
   });
 
+  it('never carries the preventive action into the client report (internal, D-077)', async () => {
+    const f = db({
+      'incidents.select': {
+        data: INCIDENTS.map((i) => ({ ...i, preventive_action: 'INTERNAL-ONLY disk alert' })),
+      },
+    });
+    await runReportDrafts(f.db, NOW, render);
+    const up = f.calls.find((c) => c.table === 'client_reports' && c.op === 'upsert')!;
+    expect(JSON.stringify(up.values)).not.toContain('INTERNAL-ONLY');
+    expect(JSON.stringify(up.values)).toContain('Hosting fault'); // the root cause does go in
+  });
+
   it('leaves an unchanged draft alone and refreshes a changed one', async () => {
     const first = db();
     await runReportDrafts(first.db, NOW, render);

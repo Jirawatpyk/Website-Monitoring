@@ -17,10 +17,10 @@ export type AckResult = { ok: true; postsAt: string } | { ok: false; message: st
 export type UndoResult = { ok: true } | { ok: false; message: string };
 export type NoteResult = { ok: true } | { ok: false; message: string };
 export type RootCauseResult =
-  { ok: true } | { ok: false; message: string; field?: 'category' | 'what' | 'fix' };
+  { ok: true } | { ok: false; message: string; field?: 'category' | 'what' | 'fix' | 'prevent' };
 export type ResolveResult =
   | { ok: true; postsAt: string; notifies: boolean }
-  | { ok: false; message: string; field?: 'category' | 'what' | 'fix' };
+  | { ok: false; message: string; field?: 'category' | 'what' | 'fix' | 'prevent' };
 
 /** Database refusals in words (`ack_incident` / `undo_ack` error codes). */
 const REFUSALS: Record<string, string> = {
@@ -86,8 +86,8 @@ export async function undoAcknowledge(incidentId: string): Promise<UndoResult> {
   return { ok: true };
 }
 
-const fieldOf = (path: PropertyKey | undefined): 'category' | 'what' | 'fix' | undefined =>
-  path === 'category' || path === 'what' || path === 'fix' ? path : undefined;
+const fieldOf = (path: PropertyKey | undefined): 'category' | 'what' | 'fix' | 'prevent' | undefined =>
+  path === 'category' || path === 'what' || path === 'fix' || path === 'prevent' ? path : undefined;
 
 /**
  * A note on the timeline and the NOTE reply in the thread, sent at once (§16.5: no @mention, no
@@ -114,13 +114,14 @@ export async function saveRootCause(input: RootCauseInput): Promise<RootCauseRes
     const issue = parsed.error.issues[0]!;
     return { ok: false, message: issue.message, field: fieldOf(issue.path[0]) };
   }
-  const { incidentId, category, what, fix } = parsed.data;
+  const { incidentId, category, what, fix, prevent } = parsed.data;
   const supabase = await createClient();
   const { error } = await supabase.rpc('save_root_cause', {
     p_incident_id: incidentId,
     p_category: category,
     p_what: what,
     p_fix: fix,
+    p_prevent: prevent,
   });
   if (error) return { ok: false, message: refusal(error, ACT_REFUSALS) };
   revalidate(incidentId);
@@ -164,13 +165,14 @@ export async function resolveIncident(input: RootCauseInput): Promise<ResolveRes
     const issue = parsed.error.issues[0]!;
     return { ok: false, message: issue.message, field: fieldOf(issue.path[0]) };
   }
-  const { incidentId, category, what, fix, acceptCheckId } = parsed.data;
+  const { incidentId, category, what, fix, prevent, acceptCheckId } = parsed.data;
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('resolve_incident', {
     p_incident_id: incidentId,
     p_category: category,
     p_what: what,
     p_fix: fix,
+    p_prevent: prevent,
     ...(acceptCheckId ? { p_accept_check_id: acceptCheckId } : {}),
   });
   if (error) return { ok: false, message: refusal(error, ACT_REFUSALS) };

@@ -64,7 +64,7 @@ const person = (
 ): ReportPerson | null => (p ? { name: p.display_name, chatUserId: p.google_chat_user_id } : null);
 
 const INCIDENT_COLUMNS = `number, state, severity, trigger, started_at, resolved_at, detected_at, acked_at, is_manual,
-  escalation_level, client_updated_at, client_update_not_needed, root_cause_category, root_cause, root_cause_fix,
+  escalation_level, client_updated_at, client_update_not_needed, root_cause_category, root_cause, root_cause_fix, preventive_action,
   sites!inner(id, name, tier, is_active, owner:profiles!sites_primary_owner_id_fkey(display_name, google_chat_user_id)),
   acker:profiles!incidents_acked_by_fkey(display_name),
   updater:profiles!incidents_client_updated_by_fkey(display_name),
@@ -110,6 +110,7 @@ const toLoaded = (i: IncidentQueryRow): LoadedIncident => ({
   root_cause_category: i.root_cause_category,
   root_cause: i.root_cause,
   root_cause_fix: i.root_cause_fix,
+  preventive_action: i.preventive_action,
   site: { name: i.sites.name, tier: i.sites.tier, owner: person(i.sites.owner) },
   siteId: i.sites.id,
   siteActive: i.sites.is_active,

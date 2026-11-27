@@ -48,6 +48,7 @@ export async function incidentsListCsv(query: URLSearchParams, now = new Date())
       'Owner',
       'Root cause',
       'What happened',
+      'Preventive action',
     ],
     rows.map((i) => [
       formatIncidentId(i.number),
@@ -62,6 +63,7 @@ export async function incidentsListCsv(query: URLSearchParams, now = new Date())
       i.ownerName,
       rootCauseLabel(i.rootCauseCategory),
       i.rootCause,
+      i.preventiveAction ?? null,
     ]),
   );
   return csvResponse(body, `incidents-last-${f.period}-days.csv`);

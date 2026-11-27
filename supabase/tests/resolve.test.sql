@@ -3,7 +3,7 @@
 -- S06-review guard on engine_relapse_incident.
 begin;
 \ir _helpers.psql
-select plan(78);
+select plan(83);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -135,6 +135,9 @@ select throws_ok(format($$select public.save_root_cause(%L, 'aliens', 'x', null)
   '22023', null, 'a category outside the nine is refused');
 select throws_ok(format($$select public.save_root_cause(%L, 'hosting', '  ', null)$$, (select id from inc where name = 'a')),
   '22023', null, '"What happened" is required');
+select throws_ok(format($$select public.save_root_cause(%L, 'hosting', 'x', null, %L)$$,
+  (select id from inc where name = 'a'), repeat('p', 501)),
+  '22023', 'Keep the preventive action under 500 characters', 'a preventive action over 500 characters is refused (D-077)');
 select lives_ok(format($$select public.save_root_cause(%L, 'hosting', 'Host rebooted the app server', '')$$,
   (select id from inc where name = 'a')), 'the owner saves a draft while it is still down');
 reset role;
@@ -201,7 +204,8 @@ values ((select id from inc where name = 'a'), 'google_chat', 'flap_summary',
         (select id from inc where name = 'a')::text, 'r1', now() + interval '12 minutes');
 
 select tests.authenticate_as((select id from ids where name = 'arm'));
-select is(public.resolve_incident((select id from inc where name = 'a'), 'hosting', 'Host rebooted the app server', 'Host restarted it'),
+select is(public.resolve_incident((select id from inc where name = 'a'), 'hosting', 'Host rebooted the app server', 'Host restarted it',
+  null, '  Disk alert at 80% on the host  '),
   now() + interval '10 seconds', 'all three met: resolved; messages go out 10 s later');
 reset role;
 select is(
@@ -224,6 +228,24 @@ select is(
   (select status::text || '/' || error from public.notifications where template = 'flap_summary'),
   'cancelled/Superseded: resolved',
   'the held flap summary is cancelled (S04b carry-over)'
+);
+select is(
+  (select preventive_action from public.incidents where id = (select id from inc where name = 'a')),
+  'Disk alert at 80% on the host', 'the preventive action is stored, trimmed (D-077)'
+);
+select is(
+  (select count(*)::int from public.notifications where template = 'resolved' and context ? 'prevent'),
+  0, 'it never rides in a RESOLVED message (internal only, D-077)'
+);
+select is(
+  (select after->>'prevent' from public.audit_log where action = 'incident.resolved'
+   and entity_id = (select id from inc where name = 'a')),
+  'Disk alert at 80% on the host', 'the resolve audit row carries it'
+);
+select is(
+  (select payload->>'prevent' from public.incident_events where type = 'resolved'
+   and incident_id = (select id from inc where name = 'a') order by at desc limit 1),
+  'Disk alert at 80% on the host', 'the timeline''s resolved event carries it'
 );
 select is(
   (select count(*)::int from public.claim_notifications('google_chat', 10) where template = 'resolved'),

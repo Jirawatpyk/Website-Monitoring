@@ -63,7 +63,7 @@ describe('Incidents CSV (D-033)', () => {
     expect(res.headers.get('content-disposition')).toContain('incidents-last-30-days.csv');
     const text = await res.text();
     expect(text.split('\r\n')[0]).toBe(
-      'Incident,Site,Severity,Trigger,State,Started (UTC+7),Recovered (UTC+7),Resolved (UTC+7),Duration,Owner,Root cause,What happened',
+      'Incident,Site,Severity,Trigger,State,Started (UTC+7),Recovered (UTC+7),Resolved (UTC+7),Duration,Owner,Root cause,What happened,Preventive action',
     );
     expect(text).toContain('INC-0139,ORCA Thailand,Down,Hard fail,Resolved,');
     expect(text).toContain(`Hosting / server,"'=Host rebooted, ""quietly"""`);

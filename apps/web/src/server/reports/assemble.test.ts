@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   causeOf,
   expiringOf,
+  preventionOf,
   reportIncident,
   rootCauseOf,
   roundsOf,
@@ -273,6 +274,14 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
     ],
   ])('rootCauseOf: %s', (_n, over, expected) => {
     expect(rootCauseOf(row(over))).toBe(expected);
+  });
+
+  it('preventionOf: the preventive action cut like the root cause; none when blank (D-077)', () => {
+    expect(
+      preventionOf(row({ preventive_action: 'Alert when the disk passes 80%. Also rotate logs.' })),
+    ).toBe('Alert when the disk passes 80%');
+    expect(preventionOf(row({ preventive_action: '   ' }))).toBeNull();
+    expect(preventionOf(row({}))).toBeNull();
   });
 
   it('an open drop runs to now (still failing), and names who acked and updated the client', () => {

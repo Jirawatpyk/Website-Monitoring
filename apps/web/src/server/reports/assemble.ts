@@ -52,6 +52,7 @@ export interface IncidentRow {
   root_cause_category?: string | null;
   root_cause?: string | null;
   root_cause_fix?: string | null;
+  preventive_action?: string | null;
   site: { name: string; tier: number; owner: ReportPerson | null };
   acker: { display_name: string } | null;
   updater: { display_name: string } | null;
@@ -73,7 +74,17 @@ const ROOT_CAUSE_WORDS = 60;
  */
 export function rootCauseOf(row: IncidentRow): string | null {
   if (!row.root_cause_category || row.root_cause_category === 'unknown') return null;
-  const words = (row.root_cause_fix?.trim() || row.root_cause?.trim() || '').split(/\s+/).join(' ');
+  return fewWords(row.root_cause_fix?.trim() || row.root_cause?.trim() || '');
+}
+
+/** D-077: the preventive action for the weekly summary, cut like the root cause; null with none. */
+export function preventionOf(row: IncidentRow): string | null {
+  return fewWords(row.preventive_action?.trim() ?? '');
+}
+
+/** The first sentence, cut at a word to about 60 characters; null when empty. */
+function fewWords(text: string): string | null {
+  const words = text.split(/\s+/).join(' ');
   if (!words) return null;
   const first = words.split(/(?<=[.!?])\s/)[0]!.replace(/[.!?]$/, '');
   if (first.length <= ROOT_CAUSE_WORDS) return first;
@@ -180,6 +191,7 @@ export function reportIncident(
     cause: causeOf(row, severity, first.start, now),
     outsideHours: !inside(first.start),
     rootCause: rootCauseOf(row),
+    prevention: preventionOf(row),
     state: row.state,
     owner: row.site.owner,
     level: row.escalation_level,

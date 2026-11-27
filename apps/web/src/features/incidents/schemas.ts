@@ -23,6 +23,8 @@ export const rootCauseSchema = z.object({
     .min(1, 'Required — say what happened, even if the site recovered on its own.')
     .max(2000, 'Keep it under 2,000 characters'),
   fix: z.string().trim().max(500, 'Keep it under 500 characters').default(''),
+  /** D-077: what stops it happening again — optional, internal (never in the client report). */
+  prevent: z.string().trim().max(500, 'Keep it under 500 characters').default(''),
   /**
    * S09d (spec §26.7, D-046 item 10): a Page change resolved as Client-side change by an Admin may also
    * accept this plain fetch as the new baseline — the SQL checks the rest.
