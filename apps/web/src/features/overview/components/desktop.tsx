@@ -193,7 +193,7 @@ export function Kpis({
         value={kpis.enough && kpis.mttaSeconds !== null ? formatDurationSeconds(kpis.mttaSeconds) : '—'}
         caption={stale(
           kpis.enough
-            ? `DOWN, all tiers · ${formatAckedCount(kpis.ackedCount, kpis.downCount)} · target ≤ 15 min`
+            ? `DOWN, all tiers · ${formatAckedCount(kpis.ackedCount, kpis.downCount)} · target ≤\u00a015\u00a0min`
             : notEnough,
         )}
         change={kpis.enough && !asOf ? changeOf(kpis.mttaChange) : undefined}

@@ -218,6 +218,20 @@ describe('weekly email (WeeklyEmail board, §36)', () => {
     ]);
   });
 
+  it('MTTA plain text: one tier a line, so the counts never run into the next tier (D-075)', () => {
+    const b = busy();
+    const mail = weeklyEmail({
+      ...b,
+      mtta: [
+        { tier: 1, seconds: 361, targetMin: 15, acked: 1, down: 3 },
+        { tier: 2, seconds: null, targetMin: 30, acked: 1, down: 2 },
+      ],
+    });
+    expect(mail.text).toContain(
+      'Tier 1 6 min · target 15 · 1 of 3 acknowledged\nTier 2 — (no ack in hours) · 1 of 2 acknowledged',
+    );
+  });
+
   it('renders email-safe HTML with a dark set, a phone layout and a plain-text part in the same order', () => {
     const mail = weeklyEmail(busy());
     expect(mail.subject).toBe('DxT Monitor · Weekly summary · 9–15 Nov');

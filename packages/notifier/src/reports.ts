@@ -402,12 +402,12 @@ export function digestModel(f: DigestFacts): ReportModel {
   };
 }
 
-/** "09:48" today, "Thu 24 Sep 22:14" another day. */
 /** "1 of 2 acknowledged" for a tier with DOWNs that week (D-075); null with none or an older caller. */
 export function mttaAckedCount(m: WeeklyFacts['mtta'][number]): string | null {
   return m.down ? formatAckedCount(m.acked ?? 0, m.down) : null;
 }
 
+/** "09:48" today, "Thu 24 Sep 22:14" another day. */
 function formatWhenShort(d: Date, at: Date): string {
   return isSameBangkokDay(d, at) ? formatTime(d) : dayTime(d);
 }
@@ -545,8 +545,11 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
   const mttaNote = f.mtta
     .map((m) => {
       const count = mttaAckedCount(m);
-      // D-075: DOWNs nobody acknowledged say so, never "(no DOWN)"
-      if (m.seconds === null && count && !m.acked) return `Tier ${m.tier} — ${count}`;
+      // D-075: a tier with DOWNs never says "(no DOWN)": nobody acked them, or no ack fell in hours
+      if (m.seconds === null && count)
+        return m.acked
+          ? `Tier ${m.tier} — (no ack inside response hours), ${count}`
+          : `Tier ${m.tier} — ${count}`;
       const words =
         m.seconds === null
           ? m.tier === 1

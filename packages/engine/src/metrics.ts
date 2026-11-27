@@ -28,24 +28,40 @@ export interface MetricIncident {
   ackedAt: Date | null;
   isManual: boolean;
   /**
-   * The confirm of each DOWN drop (`downConfirmsOf` over the incident's episodes, D-075). Absent: the
+   * Each DOWN drop's confirm and end (`downDropsOf` over the incident's episodes, D-075). Absent: the
    * incident's `detectedAt` stands for its one drop, as before D-075.
    */
-  downConfirms?: readonly Date[];
+  downDrops?: readonly MetricDrop[];
 }
 
-/** The confirm of each DOWN drop of an incident (D-075); the drop's start when no confirm is known. */
-export function downConfirmsOf(episodes: readonly Episode[]): Date[] {
-  return episodes.filter((e) => e.severity === 'down').map((e) => e.confirmedAt ?? e.start);
+/** A DOWN drop as MTTA reads it: confirmed at, and over at (null while still down). */
+export interface MetricDrop {
+  confirmedAt: Date;
+  end: Date | null;
 }
 
-/** The confirm the ack answered (D-075): the latest DOWN drop confirmed at or before it; null if none. */
+/** The DOWN drops of an incident (D-075); a drop's start stands in when no confirm is known. */
+export function downDropsOf(episodes: readonly Episode[]): MetricDrop[] {
+  return episodes
+    .filter((e) => e.severity === 'down')
+    .map((e) => ({ confirmedAt: e.confirmedAt ?? e.start, end: e.end }));
+}
+
+/**
+ * The confirm the ack answered (D-075): the DOWN drop open at the ack (confirmed at or before it, not
+ * over before it). An ack only lands while the incident is Unacked / Escalated, so in a drop: one given
+ * during a PROBLEM drop — after an unacked DOWN drop recovered, or before any DOWN — answered no DOWN
+ * and is left out (engine review M1), not measured from a DOWN that ended days before.
+ */
 function ackedDropConfirm(i: MetricIncident): Date | null {
   const acked = i.ackedAt;
   if (!acked) return null;
-  if (!i.downConfirms) return i.detectedAt && acked >= i.detectedAt ? i.detectedAt : null;
+  if (!i.downDrops) return i.detectedAt && acked >= i.detectedAt ? i.detectedAt : null;
   let found: Date | null = null;
-  for (const c of i.downConfirms) if (c <= acked && (!found || c > found)) found = c;
+  for (const d of i.downDrops) {
+    const open = d.confirmedAt <= acked && (d.end === null || d.end > acked);
+    if (open && (!found || d.confirmedAt > found)) found = d.confirmedAt;
+  }
   return found;
 }
 

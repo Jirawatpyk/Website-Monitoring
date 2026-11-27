@@ -5,7 +5,7 @@
  */
 import {
   canResolve,
-  downConfirmsOf,
+  downDropsOf,
   mttrMinutes,
   outageMinutes,
   episodesFromTimeline,
@@ -475,8 +475,8 @@ const toMetric = (i: ListIncident): MetricIncident => ({
   isManual: i.isManual,
   // D-075: from the confirm of the drop the ack answered; drops read without their confirms (older
   // rows, tests) fall back to the incident's confirm
-  downConfirms: i.drops.some((d) => d.confirmedAt)
-    ? downConfirmsOf(
+  downDrops: i.drops.some((d) => d.confirmedAt)
+    ? downDropsOf(
         i.drops.map((d) => ({
           start: new Date(d.start),
           end: d.end ? new Date(d.end) : null,

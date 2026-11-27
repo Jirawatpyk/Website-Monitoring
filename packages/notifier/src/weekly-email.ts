@@ -238,7 +238,7 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
       const count = mttaAckedCount(m);
       const v =
         m.seconds === null
-          ? m.tier === 1
+          ? m.tier === 1 || m.down === 0
             ? '— (no DOWN)'
             : f.incidents.some((i) => i.severity === 'down')
               ? '— (no DOWN in hours)'
@@ -246,8 +246,15 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
           : `${formatDuration(Math.max(1, Math.round(m.seconds / 60)))}${m.targetMin !== null ? ` · target ${m.targetMin}` : ''}`;
       return {
         k: `Tier ${m.tier}`,
-        // D-075: DOWNs nobody acknowledged say so, never "(no DOWN)"; every tier with DOWNs gets the count
-        v: m.seconds === null && count && !m.acked ? `— · ${count}` : count ? `${v} · ${count}` : v,
+        // D-075: a tier with DOWNs never says "(no DOWN)": nobody acked them, or no ack fell in hours
+        v:
+          m.seconds === null && count
+            ? m.acked
+              ? `— (no ack in hours) · ${count}`
+              : `— · ${count}`
+            : count
+              ? `${v} · ${count}`
+              : v,
         tone: mttaTone(m),
       };
     }),
@@ -426,7 +433,8 @@ ${needs}${incidents}${uptime}${mtta}${planned}${lines('COMING UP', m.coming)}${l
         ]
       : []),
     ...(m.mtta.length
-      ? ['', 'MTTA · TIME TO ACKNOWLEDGE A DOWN', m.mtta.map((x) => `${x.k} ${x.v}`).join(' · ')]
+      ? // one tier a line: each value now has " · " inside it (D-075, message-checker)
+        ['', 'MTTA · TIME TO ACKNOWLEDGE A DOWN', ...m.mtta.map((x) => `${x.k} ${x.v}`)]
       : []),
     ...(m.planned.length
       ? ['', 'PLANNED & QUIET', ...m.planned.map((p) => `${BADGE_WORD[p.badge]} · ${p.text}`)]
