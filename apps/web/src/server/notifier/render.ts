@@ -126,6 +126,17 @@ function againAtOf(i: IncidentFacts, severity: 'down' | 'problem'): Date | null 
   return drops.length > 1 && last ? (last.confirmedAt ?? last.start) : null;
 }
 
+/**
+ * When the latest DOWN drop was confirmed (the FYI's "since", D-078): after a D-021 escalation that is
+ * the DOWN, not the PROBLEM's detection; with no DOWN drop recorded, the incident's detection.
+ */
+function downSinceOf(i: IncidentFacts): Date {
+  const last = dropsOf(i)
+    .filter((d) => d.severity === 'down')
+    .at(-1);
+  return last ? (last.confirmedAt ?? last.start) : new Date(i.detected_at);
+}
+
 /** How long it had been down at `at` (D-033's one number: DOWN drops only), for ACKNOWLEDGED "so far". */
 function outageAt(i: IncidentFacts, at: Date): number | null {
   const upTo = dropsOf(i)
@@ -553,7 +564,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         ...(step.kind === 'fyi'
           ? {
               cause: causeOf(i, new Date(n.created_at)),
-              since: againAtOf(i, 'down') ?? new Date(i.detected_at),
+              since: downSinceOf(i),
               status: latestNoteOf(i, new Date(n.created_at)),
               sentAt: new Date(n.created_at),
             }
@@ -769,7 +780,8 @@ export function renderEmail(
         // When it was queued: after a relapse the elapsed minutes are the down minutes only (D-058).
         sentAt: new Date(n.created_at),
         downAgainAt: againAtOf(i, ctx.severity === 'problem' ? 'problem' : 'down'),
-        confirmedAt: new Date(i.detected_at),
+        // The FYI's "confirmed down" is the DOWN's own confirmation, not a PROBLEM before it (D-021, D-078).
+        confirmedAt: step.kind === 'fyi' ? downSinceOf(i) : new Date(i.detected_at),
         owner: l0Of(i)?.display_name ?? null,
         asFyi,
         asked: namedIn(i, n.context).askedNames.join(' and ') || null,

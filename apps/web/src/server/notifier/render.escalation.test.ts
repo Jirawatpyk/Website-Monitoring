@@ -197,6 +197,28 @@ describe('render — L2 and the L3 FYI (S10)', () => {
     expect(card).not.toContain('Written after the FYI');
   });
 
+  it('after a PROBLEM went DOWN (D-021), "since" is the DOWN, not the PROBLEM (D-078)', () => {
+    const escalated: IncidentFacts = {
+      ...noted,
+      detected_at: '2026-09-25T01:00:00Z',
+      incident_events: [
+        { type: 'detected', payload: { severity: 'problem' }, at: '2026-09-25T01:00:00Z' },
+        {
+          type: 'escalated_to_down',
+          payload: { startedAt: '2026-09-25T02:48:41Z' },
+          at: '2026-09-25T02:48:41Z',
+        },
+      ],
+    };
+    const m = renderChat(
+      row('step_fired', fyiCtx, queued),
+      escalated,
+      appUrl,
+      new Date('2026-09-25T03:55:00Z'),
+    )!;
+    expect(JSON.stringify(m.cardsV2)).toContain('"topLabel":"Down for","text":"1 h (since 09:48)"');
+  });
+
   it('the FYI email shows the same Status; no note gives "No status note yet" (D-078)', () => {
     const email = (i: IncidentFacts) =>
       renderEmail(

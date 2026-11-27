@@ -1,6 +1,7 @@
 import { formatDay, formatDuration, formatTime, isSameBangkokDay } from '@dxt/shared';
 import { plainName, type ChatMessage, type ChatPerson, type ChatWidget } from './chat-alerts';
 import { buildChatTextLine, type StepLevel } from './chat-text';
+import { row } from './maintenance-words';
 
 /**
  * The escalation ladder's messages (S08, D-034; ChatAlert / EmailAlert rows, spec §8, §14.10, §15.7):
@@ -168,8 +169,9 @@ export function statusWords(s: StatusNote | null | undefined, now: Date): string
   const text = s.text.split(/\s+/).join(' ').trim();
   if (!text) return NO_STATUS_NOTE;
   let short = text;
-  if (text.length > STATUS_CHARS) {
-    const cut = text.slice(0, STATUS_CHARS);
+  const chars = Array.from(text); // whole characters: an emoji is never split
+  if (chars.length > STATUS_CHARS) {
+    const cut = chars.slice(0, STATUS_CHARS).join('');
     const space = cut.lastIndexOf(' ');
     short = `${space > STATUS_CHARS / 2 ? cut.slice(0, space) : cut}…`;
   }
@@ -311,19 +313,15 @@ function stepAlert(input: StepAlertInput): ChatMessage {
   };
 }
 
-const factRow = (topLabel: string, text: string): ChatWidget => ({
-  decoratedText: { topLabel, text: text.replace(/</g, '&lt;'), wrapText: true },
-});
-
 /** The FYI card's facts (D-078, Bua's item 3): what's wrong, since when, the latest status, the next update. */
 function fyiRows(input: StepAlertInput, duration: string): ChatWidget[] {
   const now = input.sentAt ?? new Date();
   const since = input.since ? `${duration} (since ${dayTime(input.since, now)})` : duration;
   return [
-    ...(input.cause ? [factRow('Cause', input.cause)] : []),
-    factRow('Down for', since),
-    factRow('Status', statusWords(input.status, now)),
-    factRow('Next update', FYI_NEXT_UPDATE),
+    ...(input.cause ? [row('Cause', input.cause)] : []),
+    row('Down for', since),
+    row('Status', statusWords(input.status, now)),
+    row('Next update', FYI_NEXT_UPDATE),
   ];
 }
 
