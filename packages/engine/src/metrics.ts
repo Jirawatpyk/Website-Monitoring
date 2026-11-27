@@ -5,10 +5,11 @@ import { isInsideHours, minutesInsideHours } from './response-hours';
 /**
  * Response KPIs for the Overview (spec §21.3, PRD §2, D-032, D-075): MTTA and MTTD over DOWN incidents
  * that started in a window. Both are means (PRD §2 "Mean Time to …"):
- * - MTTA = acknowledged − the confirm of the DOWN drop the ack answered (D-075: the latest DOWN drop
- *   confirmed at or before the ack — INC-0038 was acked 6 min after it went down again, not 7 days after
- *   its first drop), DOWN incidents of every tier. One acked before any DOWN drop (still a PROBLEM, then
- *   raised to DOWN — D-021) had nobody waiting on a DOWN ack, so it is left out rather than counted as 0.
+ * - MTTA = acknowledged − the confirm of the DOWN drop the ack answered (D-075: the latest drop of any
+ *   severity confirmed at or before the ack, if it is a DOWN — INC-0038 was acked 6 min after it went
+ *   down again, not 7 days after its first drop), DOWN incidents of every tier. One whose ack answered a
+ *   PROBLEM drop (before any DOWN — D-021 — or PROBLEM AGAIN after an unacked DOWN) had nobody waiting
+ *   on a DOWN ack, so it is left out rather than counted as 0.
  *   `ackedCount` says how many were counted, so a mean of one is never read as the team's response;
  * - MTTD = confirmed down − first failed check of the outage, Tier 1 DOWN incidents, manual ones left out
  *   (a hand-opened incident has no detection to measure). A PROBLEM raised to DOWN (D-021) counts from
@@ -107,8 +108,8 @@ export function responseKpis(incidents: readonly MetricIncident[], from: Date, t
  * Fri 17:58 → Mon 09:05 waited 7 min, not 63 h (engine review S14). Null for a tier with none: "— (no
  * DOWN inside response hours)". No minimum count, unlike the Overview. D-075: the wait counts from the
  * confirm of the drop the ack answered (the hours gate reads that confirm too), and each tier says how
- * many of its DOWNs were acknowledged (`acked` of `down`; an ack outside hours is acknowledged but not in
- * the mean).
+ * many of its DOWNs were acknowledged (`acked` of `down`; a DOWN confirmed outside hours and acked is
+ * acknowledged but not in the mean).
  */
 export function mttaByTier(
   incidents: readonly MetricIncident[],
