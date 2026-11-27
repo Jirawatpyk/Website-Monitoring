@@ -232,6 +232,14 @@ export function formatDurationSeconds(totalSeconds: number): string {
   return s > 0 ? `${m} min ${s} s` : `${m} min`;
 }
 
+/**
+ * How many DOWN incidents someone acknowledged, beside every MTTA (D-075): "1 of 8 acknowledged",
+ * "0 of 3 acknowledged", "3 of 3 acknowledged" — so a mean of one is never read as the team's response.
+ */
+export function formatAckedCount(acked: number, down: number): string {
+  return `${acked} of ${down} acknowledged`;
+}
+
 /** A response time: "412 ms" under a second, then one decimal — "1.1 s", "5.8 s" (Main3). */
 export function formatMs(ms: number): string {
   const rounded = Math.round(ms);

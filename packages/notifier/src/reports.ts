@@ -3,6 +3,7 @@ import {
   formatDay,
   formatDayRange,
   formatDuration,
+  formatAckedCount,
   formatDurationSeconds,
   formatIncidentId,
   formatPercent,
@@ -152,8 +153,17 @@ export interface WeeklyFacts {
     text: string;
     who: readonly ReportPerson[];
   }[];
-  /** MTTA of DOWNs inside response hours per tier, in seconds (null: none), and its target. */
-  mtta: readonly { tier: number; seconds: number | null; targetMin: number | null }[];
+  /**
+   * MTTA of DOWNs inside response hours per tier, in seconds (null: none), and its target; D-075: how
+   * many of the tier's DOWNs someone acknowledged (`acked` of `down`; absent from an older caller).
+   */
+  mtta: readonly {
+    tier: number;
+    seconds: number | null;
+    targetMin: number | null;
+    acked?: number;
+    down?: number;
+  }[];
   /** Every window and mute in the week. */
   planned: readonly ReportWindow[];
   /** Windows in the next 7 days. */
@@ -392,6 +402,11 @@ export function digestModel(f: DigestFacts): ReportModel {
   };
 }
 
+/** "1 of 2 acknowledged" for a tier with DOWNs that week (D-075); null with none or an older caller. */
+export function mttaAckedCount(m: WeeklyFacts['mtta'][number]): string | null {
+  return m.down ? formatAckedCount(m.acked ?? 0, m.down) : null;
+}
+
 /** "09:48" today, "Thu 24 Sep 22:14" another day. */
 function formatWhenShort(d: Date, at: Date): string {
   return isSameBangkokDay(d, at) ? formatTime(d) : dayTime(d);
@@ -528,17 +543,25 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
     .map((m) => `Tier ${m.tier} ${m.seconds === null ? '—' : formatDurationSeconds(m.seconds)}`)
     .join(' · ');
   const mttaNote = f.mtta
-    .map((m) =>
-      m.seconds === null
-        ? m.tier === 1
-          ? `Tier 1 — (no DOWN)`
-          : `Tier ${m.tier} — (no DOWN inside response hours)`
-        : m.targetMin === null
-          ? `Tier ${m.tier} — no L1 step to compare with`
-          : m.seconds > m.targetMin * 60
-            ? `Tier ${m.tier} over the ${m.targetMin} min target`
-            : `Tier ${m.tier} within the ${m.targetMin} min target`,
-    )
+    .map((m) => {
+      const count = mttaAckedCount(m);
+      // D-075: a tier with DOWNs never says "(no DOWN)": nobody acked them, or no ack fell in hours
+      if (m.seconds === null && count)
+        return m.acked
+          ? `Tier ${m.tier} — (no acked DOWN confirmed inside response hours), ${count}`
+          : `Tier ${m.tier} — ${count}`;
+      const words =
+        m.seconds === null
+          ? m.tier === 1
+            ? `Tier 1 — (no DOWN)`
+            : `Tier ${m.tier} — (no DOWN inside response hours)`
+          : m.targetMin === null
+            ? `Tier ${m.tier} — no L1 step to compare with`
+            : m.seconds > m.targetMin * 60
+              ? `Tier ${m.tier} over the ${m.targetMin} min target`
+              : `Tier ${m.tier} within the ${m.targetMin} min target`;
+      return count ? `${words}, ${count}` : words;
+    })
     .join(' · ');
   const overTarget = f.mtta.some(
     (m) => m.seconds !== null && m.targetMin !== null && m.seconds > m.targetMin * 60,

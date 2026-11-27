@@ -3,7 +3,7 @@
 PRD §2 and §12, plan S19 Done-when 2 and D-071: the staging Test target is taken down once, as a Tier 1 site, and the time to detect and to acknowledge is recorded.
 
 - **MTTD** is first failed check → Confirmed down (`incidents.detected_at − started_at`). This is the same rule the Overview tile uses (`packages/engine/src/metrics.ts`, D-032). It must be ≤ 3 min.
-- **MTTA** is Confirmed down → acknowledged (`acked_at − detected_at`). It must be ≤ 15 min. Claude acknowledges from the Chat alert, so this is Claude's time, not the team's (D-071).
+- **MTTA** is Confirmed down → acknowledged, from the confirm of the DOWN drop the ack answered (D-075; for a one-drop incident `acked_at − detected_at`). It must be ≤ 15 min. Claude acknowledges from the Chat alert, so this is Claude's time, not the team's (D-071).
 - Recorded beside them:
   - the takedown time, when the mode flipped;
   - the DOWN Chat post's `sent_at`, which is what a person actually sees.

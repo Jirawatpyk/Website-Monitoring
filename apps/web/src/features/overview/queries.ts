@@ -1,5 +1,13 @@
 import 'server-only';
-import { aggregateUptime, isInsideHours, kpiChange, responseKpis, siteUptimeOver } from '@dxt/engine';
+import {
+  aggregateUptime,
+  metricDropsOf,
+  episodesFromTimeline,
+  isInsideHours,
+  kpiChange,
+  responseKpis,
+  siteUptimeOver,
+} from '@dxt/engine';
 import { shortCause } from '@dxt/notifier';
 import {
   CLOSED_INCIDENT_STATES_IN,
@@ -97,12 +105,17 @@ export async function loadOverview(
       db
         .from('incidents')
         .select(
-          'severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier), incident_events(type, payload)',
+          'severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier), incident_events(type, at, payload)',
         )
         .eq('severity', 'down')
-        .eq('incident_events.type', 'escalated_to_down')
-        // a PROBLEM raised to DOWN may have started before the window its outage falls in
-        .gte('started_at', new Date(now.getTime() - 90 * DAY_MS).toISOString()),
+        // the drops, so MTTA counts from the one the ack answered (D-075)
+        .in('incident_events.type', ['detected', 'relapsed', 'escalated_to_down', 'recovered'])
+        // a PROBLEM raised to DOWN may have started before the window its outage falls in; an older
+        // incident still open, or resolved in the 60 days, may have a DOWN drop in them (D-076)
+        .or(
+          `started_at.gte.${new Date(now.getTime() - 90 * DAY_MS).toISOString()},` +
+            `state.not.in.(resolved,in_review,closed),resolved_at.gte.${from60d.toISOString()}`,
+        ),
       db
         .from('incident_events')
         .select(
@@ -251,6 +264,7 @@ export async function loadOverview(
     ackedAt: i.acked_at ? new Date(i.acked_at) : null,
     // A PROBLEM raised to DOWN by hand (D-055 item 7) has no detection to measure either (D-032).
     isManual: i.is_manual || raisedByHand(i.incident_events),
+    drops: metricDropsOf(episodesFromTimeline(i, i.incident_events)),
   }));
   const current = responseKpis(kpiIncidents, from30d, now);
   const previous = responseKpis(kpiIncidents, from60d, from30d);
@@ -305,6 +319,8 @@ export async function loadOverview(
     oncall,
     kpis: {
       enough: current.enough,
+      downCount: current.downCount,
+      ackedCount: current.ackedCount,
       mttaSeconds: current.mttaSeconds,
       mttdSeconds: current.mttdSeconds,
       mttaChange:

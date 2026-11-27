@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bangkokDayStart,
   clockMinutes,
+  formatAckedCount,
   confirmedByWafOf,
   formatConfirmedBy,
   formatCount,
@@ -113,6 +114,16 @@ describe('formatDurationSeconds (Main3 MTTA / MTTD)', () => {
     [-5, '0 s'],
   ])('%d s → %s', (seconds, expected) => {
     expect(formatDurationSeconds(seconds)).toBe(expected);
+  });
+});
+
+describe('formatAckedCount (D-075, beside every MTTA)', () => {
+  it.each([
+    [1, 8, '1 of 8 acknowledged'],
+    [0, 3, '0 of 3 acknowledged'],
+    [3, 3, '3 of 3 acknowledged'],
+  ])('%d of %d', (acked, down, expected) => {
+    expect(formatAckedCount(acked, down)).toBe(expected);
   });
 });
 

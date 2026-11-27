@@ -80,6 +80,8 @@ const data = (over: Partial<OverviewData> = {}): OverviewData => ({
   ],
   kpis: {
     enough: false,
+    downCount: 2,
+    ackedCount: 1,
     mttaSeconds: null,
     mttdSeconds: null,
     mttaChange: null,
@@ -124,6 +126,17 @@ describe('OverviewView (Main3 / MOverview4)', () => {
     expect(screen.getAllByText('Not enough incidents yet')).toHaveLength(2); // MTTA, MTTD
     expect(screen.getByText('99.98%')).toBeInTheDocument();
     expect(screen.getByText('1 of 3 monitored sites · 1 unacked')).toBeInTheDocument();
+    expect(screen.queryByText(/acknowledged ·/)).toBeNull(); // the count waits for 3 DOWNs, as the mean does
+  });
+
+  it('MTTA says how many DOWNs were acknowledged beside the mean (D-075)', () => {
+    const d = data();
+    renderView({
+      ...d,
+      kpis: { ...d.kpis, enough: true, downCount: 8, ackedCount: 1, mttaSeconds: 361, mttdSeconds: 38 },
+    });
+    expect(screen.getByText('6 min 1 s')).toBeInTheDocument();
+    expect(screen.getByText(/DOWN, all tiers · 1 of 8 acknowledged · target/)).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'All monitored sites' })).toBeInTheDocument();
     expect(screen.getByText('3 monitored sites · 1 draft not monitored yet')).toBeInTheDocument();
     expect(screen.getByText('MuvMi DOWN confirmed — 3/3 locations')).toBeInTheDocument();

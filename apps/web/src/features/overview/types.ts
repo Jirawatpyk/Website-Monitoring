@@ -111,6 +111,9 @@ export interface OverviewKpis {
   mttaSeconds: number | null;
   mttdSeconds: number | null;
   enough: boolean;
+  /** DOWN incidents in the 30 days, and how many of them someone acknowledged (D-075). */
+  downCount: number;
+  ackedCount: number;
   mttaChange: { seconds: number; direction: 'up' | 'down' | 'flat' } | null;
   mttdChange: { seconds: number; direction: 'up' | 'down' | 'flat' } | null;
   /** All monitored sites, time-weighted (spec §5). */
