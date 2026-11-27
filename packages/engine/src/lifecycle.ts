@@ -205,7 +205,8 @@ export interface EpisodeEvent {
 export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
   const out: Episode[] = [];
   // At the same instant a recovery comes first: D-023's RECOVERED and PROBLEM AGAIN share a round.
-  const rank = (e: EpisodeEvent) => (e.type === 'recovered' ? 0 : 1);
+  const ends = (e: EpisodeEvent) => e.type === 'recovered' || e.type === 'monitoring_stopped';
+  const rank = (e: EpisodeEvent) => (ends(e) ? 0 : 1);
   const sorted = [...events].sort((a, b) => a.at.getTime() - b.at.getTime() || rank(a) - rank(b));
   for (const e of sorted) {
     const last = out.at(-1);
@@ -248,7 +249,8 @@ export function episodesOf(events: readonly EpisodeEvent[]): Episode[] {
         last.severity = 'down';
         last.confirmedAt = e.at;
       }
-    } else if (e.type === 'recovered' && open && last) {
+    } else if (ends(e) && open && last) {
+      // D-079: a drop on a site whose monitoring was stopped ends at the stop (nobody watched after it).
       last.end = e.at;
     }
   }

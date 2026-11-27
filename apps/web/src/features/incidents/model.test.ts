@@ -429,6 +429,20 @@ describe('resolveGate (T10, D-033)', () => {
       'Not written yet · needed before Resolve',
     ]);
   });
+  it('monitoring stopped (D-079): the OK-rounds condition is waived; the dialog opens; a root cause still needed', () => {
+    const g = resolveGate({ ...gateBase, severity: 'problem', monitoringStopped: true }, [], nameOf);
+    expect(g.conditions[0]).toMatchObject({
+      met: true,
+      detail: 'Not needed — monitoring of this site is stopped',
+    });
+    expect(g).toMatchObject({ metCount: 2, ok: false, canOpenDialog: true, lockedReason: null });
+    const done = resolveGate(
+      { ...gateBase, monitoringStopped: true, rootCauseCategory: 'hosting' },
+      [],
+      nameOf,
+    );
+    expect(done.ok).toBe(true);
+  });
   it('a PROBLEM still open reads "still has a problem", not "still down" (S09c /verify)', () => {
     const g = resolveGate({ ...gateBase, severity: 'problem' }, [], nameOf);
     expect(g.conditions[0]!.detail).toBe('Still has a problem · needs 2 OK rounds once it clears');

@@ -607,6 +607,8 @@ export interface GateIncident {
   clientUpdate?: ClientUpdateFacts;
   /** An internal site (no client): no track, said plainly (§37.7). */
   internal?: boolean;
+  /** The site's monitoring was stopped (D-079): no OK round can come, so that condition is waived. */
+  monitoringStopped?: boolean;
 }
 
 /** The client-update record (S11, spec §9, §16.2): what the card and the Resolve condition say. */
@@ -802,6 +804,8 @@ export function resolveGate(
   nameOf: (id: string | null) => string,
   page?: GatePage,
 ): Gate {
+  // D-079: a stopped site can never show 2 OK rounds — `resolve_incident` waives it, and so does the page.
+  const stopped = !!i.monitoringStopped;
   const okAt = okTwoRoundsAt(i, events);
   const recovered =
     !!i.recoveredAt && i.state !== 'unacked' && i.state !== 'escalated' && i.state !== 'acknowledged';
@@ -814,14 +818,16 @@ export function resolveGate(
   const recovery: Condition = {
     key: 'recovery',
     label: 'OK for 2 rounds',
-    met: !!okAt,
-    detail: okAt
-      ? `OK since ${formatTime(new Date(i.recoveredAt!))} · 2 rounds done ${formatTime(new Date(okAt))}`
-      : recovered
-        ? `OK since ${formatTime(new Date(i.recoveredAt!))} · waiting for the second OK round`
-        : i.severity === 'problem'
-          ? `Still has a problem · needs 2 OK rounds${i.stillFailingPath ? ` of ${i.stillFailingPath}` : ''} once it clears`
-          : 'Still down · needs 2 OK rounds once it recovers',
+    met: !!okAt || stopped,
+    detail: stopped
+      ? 'Not needed — monitoring of this site is stopped'
+      : okAt
+        ? `OK since ${formatTime(new Date(i.recoveredAt!))} · 2 rounds done ${formatTime(new Date(okAt))}`
+        : recovered
+          ? `OK since ${formatTime(new Date(i.recoveredAt!))} · waiting for the second OK round`
+          : i.severity === 'problem'
+            ? `Still has a problem · needs 2 OK rounds${i.stillFailingPath ? ` of ${i.stillFailingPath}` : ''} once it clears`
+            : 'Still down · needs 2 OK rounds once it recovers',
   };
   const client: Condition = {
     key: 'client_update',
@@ -843,7 +849,7 @@ export function resolveGate(
   if (page) return pageGate(i, okAt, recovered, root, page);
   const conditions = [recovery, client, root];
   const verdict = canResolve({
-    okRounds: okAt ? 2 : 0,
+    okRounds: okAt || stopped ? 2 : 0,
     clientUpdate: clientPending
       ? 'pending'
       : !i.clientUpdateRequired
@@ -1163,6 +1169,16 @@ export function timelineOf(
           e.payload.state === 'monitoring'
             ? 'Root cause already written — ready to resolve'
             : 'Needs a root cause before it can be resolved',
+          'between',
+        );
+        return;
+      case 'monitoring_stopped':
+        // D-079: written by the resolve, at the stop — the drop in progress ends here.
+        item(
+          e,
+          'ok',
+          'Monitoring stopped',
+          'Nobody watched the site after this — the outage counts until here',
           'between',
         );
         return;

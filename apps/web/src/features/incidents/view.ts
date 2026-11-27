@@ -39,6 +39,8 @@ export interface IncidentRow {
     primary_owner_id: string | null;
     backup_owner_id: string | null;
     monitors: { url: string; is_primary: boolean }[];
+    /** Monitoring stopped (D-079): no OK round can come, so the 2-OK-rounds condition is waived. */
+    is_active?: boolean;
   };
 }
 

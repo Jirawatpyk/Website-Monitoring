@@ -455,7 +455,7 @@ export async function loadIncident(
        client_update_due_at, client_updated_by, client_update_note, client_update_not_needed,
        root_cause_category, root_cause, root_cause_fix, preventive_action, site_id, monitor_id, l0_user_id, alerted_at, escalation_plan,
        l0:profiles!incidents_l0_user_id_fkey(is_active, role),
-       sites!inner(name, tier, primary_owner_id, backup_owner_id,
+       sites!inner(name, tier, primary_owner_id, backup_owner_id, is_active,
          monitors(id, url, is_primary, timeout_ms, allowed_redirect_domains),
          clients(am_user_id, name, language, is_internal))`,
     )
@@ -806,6 +806,7 @@ export async function loadIncident(
           severity: current,
           stillFailingPath: stillFailing?.path ?? null,
           internal: !!i.sites.clients?.is_internal,
+          monitoringStopped: i.sites.is_active === false,
           recoveredAt: i.recovered_at,
           clientUpdateRequired: i.client_update_required,
           clientUpdatedAt: i.client_updated_at,
