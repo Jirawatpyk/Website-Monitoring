@@ -307,10 +307,55 @@ describe('KPIs (D-032 MTTA mean, D-033 MTTR median, Unacked until S08)', () => {
     expect(k).toMatchObject({
       mttaEnough: true,
       mttaSeconds: 120,
+      mttaAckedCaption: '3 of 3 acknowledged',
       mttrMinutes: 20,
       open: 0,
       openCaption: 'Nothing open',
     });
+  });
+  it('MTTA counts from the drop the ack answered, with the count (D-075, INC-0038)', () => {
+    // Confirmed down 2 Nov 22:05, back the same night, down again 10 Nov 12:17:38, acked 12:23:39.
+    const eneos = inc({
+      id: 'eneos',
+      number: 38,
+      startedAt: '2026-11-02T14:59:44Z',
+      detectedAt: '2026-11-02T15:05:14Z',
+      ackedAt: '2026-11-10T05:23:39Z',
+      state: 'resolved',
+      drops: [
+        {
+          start: '2026-11-02T15:04:01Z',
+          end: '2026-11-02T15:07:01Z',
+          severity: 'down',
+          confirmedAt: '2026-11-02T15:05:14Z',
+        },
+        {
+          start: '2026-11-10T05:17:01Z',
+          end: '2026-11-10T05:28:01Z',
+          severity: 'down',
+          confirmedAt: '2026-11-10T05:17:38Z',
+        },
+      ],
+    });
+    const unacked = (n: number, day: string) =>
+      inc({
+        id: `u${n}`,
+        number: n,
+        startedAt: `2026-11-${day}T22:44:01Z`,
+        detectedAt: `2026-11-${day}T22:44:38Z`,
+        ackedAt: null,
+        state: 'resolved',
+        drops: [
+          {
+            start: `2026-11-${day}T22:44:01Z`,
+            end: `2026-11-${day}T23:44:01Z`,
+            severity: 'down',
+            confirmedAt: `2026-11-${day}T22:44:38Z`,
+          },
+        ],
+      });
+    const k = listKpis([eneos, unacked(65, '25'), unacked(66, '26')], new Date('2026-11-27T04:00:00Z'));
+    expect(k).toMatchObject({ mttaEnough: true, mttaSeconds: 361, mttaAckedCaption: '1 of 3 acknowledged' });
   });
 });
 

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { formatDurationSeconds } from '@dxt/shared';
-import { kpiChange, mttaByTier, mttrMinutes, responseKpis, type MetricIncident } from './metrics';
+import {
+  downConfirmsOf,
+  kpiChange,
+  mttaByTier,
+  mttrMinutes,
+  responseKpis,
+  type MetricIncident,
+} from './metrics';
 
 // Spec §1: Fri 25 Sep 2026 10:07 (UTC+7). The window is the last 30 days (spec §21.3).
 const NOW = new Date('2026-09-25T03:07:12Z');
@@ -113,6 +120,115 @@ describe('responseKpis (spec §21.3, PRD §2 means, D-032)', () => {
   });
 });
 
+// D-075: MTTA counts from the confirm of the DOWN drop the ack answered, and says how many DOWNs were
+// acknowledged. INC-0038 (ENEOS, Tier 1, production 2–10 Nov 2026): confirmed down Mon 2 Nov 22:05,
+// recovered and relapsed for a week, down again Tue 10 Nov 12:17:38, acknowledged 12:23:39 → 6 min 1 s,
+// not the 7 d 14 h from the first confirm that D-032 showed management.
+describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
+  const NOV = new Date('2026-11-27T04:00:00Z');
+  const NOV_FROM = new Date(NOV.getTime() - 30 * 86_400_000);
+  const eneos = inc({
+    startedAt: at('2026-11-02T21:59:44'),
+    downStartedAt: at('2026-11-02T22:04:01'),
+    detectedAt: at('2026-11-02T22:05:14'),
+    ackedAt: at('2026-11-10T12:23:39'),
+    downConfirms: [at('2026-11-02T22:05:14'), at('2026-11-04T07:43:39'), at('2026-11-10T12:17:38')],
+  });
+  const unacked = (day: string): MetricIncident =>
+    inc({
+      startedAt: at(`2026-11-${day}T05:44:01`),
+      detectedAt: at(`2026-11-${day}T05:44:38`),
+      ackedAt: null,
+      downConfirms: [at(`2026-11-${day}T05:44:38`)],
+    });
+
+  it.each<[string, MetricIncident[], { mtta: string | null; acked: number; down: number }]>([
+    [
+      'INC-0038: from the drop the ack answered, 1 of 3 acknowledged',
+      [eneos, unacked('07'), unacked('26')],
+      { mtta: '6 min 1 s', acked: 1, down: 3 },
+    ],
+    [
+      'a one-drop incident is unchanged',
+      [
+        inc({
+          downConfirms: [at('2026-11-20T09:48:41')],
+          startedAt: at('2026-11-20T09:47:41'),
+          detectedAt: at('2026-11-20T09:48:41'),
+          ackedAt: at('2026-11-20T10:07:00'),
+        }),
+        unacked('07'),
+        unacked('26'),
+      ],
+      { mtta: '18 min 19 s', acked: 1, down: 3 },
+    ],
+    [
+      'acknowledged at the very confirm counts as 0',
+      [
+        inc({
+          startedAt: at('2026-11-20T09:47:41'),
+          detectedAt: at('2026-11-20T09:48:41'),
+          ackedAt: at('2026-11-20T09:48:41'),
+          downConfirms: [at('2026-11-20T09:48:41')],
+        }),
+        unacked('07'),
+        unacked('26'),
+      ],
+      { mtta: '0 s', acked: 1, down: 3 },
+    ],
+    [
+      // INC-0003 shape: acked while a PROBLEM (13 Oct), raised to DOWN later — no DOWN drop to answer.
+      'acknowledged before any DOWN drop: left out, not counted as acknowledged',
+      [
+        inc({
+          startedAt: at('2026-11-01T18:00:01'),
+          downStartedAt: at('2026-11-05T21:15:01'),
+          detectedAt: at('2026-11-05T21:15:54'),
+          ackedAt: at('2026-11-03T09:11:41'),
+          downConfirms: [at('2026-11-05T21:15:54'), at('2026-11-12T08:01:13')],
+        }),
+        unacked('07'),
+        unacked('26'),
+      ],
+      { mtta: null, acked: 0, down: 3 },
+    ],
+    [
+      'nobody acknowledged: no mean, 0 of 3',
+      [unacked('07'), unacked('09'), unacked('26')],
+      { mtta: null, acked: 0, down: 3 },
+    ],
+  ])('%s', (_name, incidents, expected) => {
+    const k = responseKpis(incidents, NOV_FROM, NOV);
+    expect(k.mttaSeconds === null ? null : formatDurationSeconds(k.mttaSeconds)).toBe(expected.mtta);
+    expect(k.ackedCount).toBe(expected.acked);
+    expect(k.downCount).toBe(expected.down);
+  });
+
+  it('the count is kept below the minimum too (the means wait for 3)', () => {
+    const k = responseKpis([eneos, unacked('26')], NOV_FROM, NOV);
+    expect(k).toMatchObject({ downCount: 2, ackedCount: 1, enough: false, mttaSeconds: null });
+  });
+
+  it('without drops (an older caller) the incident confirm is used, as before', () => {
+    const k = responseKpis([muvmi, muvmi, muvmi], FROM, NOW);
+    expect(k.ackedCount).toBe(3);
+    expect(formatDurationSeconds(k.mttaSeconds!)).toBe('18 min 19 s');
+  });
+});
+
+describe('downConfirmsOf (D-075)', () => {
+  it('the confirm of each DOWN drop, PROBLEM drops left out; the start when no confirm is known', () => {
+    const t = (m: number) => new Date(Date.UTC(2026, 10, 10, 5, m));
+    expect(
+      downConfirmsOf([
+        { start: t(0), end: t(5), severity: 'down', confirmedAt: t(1) },
+        { start: t(10), end: t(20), severity: 'problem', confirmedAt: t(12) },
+        { start: t(30), end: null, severity: 'down' },
+      ]),
+    ).toEqual([t(1), t(30)]);
+  });
+});
+
 describe('kpiChange ("vs last 30d")', () => {
   it.each<[number | null, number | null, ReturnType<typeof kpiChange>]>([
     [400, 472, { seconds: 72, direction: 'down' }],
@@ -190,6 +306,38 @@ describe('mttaByTier (weekly summary, spec §15.7, D-056)', () => {
     const rows = mttaByTier(incidents, from, until, [1, 2, 3], hours);
     expect(rows.map((r) => r.tier)).toEqual([1, 2, 3]);
     expect(rows.find((r) => r.tier === tier)!.seconds).toBe(expected);
+  });
+
+  // D-075: the weekly line counts from the acknowledged drop's confirm too, and says how many were acked.
+  it('from the drop the ack answered, with the count per tier', () => {
+    const relapsed: MetricIncident = {
+      ...down(1, '2026-09-21T22:05:00', null),
+      ackedAt: at('2026-09-24T12:23:00'),
+      downConfirms: [at('2026-09-21T22:05:00'), at('2026-09-24T12:17:00')],
+    };
+    const rows = mttaByTier(
+      [relapsed, down(1, '2026-09-25T05:44:00', null), down(2, '2026-09-22T10:00:00', 6)],
+      from,
+      to,
+      [1, 2, 3],
+      hours,
+    );
+    expect(rows).toEqual([
+      { tier: 1, seconds: 6 * 60, acked: 1, down: 2 },
+      { tier: 2, seconds: 6 * 60, acked: 1, down: 1 },
+      { tier: 3, seconds: null, acked: 0, down: 0 },
+    ]);
+  });
+
+  it('Tier 2: the hours gate reads the acknowledged drop, not the first one', () => {
+    // First drop Mon 03:12 (outside hours), down again Tue 10:00 (inside), acked 10:06 → 6 min counts.
+    const tier2: MetricIncident = {
+      ...down(2, '2026-09-21T03:12:00', null),
+      ackedAt: at('2026-09-22T10:06:00'),
+      downConfirms: [at('2026-09-21T03:12:00'), at('2026-09-22T10:00:00')],
+    };
+    const row = mttaByTier([tier2], from, to, [2], hours)[0]!;
+    expect(row).toEqual({ tier: 2, seconds: 6 * 60, acked: 1, down: 1 });
   });
 });
 

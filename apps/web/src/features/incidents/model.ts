@@ -5,6 +5,7 @@
  */
 import {
   canResolve,
+  downConfirmsOf,
   mttrMinutes,
   outageMinutes,
   episodesFromTimeline,
@@ -19,6 +20,7 @@ import { expiryNow } from '@dxt/notifier';
 import {
   clockMinutes,
   CLOSED_INCIDENT_STATES,
+  formatAckedCount,
   formatConfirmedBy,
   confirmedByWafOf,
   formatDay,
@@ -71,7 +73,7 @@ export interface ListIncident {
   rootCause: string | null;
   rootCauseFix: string | null;
   /** Its drops from the timeline (`episodesFromTimeline`), for how long it was down (`outageMinutes`). */
-  drops: { start: string; end: string | null; severity: Severity }[];
+  drops: { start: string; end: string | null; severity: Severity; confirmedAt?: string | null }[];
   /** §37.9: the home page came back with something still failing (`listStillFailing`); else null. */
   stillFailing?: ListStillFailing | null;
 }
@@ -454,9 +456,11 @@ export interface ListKpis {
   escalatedCaption: string;
   needsRootCause: number;
   needsRootCauseCaption: string;
-  /** MTTA as the Overview counts it (D-032): null until 3 DOWN incidents in 30 days. */
+  /** MTTA as the Overview counts it (D-032, D-075): null until 3 DOWN incidents in 30 days. */
   mttaSeconds: number | null;
   mttaEnough: boolean;
+  /** "1 of 8 acknowledged" beside the mean (D-075). */
+  mttaAckedCaption: string;
   /** MTTR · DOWN only · median (D-033). */
   mttrMinutes: number | null;
 }
@@ -469,6 +473,18 @@ const toMetric = (i: ListIncident): MetricIncident => ({
   detectedAt: new Date(i.detectedAt),
   ackedAt: i.ackedAt ? new Date(i.ackedAt) : null,
   isManual: i.isManual,
+  // D-075: from the confirm of the drop the ack answered; drops read without their confirms (older
+  // rows, tests) fall back to the incident's confirm
+  downConfirms: i.drops.some((d) => d.confirmedAt)
+    ? downConfirmsOf(
+        i.drops.map((d) => ({
+          start: new Date(d.start),
+          end: d.end ? new Date(d.end) : null,
+          severity: d.severity,
+          ...(d.confirmedAt ? { confirmedAt: new Date(d.confirmedAt) } : {}),
+        })),
+      )
+    : undefined,
 });
 
 export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
@@ -512,6 +528,7 @@ export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {
     needsRootCauseCaption: rc[0] ? `${rc[0].siteName} · recovered, not resolved` : 'None waiting',
     mttaSeconds: kpis.mttaSeconds,
     mttaEnough: kpis.enough,
+    mttaAckedCaption: formatAckedCount(kpis.ackedCount, kpis.downCount),
     mttrMinutes: kpis.enough
       ? mttrMinutes(
           recent.map((i) => ({

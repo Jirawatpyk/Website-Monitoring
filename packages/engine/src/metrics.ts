@@ -1,12 +1,15 @@
 import type { ResponseHours } from '@dxt/shared';
+import type { Episode } from './lifecycle';
 import { isInsideHours, minutesInsideHours } from './response-hours';
 
 /**
- * Response KPIs for the Overview (spec §21.3, PRD §2, D-032): MTTA and MTTD over DOWN incidents that
- * started in a window. Both are means (PRD §2 "Mean Time to …"):
- * - MTTA = acknowledged − confirmed down (`detected_at`), DOWN incidents of every tier acknowledged after
- *   they were confirmed down (one acked while still a PROBLEM, then raised to DOWN — D-021 — had nobody
- *   waiting on a DOWN ack, so it is left out rather than counted as 0);
+ * Response KPIs for the Overview (spec §21.3, PRD §2, D-032, D-075): MTTA and MTTD over DOWN incidents
+ * that started in a window. Both are means (PRD §2 "Mean Time to …"):
+ * - MTTA = acknowledged − the confirm of the DOWN drop the ack answered (D-075: the latest DOWN drop
+ *   confirmed at or before the ack — INC-0038 was acked 6 min after it went down again, not 7 days after
+ *   its first drop), DOWN incidents of every tier. One acked before any DOWN drop (still a PROBLEM, then
+ *   raised to DOWN — D-021) had nobody waiting on a DOWN ack, so it is left out rather than counted as 0.
+ *   `ackedCount` says how many were counted, so a mean of one is never read as the team's response;
  * - MTTD = confirmed down − first failed check of the outage, Tier 1 DOWN incidents, manual ones left out
  *   (a hand-opened incident has no detection to measure). A PROBLEM raised to DOWN (D-021) counts from
  *   `downStartedAt`, not from the PROBLEM's start — the same start uptime uses.
@@ -24,11 +27,33 @@ export interface MetricIncident {
   detectedAt: Date | null;
   ackedAt: Date | null;
   isManual: boolean;
+  /**
+   * The confirm of each DOWN drop (`downConfirmsOf` over the incident's episodes, D-075). Absent: the
+   * incident's `detectedAt` stands for its one drop, as before D-075.
+   */
+  downConfirms?: readonly Date[];
+}
+
+/** The confirm of each DOWN drop of an incident (D-075); the drop's start when no confirm is known. */
+export function downConfirmsOf(episodes: readonly Episode[]): Date[] {
+  return episodes.filter((e) => e.severity === 'down').map((e) => e.confirmedAt ?? e.start);
+}
+
+/** The confirm the ack answered (D-075): the latest DOWN drop confirmed at or before it; null if none. */
+function ackedDropConfirm(i: MetricIncident): Date | null {
+  const acked = i.ackedAt;
+  if (!acked) return null;
+  if (!i.downConfirms) return i.detectedAt && acked >= i.detectedAt ? i.detectedAt : null;
+  let found: Date | null = null;
+  for (const c of i.downConfirms) if (c <= acked && (!found || c > found)) found = c;
+  return found;
 }
 
 export interface ResponseKpis {
   /** DOWN incidents that started in the window. */
   downCount: number;
+  /** Of those, the ones acknowledged after a DOWN drop: the n of "n of N acknowledged" (D-075). */
+  ackedCount: number;
   /** True once `downCount` reaches `MIN_DOWN_INCIDENTS`; until then both means are null. */
   enough: boolean;
   /** Mean seconds from confirmed down to acknowledged; null when none was acknowledged. */
@@ -48,15 +73,17 @@ export function responseKpis(incidents: readonly MetricIncident[], from: Date, t
   const down = incidents.filter(
     (i) => i.severity === 'down' && outageStart(i) >= from && outageStart(i) < to,
   );
+  const acks = down.flatMap((i) => {
+    const confirm = ackedDropConfirm(i);
+    return confirm && i.ackedAt ? [seconds(confirm, i.ackedAt)] : [];
+  });
   const enough = down.length >= MIN_DOWN_INCIDENTS;
-  if (!enough) return { downCount: down.length, enough, mttaSeconds: null, mttdSeconds: null };
-  const acks = down.flatMap((i) =>
-    i.detectedAt && i.ackedAt && i.ackedAt >= i.detectedAt ? [seconds(i.detectedAt, i.ackedAt)] : [],
-  );
+  const counts = { downCount: down.length, ackedCount: acks.length, enough };
+  if (!enough) return { ...counts, mttaSeconds: null, mttdSeconds: null };
   const detections = down.flatMap((i) =>
     i.tier === 1 && !i.isManual && i.detectedAt ? [seconds(outageStart(i), i.detectedAt)] : [],
   );
-  return { downCount: down.length, enough, mttaSeconds: mean(acks), mttdSeconds: mean(detections) };
+  return { ...counts, mttaSeconds: mean(acks), mttdSeconds: mean(detections) };
 }
 
 /**
@@ -65,7 +92,10 @@ export function responseKpis(incidents: readonly MetricIncident[], from: Date, t
  * Tier 1 at any hour (24/7, on the clock); Tier 2–3 only those confirmed down inside response hours,
  * where the ladder clock starts, and counted in response-hour minutes as their L1 delay is (D-034) —
  * Fri 17:58 → Mon 09:05 waited 7 min, not 63 h (engine review S14). Null for a tier with none: "— (no
- * DOWN inside response hours)". No minimum count, unlike the Overview.
+ * DOWN inside response hours)". No minimum count, unlike the Overview. D-075: the wait counts from the
+ * confirm of the drop the ack answered (the hours gate reads that confirm too), and each tier says how
+ * many of its DOWNs were acknowledged (`acked` of `down`; an ack outside hours is acknowledged but not in
+ * the mean).
  */
 export function mttaByTier(
   incidents: readonly MetricIncident[],
@@ -73,18 +103,23 @@ export function mttaByTier(
   to: Date,
   tiers: readonly number[],
   hours: ResponseHours,
-): { tier: number; seconds: number | null }[] {
+): { tier: number; seconds: number | null; acked: number; down: number }[] {
   const outageStart = (i: MetricIncident) => i.downStartedAt ?? i.startedAt;
   return tiers.map((tier) => {
-    const acks = incidents.flatMap((i) => {
+    const down = incidents.filter((i) => {
       const start = outageStart(i);
-      if (i.severity !== 'down' || i.tier !== tier || start < from || start >= to) return [];
-      if (!i.detectedAt || !i.ackedAt || i.ackedAt < i.detectedAt) return [];
-      if (tier === 1) return [seconds(i.detectedAt, i.ackedAt)];
-      if (!isInsideHours(i.detectedAt, hours)) return [];
-      return [minutesInsideHours(i.detectedAt, i.ackedAt, hours) * 60];
+      return i.severity === 'down' && i.tier === tier && start >= from && start < to;
     });
-    return { tier, seconds: mean(acks) };
+    let acked = 0;
+    const acks = down.flatMap((i) => {
+      const confirm = ackedDropConfirm(i);
+      if (!confirm || !i.ackedAt) return [];
+      acked += 1;
+      if (tier === 1) return [seconds(confirm, i.ackedAt)];
+      if (!isInsideHours(confirm, hours)) return [];
+      return [minutesInsideHours(confirm, i.ackedAt, hours) * 60];
+    });
+    return { tier, seconds: mean(acks), acked, down: down.length };
   });
 }
 

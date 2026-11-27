@@ -2,6 +2,7 @@ import 'server-only';
 import type { DbClient } from '@dxt/db';
 import {
   aggregateUptime,
+  downConfirmsOf,
   episodesFromTimeline,
   isInsideHours,
   mttaByTier,
@@ -428,15 +429,20 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
     }),
   );
   const tiers = [...new Set(sites.map((s) => s.tier))].sort();
-  const metric: MetricIncident[] = live.map((i) => ({
-    severity: i.severity,
-    tier: i.site.tier,
-    startedAt: new Date(i.started_at),
-    downStartedAt: episodesFromTimeline(i, i.events).find((e) => e.severity === 'down')?.start ?? null,
-    detectedAt: i.detected_at ? new Date(i.detected_at) : null,
-    ackedAt: i.acked_at ? new Date(i.acked_at) : null,
-    isManual: i.is_manual,
-  }));
+  const metric: MetricIncident[] = live.map((i) => {
+    const drops = episodesFromTimeline(i, i.events);
+    return {
+      severity: i.severity,
+      tier: i.site.tier,
+      startedAt: new Date(i.started_at),
+      downStartedAt: drops.find((e) => e.severity === 'down')?.start ?? null,
+      detectedAt: i.detected_at ? new Date(i.detected_at) : null,
+      ackedAt: i.acked_at ? new Date(i.acked_at) : null,
+      isManual: i.is_manual,
+      // MTTA from the confirm of the drop the ack answered (D-075)
+      downConfirms: downConfirmsOf(drops),
+    };
+  });
   const mtta = mttaByTier(metric, weekStart, weekEndExclusive, tiers, inside.hours).map((m) => ({
     ...m,
     // No L1 step on that tier's DOWN policy: no target to compare with (code review S14).

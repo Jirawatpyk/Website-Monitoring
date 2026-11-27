@@ -1,5 +1,13 @@
 import 'server-only';
-import { aggregateUptime, isInsideHours, kpiChange, responseKpis, siteUptimeOver } from '@dxt/engine';
+import {
+  aggregateUptime,
+  downConfirmsOf,
+  episodesFromTimeline,
+  isInsideHours,
+  kpiChange,
+  responseKpis,
+  siteUptimeOver,
+} from '@dxt/engine';
 import { shortCause } from '@dxt/notifier';
 import {
   CLOSED_INCIDENT_STATES_IN,
@@ -97,10 +105,11 @@ export async function loadOverview(
       db
         .from('incidents')
         .select(
-          'severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier), incident_events(type, payload)',
+          'severity, started_at, detected_at, acked_at, is_manual, sites!inner(tier), incident_events(type, at, payload)',
         )
         .eq('severity', 'down')
-        .eq('incident_events.type', 'escalated_to_down')
+        // the drops, so MTTA counts from the one the ack answered (D-075)
+        .in('incident_events.type', ['detected', 'relapsed', 'escalated_to_down', 'recovered'])
         // a PROBLEM raised to DOWN may have started before the window its outage falls in
         .gte('started_at', new Date(now.getTime() - 90 * DAY_MS).toISOString()),
       db
@@ -251,6 +260,7 @@ export async function loadOverview(
     ackedAt: i.acked_at ? new Date(i.acked_at) : null,
     // A PROBLEM raised to DOWN by hand (D-055 item 7) has no detection to measure either (D-032).
     isManual: i.is_manual || raisedByHand(i.incident_events),
+    downConfirms: downConfirmsOf(episodesFromTimeline(i, i.incident_events)),
   }));
   const current = responseKpis(kpiIncidents, from30d, now);
   const previous = responseKpis(kpiIncidents, from60d, from30d);
@@ -305,6 +315,8 @@ export async function loadOverview(
     oncall,
     kpis: {
       enough: current.enough,
+      downCount: current.downCount,
+      ackedCount: current.ackedCount,
       mttaSeconds: current.mttaSeconds,
       mttdSeconds: current.mttdSeconds,
       mttaChange:

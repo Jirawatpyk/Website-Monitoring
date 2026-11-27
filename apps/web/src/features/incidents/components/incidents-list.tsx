@@ -243,7 +243,11 @@ export function IncidentsList({ meta, incidents, sites, nowIso, viewer, initialV
             value={
               kpis.mttaEnough && kpis.mttaSeconds !== null ? formatDurationSeconds(kpis.mttaSeconds) : '—'
             }
-            caption={kpis.mttaEnough ? 'DOWN only · mean · target ≤ 15 min' : 'Not enough incidents yet'}
+            caption={
+              kpis.mttaEnough
+                ? `DOWN only · mean · ${kpis.mttaAckedCaption} · target ≤ 15 min`
+                : 'Not enough incidents yet'
+            }
             icon={<IconCheck />}
           />
           <Stat

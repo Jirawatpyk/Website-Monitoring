@@ -39,6 +39,7 @@ import {
   IconUsers,
 } from '@jirawatpyk/aura-react/icons';
 import {
+  formatAckedCount,
   formatDuration,
   formatDurationSeconds,
   formatIncidentId,
@@ -190,7 +191,11 @@ export function Kpis({
       <Stat
         label="MTTA · 30d"
         value={kpis.enough && kpis.mttaSeconds !== null ? formatDurationSeconds(kpis.mttaSeconds) : '—'}
-        caption={stale(kpis.enough ? 'DOWN, all tiers · target ≤ 15 min' : notEnough)}
+        caption={stale(
+          kpis.enough
+            ? `DOWN, all tiers · ${formatAckedCount(kpis.ackedCount, kpis.downCount)} · target ≤ 15 min`
+            : notEnough,
+        )}
         change={kpis.enough && !asOf ? changeOf(kpis.mttaChange) : undefined}
         icon={<IconClock />}
       />

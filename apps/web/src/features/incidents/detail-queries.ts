@@ -1033,6 +1033,8 @@ export async function loadIncidentList(db: DbClient, now: Date): Promise<Inciden
       start: d.start.toISOString(),
       end: d.end?.toISOString() ?? null,
       severity: d.severity,
+      // MTTA counts from the confirm of the drop the ack answered (D-075)
+      confirmedAt: d.confirmedAt?.toISOString() ?? null,
     }));
   return {
     incidents: rows.map((r): ListIncident => {

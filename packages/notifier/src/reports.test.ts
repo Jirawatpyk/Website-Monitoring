@@ -653,6 +653,22 @@ describe('root cause and the MTTA note (message-checker S14)', () => {
     expect(row.note).toBe('Tier 1 — (no DOWN) · Tier 3 — no L1 step to compare with');
   });
 
+  it('says how many DOWNs were acknowledged, and never "(no DOWN)" when nobody acked them (D-075)', () => {
+    const row = weeklyModel(
+      weekly({
+        mtta: [
+          { tier: 1, seconds: 361, targetMin: 15, acked: 1, down: 3 },
+          { tier: 2, seconds: null, targetMin: 30, acked: 0, down: 2 },
+          { tier: 3, seconds: null, targetMin: null, acked: 1, down: 1 },
+        ],
+      }),
+    ).sections.find((x) => x.rows[0]?.label?.startsWith('MTTA'))!.rows[0]!;
+    expect(row.note).toBe(
+      'Tier 1 within the 15 min target, 1 of 3 acknowledged · Tier 2 — 0 of 2 acknowledged · ' +
+        'Tier 3 — (no DOWN inside response hours), 1 of 1 acknowledged',
+    );
+  });
+
   it('puts the note under the value in Chat, never joined by a second dash', () => {
     const msg = reportChat(weeklyModel(weekly()), 'weekly');
     const widget = msg.cardsV2[0]!.card.sections.flatMap((s) => s.widgets).find(

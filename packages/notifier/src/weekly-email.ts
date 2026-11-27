@@ -12,6 +12,7 @@ import {
   dayTime,
   midSentence,
   monitorLines,
+  mttaAckedCount,
   plannedText,
   comingLines,
   type ReportIncident,
@@ -233,18 +234,23 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
             : null,
         }
       : null,
-    mtta: f.mtta.map((m) => ({
-      k: `Tier ${m.tier}`,
-      v:
+    mtta: f.mtta.map((m) => {
+      const count = mttaAckedCount(m);
+      const v =
         m.seconds === null
           ? m.tier === 1
             ? '— (no DOWN)'
             : f.incidents.some((i) => i.severity === 'down')
               ? '— (no DOWN in hours)'
               : '— (no DOWN)'
-          : `${formatDuration(Math.max(1, Math.round(m.seconds / 60)))}${m.targetMin !== null ? ` · target ${m.targetMin}` : ''}`,
-      tone: mttaTone(m),
-    })),
+          : `${formatDuration(Math.max(1, Math.round(m.seconds / 60)))}${m.targetMin !== null ? ` · target ${m.targetMin}` : ''}`;
+      return {
+        k: `Tier ${m.tier}`,
+        // D-075: DOWNs nobody acknowledged say so, never "(no DOWN)"; every tier with DOWNs gets the count
+        v: m.seconds === null && count && !m.acked ? `— · ${count}` : count ? `${v} · ${count}` : v,
+        tone: mttaTone(m),
+      };
+    }),
     planned: f.planned.map((w) => ({
       badge: w.kind === 'mute' ? 'muted' : 'maintenance',
       text: plannedText(w, f.at),
