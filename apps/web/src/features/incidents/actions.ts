@@ -121,7 +121,7 @@ export async function saveRootCause(input: RootCauseInput): Promise<RootCauseRes
     p_category: category,
     p_what: what,
     p_fix: fix,
-    p_prevent: prevent,
+    ...(prevent === undefined ? {} : { p_prevent: prevent }),
   });
   if (error) return { ok: false, message: refusal(error, ACT_REFUSALS) };
   revalidate(incidentId);
@@ -172,7 +172,7 @@ export async function resolveIncident(input: RootCauseInput): Promise<ResolveRes
     p_category: category,
     p_what: what,
     p_fix: fix,
-    p_prevent: prevent,
+    ...(prevent === undefined ? {} : { p_prevent: prevent }),
     ...(acceptCheckId ? { p_accept_check_id: acceptCheckId } : {}),
   });
   if (error) return { ok: false, message: refusal(error, ACT_REFUSALS) };

@@ -3,7 +3,7 @@
 -- S06-review guard on engine_relapse_incident.
 begin;
 \ir _helpers.psql
-select plan(83);
+select plan(86);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -147,9 +147,35 @@ select is(
   'hosting/Host rebooted the app server/null/unacked',
   'the root cause is stored; an empty fix is null; the state is unchanged'
 );
+update public.incidents set preventive_action = 'Kept' where id = (select id from inc where name = 'a');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select public.save_root_cause((select id from inc where name = 'a'), 'hosting', 'Host rebooted the app server', '');
+reset role;
+select is((select preventive_action from public.incidents where id = (select id from inc where name = 'a')),
+  'Kept', 'a save with no p_prevent (a form from before D-077) keeps the stored one');
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select public.save_root_cause((select id from inc where name = 'a'), 'hosting', 'Host rebooted the app server', '',
+  '  Disk alert at 80%  ');
+reset role;
+select is(
+  (select i.preventive_action || '/' || (a.before->>'prevent') || '/' || (a.after->>'prevent') || '/' || (e.payload->>'prevent')
+   from public.incidents i
+   join public.audit_log a on a.entity_id = i.id and a.action = 'incident.root_cause'
+     and a.after->>'prevent' = 'Disk alert at 80%' and a.before->>'prevent' = 'Kept'
+   join public.incident_events e on e.incident_id = i.id and e.type = 'root_cause' and e.payload->>'prevent' = 'Disk alert at 80%'
+   where i.id = (select id from inc where name = 'a')),
+  'Disk alert at 80%/Kept/Disk alert at 80%/Disk alert at 80%',
+  'a save with a value stores it trimmed, with the audit before / after and the timeline payload (D-077)'
+);
+select tests.authenticate_as((select id from ids where name = 'arm'));
+select public.save_root_cause((select id from inc where name = 'a'), 'hosting', 'Host rebooted the app server', '', '   ');
+reset role;
+select is((select preventive_action from public.incidents where id = (select id from inc where name = 'a')),
+  null, 'blank clears it (D-077)');
 select is(
   (select (payload->>'first')::text || '/' || (payload->>'state') from public.incident_events
-   where incident_id = (select id from inc where name = 'a') and type = 'root_cause'),
+   where incident_id = (select id from inc where name = 'a') and type = 'root_cause'
+     and payload->>'first' = 'true'),
   'true/unacked',
   'the timeline can tell a first save while still down (a draft)'
 );

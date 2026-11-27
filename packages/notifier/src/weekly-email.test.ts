@@ -159,6 +159,17 @@ describe('weekly email (WeeklyEmail board, §36)', () => {
         line2: 'Slow, p50 5.8 s · acked by Ploy 16:06 · root cause: image CDN slow',
       },
     ]);
+    // D-077: "prevent: …" after the root cause; none when there is none (above)
+    const b = busy();
+    const withPrevention = weeklyEmailModel({
+      ...b,
+      incidents: b.incidents.map((i) =>
+        i.rootCause ? { ...i, prevention: 'Alert when p50 passes 5 s' } : i,
+      ),
+    });
+    expect(withPrevention.incidents.at(-1)!.line2).toBe(
+      'Slow, p50 5.8 s · acked by Ploy 16:06 · root cause: image CDN slow · prevent: alert when p50 passes 5 s',
+    );
   });
 
   it('a site below its target gets its own row; the rest fold into one line (§36.8, D-059 30 days)', () => {

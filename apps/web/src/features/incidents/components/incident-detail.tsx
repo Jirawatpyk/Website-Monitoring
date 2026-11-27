@@ -794,7 +794,7 @@ function ResolvedCard({
       </span>
       {d.rootCause.prevent ? (
         // D-077: what stops it happening again (internal)
-        <span className="text-sm text-fg-secondary">{`Preventive action: ${d.rootCause.prevent}`}</span>
+        <span className="min-w-0 text-sm break-words text-fg-secondary">{`Preventive action: ${d.rootCause.prevent}`}</span>
       ) : null}
       {/* the visible line is the live region: each phase is announced once (the count isn't) */}
       <span className="flex items-center gap-1.5 text-xs text-fg-secondary">

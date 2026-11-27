@@ -97,7 +97,7 @@ function RootCauseFields({
         value={value.prevent}
         onChange={(e) => onChange({ ...value, prevent: e.target.value })}
         error={errors.prevent}
-        placeholder="e.g. Alert when the server's disk passes 80%"
+        placeholder="e.g. Alert when the server’s disk passes 80%"
         hint="Internal — what stops it happening again. Not in the client report."
       />
     </div>

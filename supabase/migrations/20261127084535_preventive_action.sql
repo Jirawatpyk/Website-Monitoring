@@ -4,11 +4,15 @@
 -- Never in the client report and never in a RESOLVED message: it stays out of `root_cause_input`'s
 -- jsonb and so out of resolve_incident's notification context.
 
+-- ACCESS EXCLUSIVE on incidents for a moment: never queue behind the every-minute engine (db-reviewer).
+set local lock_timeout = '5s';
+
 alter table public.incidents
   add column preventive_action text
     constraint incidents_preventive_action_length check (length(preventive_action) <= 500);
 
--- Trimmed, empty → null, at most 500 characters (as the form says).
+-- Trimmed, empty → null, at most 500 characters (as the form says). The functions keep the stored value
+-- when the caller sends no p_prevent (null: a form from before D-077) and clear it only on an empty string.
 create function private.preventive_input(p_prevent text)
 returns text
 language plpgsql
@@ -58,13 +62,15 @@ begin
     raise exception 'This incident is already resolved' using errcode = '55000';
   end if;
   v_rc := private.root_cause_input(p_category, p_what, p_fix);
-  v_prevent := private.preventive_input(p_prevent);
+  v_prevent := case when p_prevent is null then v_inc.preventive_action
+                    else private.preventive_input(p_prevent) end;
 
   select display_name into v_name from public.profiles where id = auth.uid();
 
   update public.incidents
     set root_cause_category = v_rc->>'category', root_cause = v_rc->>'what',
-        root_cause_fix = v_rc->>'fix', preventive_action = v_prevent,
+        root_cause_fix = v_rc->>'fix',
+        preventive_action = v_prevent,
         -- Settled in Monitoring because a root cause was written (§16.4), now Unknown: it needs one.
         state = case
           when state = 'monitoring' and v_rc->>'category' = 'unknown' and recovered_at is not null
@@ -130,7 +136,8 @@ begin
     raise exception 'This incident is already resolved' using errcode = '55000';
   end if;
   v_rc := private.root_cause_input(p_category, p_what, p_fix);
-  v_prevent := private.preventive_input(p_prevent);
+  v_prevent := case when p_prevent is null then v_inc.preventive_action
+                    else private.preventive_input(p_prevent) end;
 
   if v_accept then
     if not coalesce(public.current_app_role() = 'admin', false) then
@@ -178,7 +185,8 @@ begin
   update public.incidents
     set state = 'resolved', resolved_at = v_now, resolved_by = auth.uid(),
         root_cause_category = v_rc->>'category', root_cause = v_rc->>'what',
-        root_cause_fix = v_rc->>'fix', preventive_action = v_prevent
+        root_cause_fix = v_rc->>'fix',
+        preventive_action = v_prevent
     where id = p_incident_id;
 
   insert into public.audit_log (actor_id, action, entity, entity_id, before, after)

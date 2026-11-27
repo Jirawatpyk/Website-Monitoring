@@ -276,11 +276,13 @@ describe('reportIncident (WeeklySummary: a DOWN counts once, durations are down 
     expect(rootCauseOf(row(over))).toBe(expected);
   });
 
-  it('preventionOf: the preventive action cut like the root cause; none when blank (D-077)', () => {
+  it('preventionOf: cut like the root cause; none when blank or with no known root cause (D-077)', () => {
+    const known = { root_cause_category: 'hosting' };
     expect(
-      preventionOf(row({ preventive_action: 'Alert when the disk passes 80%. Also rotate logs.' })),
+      preventionOf(row({ ...known, preventive_action: 'Alert when the disk passes 80%. Also rotate logs.' })),
     ).toBe('Alert when the disk passes 80%');
-    expect(preventionOf(row({ preventive_action: '   ' }))).toBeNull();
+    expect(preventionOf(row({ ...known, preventive_action: '   ' }))).toBeNull();
+    expect(preventionOf(row({ root_cause_category: 'unknown', preventive_action: 'Disk alert' }))).toBeNull();
     expect(preventionOf(row({}))).toBeNull();
   });
 

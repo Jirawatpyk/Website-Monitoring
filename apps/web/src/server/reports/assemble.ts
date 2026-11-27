@@ -79,6 +79,8 @@ export function rootCauseOf(row: IncidentRow): string | null {
 
 /** D-077: the preventive action for the weekly summary, cut like the root cause; null with none. */
 export function preventionOf(row: IncidentRow): string | null {
+  // only beside a known root cause, as the root cause itself (never "no root cause yet · prevent: …")
+  if (!row.root_cause_category || row.root_cause_category === 'unknown') return null;
   return fewWords(row.preventive_action?.trim() ?? '');
 }
 

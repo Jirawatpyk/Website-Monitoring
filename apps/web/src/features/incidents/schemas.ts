@@ -24,7 +24,8 @@ export const rootCauseSchema = z.object({
     .max(2000, 'Keep it under 2,000 characters'),
   fix: z.string().trim().max(500, 'Keep it under 500 characters').default(''),
   /** D-077: what stops it happening again — optional, internal (never in the client report). */
-  prevent: z.string().trim().max(500, 'Keep it under 500 characters').default(''),
+  // optional with no default: a form from before D-077 sends none, and the stored value is kept
+  prevent: z.string().trim().max(500, 'Keep it under 500 characters').optional(),
   /**
    * S09d (spec §26.7, D-046 item 10): a Page change resolved as Client-side change by an Admin may also
    * accept this plain fetch as the new baseline — the SQL checks the rest.

@@ -178,8 +178,7 @@ describe('note, root cause, resolve (S07, D-033)', () => {
       p_category: 'hosting',
       p_what: 'Host rebooted',
       p_fix: '',
-      p_prevent: '',
-    });
+    }); // no p_prevent: a form that doesn't send it keeps the stored one (D-077)
   });
 
   it('sends the preventive action, trimmed; over 500 characters is refused at its field (D-077)', async () => {
