@@ -1,7 +1,7 @@
 import 'server-only';
 import {
   aggregateUptime,
-  downDropsOf,
+  metricDropsOf,
   episodesFromTimeline,
   isInsideHours,
   kpiChange,
@@ -260,7 +260,7 @@ export async function loadOverview(
     ackedAt: i.acked_at ? new Date(i.acked_at) : null,
     // A PROBLEM raised to DOWN by hand (D-055 item 7) has no detection to measure either (D-032).
     isManual: i.is_manual || raisedByHand(i.incident_events),
-    downDrops: downDropsOf(episodesFromTimeline(i, i.incident_events)),
+    drops: metricDropsOf(episodesFromTimeline(i, i.incident_events)),
   }));
   const current = responseKpis(kpiIncidents, from30d, now);
   const previous = responseKpis(kpiIncidents, from60d, from30d);

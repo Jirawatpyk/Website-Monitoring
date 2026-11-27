@@ -228,7 +228,7 @@ describe('weekly email (WeeklyEmail board, §36)', () => {
       ],
     });
     expect(mail.text).toContain(
-      'Tier 1 6 min · target 15 · 1 of 3 acknowledged\nTier 2 — (no ack in hours) · 1 of 2 acknowledged',
+      'Tier 1 6 min · target 15 · 1 of 3 acknowledged\nTier 2 — (no acked DOWN in hours) · 1 of 2 acknowledged',
     );
   });
 

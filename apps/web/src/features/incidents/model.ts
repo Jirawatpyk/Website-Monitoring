@@ -5,7 +5,7 @@
  */
 import {
   canResolve,
-  downDropsOf,
+  metricDropsOf,
   mttrMinutes,
   outageMinutes,
   episodesFromTimeline,
@@ -473,18 +473,15 @@ const toMetric = (i: ListIncident): MetricIncident => ({
   detectedAt: new Date(i.detectedAt),
   ackedAt: i.ackedAt ? new Date(i.ackedAt) : null,
   isManual: i.isManual,
-  // D-075: from the confirm of the drop the ack answered; drops read without their confirms (older
-  // rows, tests) fall back to the incident's confirm
-  downDrops: i.drops.some((d) => d.confirmedAt)
-    ? downDropsOf(
-        i.drops.map((d) => ({
-          start: new Date(d.start),
-          end: d.end ? new Date(d.end) : null,
-          severity: d.severity,
-          ...(d.confirmedAt ? { confirmedAt: new Date(d.confirmedAt) } : {}),
-        })),
-      )
-    : undefined,
+  // D-075: from the confirm of the drop the ack answered — the same rule as the Overview and weekly
+  drops: metricDropsOf(
+    i.drops.map((d) => ({
+      start: new Date(d.start),
+      end: d.end ? new Date(d.end) : null,
+      severity: d.severity,
+      ...(d.confirmedAt ? { confirmedAt: new Date(d.confirmedAt) } : {}),
+    })),
+  ),
 });
 
 export function listKpis(list: readonly ListIncident[], now: Date): ListKpis {

@@ -250,7 +250,7 @@ export function weeklyEmailModel(f: WeeklyFacts): WeeklyEmailModel {
         v:
           m.seconds === null && count
             ? m.acked
-              ? `— (no ack in hours) · ${count}`
+              ? `— (no acked DOWN in hours) · ${count}`
               : `— · ${count}`
             : count
               ? `${v} · ${count}`

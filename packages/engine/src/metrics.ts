@@ -28,41 +28,38 @@ export interface MetricIncident {
   ackedAt: Date | null;
   isManual: boolean;
   /**
-   * Each DOWN drop's confirm and end (`downDropsOf` over the incident's episodes, D-075). Absent: the
-   * incident's `detectedAt` stands for its one drop, as before D-075.
+   * Every drop's confirm and severity (`metricDropsOf` over the incident's episodes, D-075). Absent: the
+   * incident's `detectedAt` stands for its one DOWN drop, as before D-075.
    */
-  downDrops?: readonly MetricDrop[];
+  drops?: readonly MetricDrop[];
 }
 
-/** A DOWN drop as MTTA reads it: confirmed at, and over at (null while still down). */
+/** A drop as MTTA reads it: when it was confirmed, and at which severity. */
 export interface MetricDrop {
   confirmedAt: Date;
-  end: Date | null;
+  severity: 'down' | 'problem';
 }
 
-/** The DOWN drops of an incident (D-075); a drop's start stands in when no confirm is known. */
-export function downDropsOf(episodes: readonly Episode[]): MetricDrop[] {
-  return episodes
-    .filter((e) => e.severity === 'down')
-    .map((e) => ({ confirmedAt: e.confirmedAt ?? e.start, end: e.end }));
+/** The drops of an incident for MTTA (D-075); a drop's start stands in when no confirm is known. */
+export function metricDropsOf(episodes: readonly Episode[]): MetricDrop[] {
+  return episodes.map((e) => ({ confirmedAt: e.confirmedAt ?? e.start, severity: e.severity }));
 }
 
 /**
- * The confirm the ack answered (D-075): the DOWN drop open at the ack (confirmed at or before it, not
- * over before it). An ack only lands while the incident is Unacked / Escalated, so in a drop: one given
- * during a PROBLEM drop — after an unacked DOWN drop recovered, or before any DOWN — answered no DOWN
- * and is left out (engine review M1), not measured from a DOWN that ended days before.
+ * The confirm the ack answered (D-075): the latest drop confirmed at or before the ack, counted only if
+ * it is a DOWN. An ack lands while the incident is Unacked / Escalated, which a recovery ends only once
+ * the engine records it — so an ack a minute after the first OK check still answers that DOWN (engine
+ * re-review M1), while one during a PROBLEM drop (after an unacked DOWN recovered, or before any DOWN,
+ * D-021) answered no DOWN and is left out, never measured from a DOWN that ended days before.
  */
 function ackedDropConfirm(i: MetricIncident): Date | null {
   const acked = i.ackedAt;
   if (!acked) return null;
-  if (!i.downDrops) return i.detectedAt && acked >= i.detectedAt ? i.detectedAt : null;
-  let found: Date | null = null;
-  for (const d of i.downDrops) {
-    const open = d.confirmedAt <= acked && (d.end === null || d.end > acked);
-    if (open && (!found || d.confirmedAt > found)) found = d.confirmedAt;
-  }
-  return found;
+  if (!i.drops) return i.detectedAt && acked >= i.detectedAt ? i.detectedAt : null;
+  let latest: MetricDrop | null = null;
+  for (const d of i.drops)
+    if (d.confirmedAt <= acked && (!latest || d.confirmedAt >= latest.confirmedAt)) latest = d;
+  return latest?.severity === 'down' ? latest.confirmedAt : null;
 }
 
 export interface ResponseKpis {

@@ -2,7 +2,7 @@ import 'server-only';
 import type { DbClient } from '@dxt/db';
 import {
   aggregateUptime,
-  downDropsOf,
+  metricDropsOf,
   episodesFromTimeline,
   isInsideHours,
   mttaByTier,
@@ -440,7 +440,7 @@ export async function loadWeeklyFacts(db: DbClient, now: Date, appUrl: string): 
       ackedAt: i.acked_at ? new Date(i.acked_at) : null,
       isManual: i.is_manual,
       // MTTA from the confirm of the drop the ack answered (D-075)
-      downDrops: downDropsOf(drops),
+      drops: metricDropsOf(drops),
     };
   });
   const mtta = mttaByTier(metric, weekStart, weekEndExclusive, tiers, inside.hours).map((m) => ({

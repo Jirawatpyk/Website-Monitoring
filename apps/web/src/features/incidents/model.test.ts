@@ -300,6 +300,7 @@ describe('KPIs (D-032 MTTA mean, D-033 MTTR median, Unacked until S08)', () => {
             start: at('24T10:00:00'),
             end: new Date(Date.parse(at('24T10:00:00')) + minutes * 60_000).toISOString(),
             severity: 'down',
+            confirmedAt: at('24T10:00:30'), // as every timeline drop carries it (D-075)
           },
         ],
       });

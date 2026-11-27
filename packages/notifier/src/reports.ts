@@ -548,7 +548,7 @@ export function weeklyModel(f: WeeklyFacts): ReportModel {
       // D-075: a tier with DOWNs never says "(no DOWN)": nobody acked them, or no ack fell in hours
       if (m.seconds === null && count)
         return m.acked
-          ? `Tier ${m.tier} — (no ack inside response hours), ${count}`
+          ? `Tier ${m.tier} — (no acked DOWN confirmed inside response hours), ${count}`
           : `Tier ${m.tier} — ${count}`;
       const words =
         m.seconds === null

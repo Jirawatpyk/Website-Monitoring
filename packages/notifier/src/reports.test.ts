@@ -665,7 +665,7 @@ describe('root cause and the MTTA note (message-checker S14)', () => {
     ).sections.find((x) => x.rows[0]?.label?.startsWith('MTTA'))!.rows[0]!;
     expect(row.note).toBe(
       'Tier 1 within the 15 min target, 1 of 3 acknowledged · Tier 2 — 0 of 2 acknowledged · ' +
-        'Tier 3 — (no ack inside response hours), 1 of 1 acknowledged',
+        'Tier 3 — (no acked DOWN confirmed inside response hours), 1 of 1 acknowledged',
     );
   });
 

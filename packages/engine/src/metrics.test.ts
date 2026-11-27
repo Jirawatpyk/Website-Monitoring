@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatDurationSeconds } from '@dxt/shared';
 import { episodesFromTimeline } from './lifecycle';
 import {
-  downDropsOf,
+  metricDropsOf,
   kpiChange,
   mttaByTier,
   mttrMinutes,
@@ -125,10 +125,10 @@ describe('responseKpis (spec §21.3, PRD §2 means, D-032)', () => {
 // acknowledged. INC-0038 (ENEOS, Tier 1, production 2–10 Nov 2026): confirmed down Mon 2 Nov 22:05,
 // recovered and relapsed for a week, down again Tue 10 Nov 12:17:38, acknowledged 12:23:39 → 6 min 1 s,
 // not the 7 d 14 h from the first confirm that D-032 showed management.
-/** A DOWN drop: its confirm and its recovery (Bangkok times), open without an end. */
-const drop = (confirmedAt: string, end?: string) => ({
+/** A drop: its confirm (Bangkok time) and severity; the end is kept for reading only. */
+const drop = (confirmedAt: string, _end?: string, severity: 'down' | 'problem' = 'down') => ({
   confirmedAt: at(confirmedAt),
-  end: end ? at(end) : null,
+  severity,
 });
 
 describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
@@ -139,7 +139,7 @@ describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
     downStartedAt: at('2026-11-02T22:04:01'),
     detectedAt: at('2026-11-02T22:05:14'),
     ackedAt: at('2026-11-10T12:23:39'),
-    downDrops: [
+    drops: [
       drop('2026-11-02T22:05:14', '2026-11-02T22:07:01'),
       drop('2026-11-04T07:43:39', '2026-11-04T07:44:08'),
       drop('2026-11-10T12:17:38', '2026-11-10T12:28:01'),
@@ -150,7 +150,7 @@ describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
       startedAt: at(`2026-11-${day}T05:44:01`),
       detectedAt: at(`2026-11-${day}T05:44:38`),
       ackedAt: null,
-      downDrops: [drop(`2026-11-${day}T05:44:38`, `2026-11-${day}T08:20:01`)],
+      drops: [drop(`2026-11-${day}T05:44:38`, `2026-11-${day}T08:20:01`)],
     });
 
   it.each<[string, MetricIncident[], { mtta: string | null; acked: number; down: number }]>([
@@ -163,7 +163,7 @@ describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
       'a one-drop incident is unchanged',
       [
         inc({
-          downDrops: [drop('2026-11-20T09:48:41', '2026-11-20T10:30:00')],
+          drops: [drop('2026-11-20T09:48:41', '2026-11-20T10:30:00')],
           startedAt: at('2026-11-20T09:47:41'),
           detectedAt: at('2026-11-20T09:48:41'),
           ackedAt: at('2026-11-20T10:07:00'),
@@ -180,7 +180,7 @@ describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
           startedAt: at('2026-11-20T09:47:41'),
           detectedAt: at('2026-11-20T09:48:41'),
           ackedAt: at('2026-11-20T09:48:41'),
-          downDrops: [drop('2026-11-20T09:48:41', '2026-11-20T10:30:00')],
+          drops: [drop('2026-11-20T09:48:41', '2026-11-20T10:30:00')],
         }),
         unacked('07'),
         unacked('26'),
@@ -196,7 +196,7 @@ describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
           downStartedAt: at('2026-11-05T21:15:01'),
           detectedAt: at('2026-11-05T21:15:54'),
           ackedAt: at('2026-11-03T09:11:41'),
-          downDrops: [
+          drops: [
             drop('2026-11-05T21:15:54', '2026-11-05T21:33:01'),
             drop('2026-11-12T08:01:13', '2026-11-12T08:10:01'),
           ],
@@ -214,7 +214,10 @@ describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
           startedAt: at('2026-11-20T09:47:41'),
           detectedAt: at('2026-11-20T09:48:41'),
           ackedAt: at('2026-11-23T10:00:00'),
-          downDrops: [drop('2026-11-20T09:48:41', '2026-11-20T10:05:00')],
+          drops: [
+            drop('2026-11-20T09:48:41', '2026-11-20T10:05:00'),
+            drop('2026-11-23T09:50:00', undefined, 'problem'),
+          ],
         }),
         unacked('07'),
         unacked('26'),
@@ -229,7 +232,7 @@ describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
           startedAt: at('2026-11-20T09:47:41'),
           detectedAt: at('2026-11-20T09:48:41'),
           ackedAt: at('2026-11-20T09:53:41'),
-          downDrops: [
+          drops: [
             drop('2026-11-20T09:48:41', '2026-11-20T10:05:00'),
             drop('2026-11-21T03:12:00', '2026-11-21T03:40:00'),
           ],
@@ -263,23 +266,24 @@ describe('responseKpis: the acknowledged drop and the count (D-075)', () => {
   });
 });
 
-describe('downDropsOf (D-075)', () => {
-  it('each DOWN drop with its confirm and end, PROBLEM drops left out; the start when no confirm', () => {
+describe('metricDropsOf (D-075)', () => {
+  it('every drop with its confirm and severity; the start when no confirm is known', () => {
     const t = (m: number) => new Date(Date.UTC(2026, 10, 10, 5, m));
     expect(
-      downDropsOf([
+      metricDropsOf([
         { start: t(0), end: t(5), severity: 'down', confirmedAt: t(1) },
         { start: t(10), end: t(20), severity: 'problem', confirmedAt: t(12) },
         { start: t(30), end: null, severity: 'down' },
       ]),
     ).toEqual([
-      { confirmedAt: t(1), end: t(5) },
-      { confirmedAt: t(30), end: null },
+      { confirmedAt: t(1), severity: 'down' },
+      { confirmedAt: t(12), severity: 'problem' },
+      { confirmedAt: t(30), severity: 'down' },
     ]);
   });
 });
 
-// The same rule from stored timeline rows, as the callers build it: episodesFromTimeline → downDropsOf.
+// The same rule from stored timeline rows, as the callers build it: episodesFromTimeline → metricDropsOf.
 describe('MTTA from a stored timeline (D-075, engine review)', () => {
   const NOV = new Date('2026-11-27T04:00:00Z');
   const FROM_NOV = new Date(NOV.getTime() - 30 * 86_400_000);
@@ -300,7 +304,7 @@ describe('MTTA from a stored timeline (D-075, engine review)', () => {
       detectedAt: drops[0]?.confirmedAt ?? null,
       ackedAt: acked ? utc(acked) : null,
       isManual: false,
-      downDrops: downDropsOf(drops),
+      drops: metricDropsOf(drops),
     };
   };
   const none = (day: string) =>
@@ -348,6 +352,70 @@ describe('MTTA from a stored timeline (D-075, engine review)', () => {
     const k = responseKpis([eneos, none('25'), none('26')], FROM_NOV, NOV);
     expect(formatDurationSeconds(k.mttaSeconds!)).toBe('6 min 1 s');
     expect(k).toMatchObject({ ackedCount: 1, downCount: 3 });
+  });
+
+  it.each<[string, string, { type: string; at: string; payload?: Record<string, unknown> }[], string | null]>(
+    [
+      // INC-0038's 22:05:14 drop, first OK check 22:07:01; the engine records the recovery a round later,
+      // and until then the incident is still Unacked — the ack answers that DOWN (engine re-review M1).
+      [
+        'acked after the first OK check, before the engine recorded it: still that DOWN',
+        '2026-11-02T15:07:40',
+        [
+          { type: 'detected', at: '2026-11-02T15:05:14' },
+          { type: 'recovered', at: '2026-11-02T15:07:01' },
+        ],
+        '2 min 26 s',
+      ],
+      // D-021 in place: PROBLEM detected 10:00, raised to DOWN 10:20 (no downStartedAt).
+      [
+        'acked while still a PROBLEM, raised to DOWN after: left out',
+        '2026-11-20T03:10:00',
+        [
+          { type: 'detected', at: '2026-11-20T03:00:00' },
+          { type: 'escalated_to_down', at: '2026-11-20T03:20:00' },
+        ],
+        null,
+      ],
+      [
+        'acked after a D-021 raise: counts from the raise',
+        '2026-11-20T03:26:00',
+        [
+          { type: 'detected', at: '2026-11-20T03:00:00' },
+          { type: 'escalated_to_down', at: '2026-11-20T03:20:00' },
+        ],
+        '6 min',
+      ],
+      // D-023: the home page back while a key page fails — RECOVERED and PROBLEM AGAIN in one round.
+      [
+        'acked just after a D-023 split (PROBLEM AGAIN open): left out',
+        '2026-11-20T03:20:30',
+        [
+          { type: 'detected', at: '2026-11-20T03:00:00' },
+          { type: 'recovered', at: '2026-11-20T03:20:00' },
+          {
+            type: 'relapsed',
+            at: '2026-11-20T03:20:00',
+            payload: { severity: 'problem', startedAt: '2026-11-20T03:15:00Z' },
+          },
+        ],
+        null,
+      ],
+    ],
+  )('%s', (_name, acked, events, expected) => {
+    const one = fromTimeline(events[0]!.at, acked, events);
+    const k = responseKpis([one, none('25'), none('26')], FROM_NOV, NOV);
+    expect(k.mttaSeconds === null ? null : formatDurationSeconds(k.mttaSeconds)).toBe(expected);
+    expect(k.ackedCount).toBe(expected === null ? 0 : 1);
+  });
+
+  it('no drop read: the ack answered no DOWN that can be shown, so it is left out', () => {
+    const k = responseKpis(
+      [{ ...none('25'), ackedAt: utc('2026-11-25T23:00:00'), drops: [] }, none('25'), none('26')],
+      FROM_NOV,
+      NOV,
+    );
+    expect(k).toMatchObject({ ackedCount: 0, mttaSeconds: null });
   });
 
   it('acked during PROBLEM AGAIN after the DOWN recovered: left out (engine review M1)', () => {
@@ -449,7 +517,7 @@ describe('mttaByTier (weekly summary, spec §15.7, D-056)', () => {
     const relapsed: MetricIncident = {
       ...down(1, '2026-09-21T22:05:00', null),
       ackedAt: at('2026-09-24T12:23:00'),
-      downDrops: [
+      drops: [
         drop('2026-09-21T22:05:00', '2026-09-21T22:30:00'),
         drop('2026-09-24T12:17:00', '2026-09-24T12:40:00'),
       ],
@@ -473,7 +541,7 @@ describe('mttaByTier (weekly summary, spec §15.7, D-056)', () => {
     const tier2: MetricIncident = {
       ...down(2, '2026-09-21T03:12:00', null),
       ackedAt: at('2026-09-22T10:06:00'),
-      downDrops: [
+      drops: [
         drop('2026-09-21T03:12:00', '2026-09-21T03:50:00'),
         drop('2026-09-22T10:00:00', '2026-09-22T10:30:00'),
       ],
