@@ -553,7 +553,7 @@ export function buildAcknowledgedEmail(input: AcknowledgedEmailInput): EmailMess
       : downtime(input.startedAt, input.ackedAt).duration;
   const slow = problem?.trigger === 'slow';
   const still = !problem ? 'still down' : slow ? 'still slow' : 'still has a problem';
-  const stopped = stoppedWords(input.stopped);
+  const stopped = stoppedWords(input.stopped, { nudge: !input.amReader });
   return render(input, {
     template: 'acknowledged',
     color: C.secondary,

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { IncidentFacts, Notification } from './facts';
 import { ladderFactsOf, toldAtOf } from './ladder-facts';
-import { renderChat, renderEmail } from './render';
+import { emailReason, renderChat, renderEmail } from './render';
 
 // INC-0142 MuvMi (Tier 1): confirmed 09:48:41 Bangkok; Arm owns, Ploy backs up, Tao the Admin (spec §4).
 const arm = { id: 'u-arm', display_name: 'Arm', google_chat_user_id: 'ARM' };
@@ -193,7 +193,7 @@ describe('render — L2 and the L3 FYI (S10)', () => {
     const m = renderChat(row('step_fired', fyiCtx, queued), noted, appUrl, new Date('2026-09-25T03:55:00Z'))!;
     const card = JSON.stringify(m.cardsV2);
     expect(card).toContain('"topLabel":"Status","text":"Ploy 10:30 — Restarting Redis"');
-    expect(card).toContain('"topLabel":"Down for","text":"1 h (since 09:48)"');
+    expect(card).toContain('"topLabel":"Down for","text":"1 h (confirmed down 09:48)"');
     expect(card).not.toContain('Written after the FYI');
   });
 
@@ -216,7 +216,7 @@ describe('render — L2 and the L3 FYI (S10)', () => {
       appUrl,
       new Date('2026-09-25T03:55:00Z'),
     )!;
-    expect(JSON.stringify(m.cardsV2)).toContain('"topLabel":"Down for","text":"1 h (since 09:48)"');
+    expect(JSON.stringify(m.cardsV2)).toContain('"topLabel":"Down for","text":"1 h (confirmed down 09:48)"');
   });
 
   it('the FYI email shows the same Status; no note gives "No status note yet" (D-078)', () => {
@@ -230,6 +230,26 @@ describe('render — L2 and the L3 FYI (S10)', () => {
       )!;
     expect(email(noted).text).toContain('Status: Ploy 10:30 — Restarting Redis');
     expect(email({ ...noted, incident_events: [] }).text).toContain('Status: No status note yet');
+  });
+
+  it('the CEO’s RECOVERED after an FYI says they were emailed about it, not a Chat fallback (D-078)', () => {
+    const fyied: IncidentFacts = {
+      ...noted,
+      incident_events: [
+        ...noted.incident_events!,
+        {
+          type: 'step_fired',
+          payload: { level: 3, fyiStep: true, notified: ['u-ceo', 'u-bua'] },
+          at: '2026-09-25T03:48:42Z',
+        },
+      ],
+    };
+    expect(emailReason(row('recovered', {}, { channel: 'email', user_id: 'u-ceo' }), fyied)).toBe('emailed');
+    expect(emailReason(row('flap_summary', {}, { channel: 'email', user_id: 'u-ceo' }), fyied)).toBe(
+      'emailed',
+    );
+    // Someone no step told stays the D-016 fallback.
+    expect(emailReason(row('recovered', {}, { channel: 'email', user_id: 'u-x' }), fyied)).toBe('fallback');
   });
 
   it('ACKNOWLEDGED · L1–L2 stopped', () => {

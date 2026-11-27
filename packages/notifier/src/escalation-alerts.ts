@@ -80,6 +80,8 @@ export type LadderStopped = {
 
 export function stoppedWords(
   s: LadderStopped | null | undefined,
+  /** The status-note ask is for the team; an FYI reader (the AM's own email) doesn't get it. */
+  { nudge = true }: { nudge?: boolean } = {},
 ): { line: string; body: string; fact: [string, string] | null } | null {
   if (!s) return null;
   if (s.severity === 'down') {
@@ -94,7 +96,7 @@ export function stoppedWords(
     // 10:48, CEO + Bua get an FYI (no call)."
     // D-078: the FYI shows the latest note as the status, so ask for one.
     const fyi = s.fyi
-      ? ` If ${plainName(s.site ?? 'the site')} is still down at ${formatTime(s.fyi.at)}, ${plainName(s.fyi.who)} get an FYI (no call). Add a status note — they see it in the FYI.`
+      ? ` If ${plainName(s.site ?? 'the site')} is still down at ${formatTime(s.fyi.at)}, ${plainName(s.fyi.who)} get an FYI (no call).${nudge ? ' Add a status note — they see it in the FYI.' : ''}`
       : '';
     return { line: stopped, body: `${stopped}.${fyi}`, fact };
   }
@@ -169,7 +171,11 @@ export function statusWords(s: StatusNote | null | undefined, now: Date): string
   const text = s.text.split(/\s+/).join(' ').trim();
   if (!text) return NO_STATUS_NOTE;
   let short = text;
-  const chars = Array.from(text); // whole characters: an emoji is never split
+  // Whole graphemes: an emoji, or a Thai vowel / tone mark, is never split from its letter.
+  const chars = Array.from(
+    new Intl.Segmenter('th', { granularity: 'grapheme' }).segment(text),
+    (g) => g.segment,
+  );
   if (chars.length > STATUS_CHARS) {
     const cut = chars.slice(0, STATUS_CHARS).join('');
     const space = cut.lastIndexOf(' ');
@@ -316,7 +322,7 @@ function stepAlert(input: StepAlertInput): ChatMessage {
 /** The FYI card's facts (D-078, Bua's item 3): what's wrong, since when, the latest status, the next update. */
 function fyiRows(input: StepAlertInput, duration: string): ChatWidget[] {
   const now = input.sentAt ?? new Date();
-  const since = input.since ? `${duration} (since ${dayTime(input.since, now)})` : duration;
+  const since = input.since ? `${duration} (confirmed down ${dayTime(input.since, now)})` : duration;
   return [
     ...(input.cause ? [row('Cause', input.cause)] : []),
     row('Down for', since),

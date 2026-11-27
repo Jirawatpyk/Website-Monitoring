@@ -232,7 +232,7 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
     );
     const card = JSON.stringify(msg.cardsV2);
     expect(card).toContain('"topLabel":"Cause","text":"HTTP 503 ×3"');
-    expect(card).toContain('"topLabel":"Down for","text":"1 h (since 09:48)"');
+    expect(card).toContain('"topLabel":"Down for","text":"1 h (confirmed down 09:48)"');
     // People's words never carry markup into the card.
     expect(card).toContain('"topLabel":"Status","text":"Arm 10:30 — Restarting &lt;b>Redis&lt;/b>"');
   });
@@ -308,6 +308,30 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
       },
     });
     expect(m.text).toContain('Escalation: L2 cancelled · acked · L3 FYI at 10:48 if still down');
+    expect(m.text).toContain('Add a status note — they see it in the FYI.');
+  });
+
+  it('the AM’s ACKNOWLEDGED email doesn’t ask them for a status note (D-078)', () => {
+    const m = buildAcknowledgedEmail({
+      ...base,
+      recipientId: 'bua',
+      reason: 'emailed',
+      ackedBy: 'Arm',
+      ackedAt: bkk('2026-09-25T10:07:40'),
+      startedAt: bkk('2026-09-25T09:48:12'),
+      confirmedAt: bkk('2026-09-25T09:48:41'),
+      amReader: { marked: null, draftUrl: `${url}#client-update` },
+      stopped: {
+        severity: 'down',
+        backup: 'Ploy',
+        l1Fired: true,
+        stopsThrough: 2,
+        site: 'MuvMi',
+        fyi: { level: 3, at: bkk('2026-09-25T10:48:41'), who: 'CEO + Bua' },
+      },
+    });
+    expect(m.text).toContain('CEO + Bua get an FYI (no call).');
+    expect(m.text).not.toContain('Add a status note');
   });
 });
 

@@ -653,6 +653,14 @@ export function emailReason(n: Notification, i: IncidentFacts): EmailReason {
       (contextOf(e.payload).mention as { id?: unknown } | undefined)?.id === n.user_id,
   );
   if (n.user_id && told) return 'emailed';
+  // Anyone a step told (the Tier 1 FYI's CEO and AM): their RECOVERED / flap summary is the "email when
+  // it's back" the FYI promised (D-078), not a Chat fallback.
+  const stepped = (i.incident_events ?? []).some((e) => {
+    if (e.type !== 'step_fired') return false;
+    const notified = contextOf(e.payload).notified;
+    return Array.isArray(notified) && notified.includes(n.user_id);
+  });
+  if (n.user_id && stepped) return 'emailed';
   // Someone the L0 pencil adds (S10): told at once by email too, then followed up like anyone emailed.
   if (n.user_id && l0PeopleOf(i).includes(n.user_id)) return L0_TEMPLATES.has(n.template) ? 'l0' : 'emailed';
   if (n.template === 'resolved') return 'emailed';
