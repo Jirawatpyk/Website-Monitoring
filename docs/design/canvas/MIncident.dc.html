@@ -474,12 +474,12 @@ class Component extends DCLogic {
     var ladder = [
       Object.assign({ level: 'L0', when: '0 min · 09:48', status: 'Sent 09:48', who: 'Arm (owner, business hours) @mention + Alerts Space', proposal: false }, done),
       Object.assign({ level: 'L1', when: '+15 min · 10:03', status: 'Sent 10:03', who: 'Ploy (backup) + Tao · “@Ploy please acknowledge · Tao FYI”', proposal: false }, done),
-      Object.assign({ level: 'L2', when: '+30 min · 10:18', status: 'Cancelled · acked', who: 'CEO @mention + email (voice call off until approved)', proposal: false }, off),
+      Object.assign({ level: 'L2', when: '+30 min · 10:18', status: 'Cancelled · acked', who: 'Management (Vee, Pim) @mention + email', proposal: false }, off),
       Object.assign({ level: 'L3', when: '+60 min · 10:48', status: later ? 'Not sent · recovered 10:31' : 'If still down', who: 'FYI to CEO + Bua at 10:48 if still down (no call)', proposal: false }, off)
     ];
     var escFoot = later
       ? 'Acknowledged by Arm 10:07 → L1–L2 stopped. MuvMi recovered at 10:31, so the L3 FYI to CEO + Bua was not needed.'
-      : 'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).';
+      : 'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call). Add a status note — they see it in the FYI.';
 
     // Resolve gate — 3 conditions (§15.4, §16.2, §16.3)
     var conds = [];
@@ -677,7 +677,7 @@ class Component extends DCLogic {
     var LV = [
       { level: 'L0', when: '0 min · 02:31', who: 'Ploy (on call) + Alerts Space' },
       { level: 'L1', when: '+15 · 02:46', who: 'Arm (backup) + Tao', btn: 'L1 (Arm, backup · Tao)', sendWho: [['Arm', 'backup'], ['Tao', 'Admin']] },
-      { level: 'L2', when: '+30 · 03:01', who: 'CEO', btn: 'L2 (CEO)', sendWho: [['CEO', 'L2']] },
+      { level: 'L2', when: '+30 · 03:01', who: 'Management (Vee, Pim)', btn: 'L2 (Vee, Pim)', sendWho: [['Vee', 'Management'], ['Pim', 'Management']] },
       { level: 'L3', when: '+60 · 03:31', who: 'CEO + Thee (AM)', btn: 'L3 (CEO + Thee)', sendWho: [['CEO', 'L3'], ['Thee', 'Site AM']] }
     ];
     var AT = ['02:31', '02:35', '02:36', '02:37'];

@@ -82,7 +82,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 <span>{{hoursLine}}</span>
 </div>
 
-<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Mobile Escalation is read-only for every role (spec §22): same policies and steps as the desktop Escalation board, one vertical ladder per policy, names resolved for the picked site (role tokens shown underneath), the example shows when each step fires if nobody acknowledges. No edit, reorder, delete or Save controls — the banner at the top says why; there is no “Open on desktop” link. Opened from My profile (“Where I sit in escalation”) and from the incident’s escalation card; back returns to whichever screen opened it, and from an incident “Show names for” starts on that incident’s site. L2 CEO is approved (D-009), so no “Proposal” tag; voice stays off until the call provider is approved. Sample: viewer Arm; names, sites and times are mock data — compute them.</div>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Mobile Escalation is read-only for every role (spec §22): same policies and steps as the desktop Escalation board, one vertical ladder per policy, names resolved for the picked site (role tokens shown underneath), the example shows when each step fires if nobody acknowledges. No edit, reorder, delete or Save controls — the banner at the top says why; there is no “Open on desktop” link. Opened from My profile (“Where I sit in escalation”) and from the incident’s escalation card; back returns to whichever screen opened it, and from an incident “Show names for” starts on that incident’s site. Tier 1 L2 is Management (§43, D-078): names listed (Vee, Pim), role token “Management” underneath, Chat + email, no voice; L1 notes that Admins who are Management are left out. The CEO is only on the L3 FYI. Voice stays configured and off — no step carries it. Sample: viewer Arm; names, sites and times are mock data — compute them.</div>
 </div>
 
 <x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="" label="Sections"></x-import>
@@ -118,14 +118,14 @@ class Component extends DCLogic {
     var steps;
     if (st.pol === 'Tier 1 DOWN') steps = [
       S1('L0', 0, 'DOWN confirmed', owner + ' + Alerts Space', 'Owner / on-call', ['chat', 'space', 'email'], 'Only this person is @mentioned; the backup is named in plain text.'),
-      S1('L1', 15, 'No acknowledgement', S[1] + ' + Tao', 'Backup + Admin (Tao)', ['chat', 'email'], 'Anyone already paged is left out (at night the backup may be the on-call person).'),
-      S1('L2', 30, 'No acknowledgement', 'CEO', 'CEO', ['chat', 'email', 'voice']),
+      S1('L1', 15, 'No acknowledgement', S[1] + ' + Tao', 'Backup + Admin', ['chat', 'email'], 'Anyone already paged is left out (at night the backup may be the on-call person). Admins who are Management are left out here — they get L2.'),
+      S1('L2', 30, 'No acknowledgement', 'Vee, Pim', 'Management', ['chat', 'email'], 'Asked to step in and find someone to take it. No voice call.'),
       S1('L3', 60, 'Still DOWN — even if acknowledged', 'CEO + ' + (S[2] || 'Site AM'), 'CEO + Site AM', ['chat', 'email'], 'FYI only, never a call. Recovered by then → nothing is sent.', 'var(--aura-alert-warning-fg)')
     ];
     else if (st.pol === 'Tier 2–3 DOWN') steps = [
       S1('L0', 0, 'DOWN confirmed · any hour', S[0] + ' + Alerts Space', 'Owner', ['chat', 'space', 'email'], 'Outside response hours it still posts; the timers below wait until 09:00.'),
-      S1('L1', 15, 'No acknowledgement', S[1] + ' + Tao', 'Backup + Admin (Tao)', ['chat', 'email']),
-      S1('L2', 30, 'Still no acknowledgement', 'Tao', 'Admin (Tao) · reminder', ['chat', 'email'], 'No CEO page — the CEO sees it in the digest.')
+      S1('L1', 15, 'No acknowledgement', S[1] + ' + Tao', 'Backup + Admin', ['chat', 'email']),
+      S1('L2', 30, 'Still no acknowledgement', 'Tao', 'Admin · reminder', ['chat', 'email'], 'No CEO page — the CEO sees it in the digest.')
     ];
     else steps = [
       S1('L0', 0, 'PROBLEM confirmed', owner + ' + Alerts Space', 'Owner / on-call', ['chat', 'space']),
@@ -135,7 +135,7 @@ class Component extends DCLogic {
     var example, exCase;
     if (st.pol === 'Tier 1 DOWN') {
       exCase = site + ' DOWN confirmed 09:48 on a weekday:';
-      example = steps.map(function (s) { return { at: hm(9, 48 + s.delay), what: s.level + ' → ' + s.names.replace(' (day) · ' + ON + ' (night)', ''), color: 'var(--aura-fg-primary)' }; });
+      example = steps.map(function (s) { return { at: hm(9, 48 + s.delay), what: s.level + ' → ' + (s.roles === 'Management' ? 'Management — ' : '') + s.names.replace(' (day) · ' + ON + ' (night)', ''), color: 'var(--aura-fg-primary)' }; });
       example.splice(2, 0, { at: '10:03', what: 'Client update → ' + (S[2] || 'Site AM') + ' gets a draft message (acked or not)', color: 'var(--aura-fg-secondary)' });
     } else if (st.pol === 'Tier 2–3 DOWN') {
       exCase = site + ' DOWN at Thu 22:14 (outside response hours):';

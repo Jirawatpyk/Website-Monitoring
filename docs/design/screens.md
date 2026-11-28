@@ -44,8 +44,8 @@ The index `/implement-screen` reads. One row per canvas board (62). The board fi
 | MMaintenance | Mobile — Mute / maintenance sheet | sheet (390) | P0 (mute pulled into the MVP) | S09 | §14.5, §15.1, §23.6 | FR-10a, FR-14 |
 | MaintenancePage | Maintenance & mutes — /maintenance | `/maintenance` | P0 (mute pulled into the MVP) | S09 | §23 | FR-10a, FR-14 |
 | MMaintenanceList | Mobile — Maintenance & mutes | `/maintenance` (390) | P0 (mute pulled into the MVP) | S09 | §22, §23.9 | FR-10a, FR-14 |
-| Escalation | Escalation policies | `/escalation` | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §14.1, §14.7, §15.5, §22 | FR-09a, FR-09b |
-| MEscalation | Mobile — Escalation (view only) | `/escalation` (390) | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §22.5–6 | FR-09a, FR-09b |
+| Escalation | Escalation policies | `/escalation` | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §14.1, §14.7, §15.5, §22, §43 | FR-09a, FR-09b |
+| MEscalation | Mobile — Escalation (view only) | `/escalation` (390) | P0 (L0–L1) / P1 (L2–L3) | S08 · S10 | §8, §22.5–6, §43 | FR-09a, FR-09b |
 | OnCall | On-call rotation | `/oncall` | P1 | S10 | §2, §15.8, §27, §28 | FR-09b, §8 |
 | MOnCall | Mobile — On-call | `/oncall` (390) | P1 | S10 | §10 (checklist), §27, §28 | §8 |
 | Expiry | SSL & domain expiry | `/expiry` | P1 | S13 | §14.12, §15.8, §39 | FR-11 |
@@ -56,11 +56,11 @@ The index `/implement-screen` reads. One row per canvas board (62). The board fi
 | AuditLog | Audit log | `/audit` | P1 | S15 | §16.11 | FR-13 |
 | MAuditLog | Mobile — Audit log | `/audit` (390) | P1 | S15 | §22, §33 | FR-13 |
 | MAuditLogDark | Mobile — Audit log · dark | same (390), dark theme | P1 | S15 | §33 | FR-13 |
-| MUsers | Mobile — Settings: Users & roles, view only | `/settings/users` (390) | P1 | S16 | §22.5, §35 | §3 |
-| MUsersDark | Mobile — Settings: Users & roles · dark | same (390), dark theme | P1 | S16 | §35 | §3 |
+| MUsers | Mobile — Settings: Users & roles, view only | `/settings/users` (390) | P1 | S16 | §22.5, §35, §43 | §3 |
+| MUsersDark | Mobile — Settings: Users & roles · dark | same (390), dark theme | P1 | S16 | §35, §43 | §3 |
 | MSecurity | Mobile — Settings: Sign-in & security, view only | `/settings/security` (390) | P1 | S16 | §22.5, §35 | §3, §9 |
 | MSecurityDark | Mobile — Settings: Sign-in & security · dark | same (390), dark theme | P1 | S16 | §35 | §3, §9 |
-| Users | Settings — users & roles | `/settings/users` | P1 — until then the allowlist and roles are set by SQL (S01, D-007) | S16 | §14.9, §15.2, §16.6 | §3 |
+| Users | Settings — users & roles | `/settings/users` | P1 — until then the allowlist and roles are set by SQL (S01, D-007) | S16 | §14.9, §15.2, §16.6, §43 | §3 |
 | Security | Settings — sessions & security (no 2-step lock, D-007) | `/settings/security` | P1 | S16 | §15.2, §16.7 | §3, §9 |
 | AlertChannels | Settings — alert channels & routing | `/settings/alert-channels` | P1 | S17 | §14.8, §15.5, §15.8 | §7 |
 | Organisation | Settings — organisation: tiers, clients, data, cost | `/settings/organisation` | P1 | S17 | §7, §14.14 | §4, §10 |

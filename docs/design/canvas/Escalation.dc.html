@@ -41,6 +41,10 @@ main > *{flex-shrink:0}
 </aside>
 
 <main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 32px 40px 24px; display: flex; flex-direction: column; gap: 24px; position: relative">
+<div style="position: absolute; top: 10px; right: 40px; z-index: 6; width: 300px; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas)">
+<span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-secondary); flex-shrink: 0">STATE</span>
+<div style="flex-grow: 1; min-width: 0"><x-import component-from-global-scope="Aura.Select" label="Preview state" hide-label="{{yes}}" options="{{mgViews}}" value="{{mgView}}" on-change="{{setMgView}}"></x-import></div>
+</div>
 
 <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
 <div style="display: flex; flex-direction: column; gap: 4px">
@@ -48,7 +52,7 @@ main > *{flex-shrink:0}
 <h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em">Escalation policies</h1>
 <span style="font-size: 14px; color: var(--aura-fg-secondary)">One person must acknowledge. No ack in time → the next level is notified. Acknowledge stops this chain — not the client-update track.</span>
 </div>
-<x-import component-from-global-scope="Aura.Button" variant="ghost" icon="file-text" href="AuditLog.dc.html">Change history</x-import>
+<div style="padding-top: 48px"><x-import component-from-global-scope="Aura.Button" variant="ghost" icon="file-text" href="AuditLog.dc.html">Change history</x-import></div>
 </div>
 
 <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
@@ -86,7 +90,7 @@ main > *{flex-shrink:0}
 <sc-for list="{{s.who}}" as="t" hint-placeholder-count="2">
 <x-import component-from-global-scope="Aura.Tag" icon="user">{{t}}</x-import>
 </sc-for>
-<sc-if value="{{s.hasAdmin}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-warning); line-height: 1.4"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import>Tao is the only active Admin · Second Admin hasn’t joined · <a href="Users.dc.html">Users</a></span></sc-if>
+<sc-if value="{{s.hasAdmin}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.4"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import>Admins who are Management are left out here — they get L2.</span></sc-if>
 </div>
 <span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">CHANNELS</span>
 <div style="display: flex; flex-wrap: wrap; gap: 8px">
@@ -242,6 +246,7 @@ main > *{flex-shrink:0}
 </div>
 <span style="font-size: 12px; color: {{eWhoColor}}; line-height: 1.5">{{eWhoHint}}</span>
 <span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">{{eCeoNote}}</span>
+<span style="font-size: 12px; color: {{eMgColor}}; line-height: 1.5">{{eMgNote}}</span>
 </div>
 <div style="display: flex; flex-direction: column; gap: 8px">
 <span style="font-size: 13px; font-weight: 500">Channels</span>
@@ -252,7 +257,7 @@ main > *{flex-shrink:0}
 <sc-if value="{{eNoCh}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--aura-fg-danger); line-height: 1.5"><x-import component-from-global-scope="Aura.Icon" name="circle-alert" size="sm"></x-import>No channel ticked — this step notifies nobody. You can apply it, but Save stays blocked.</span></sc-if>
 </div>
 <sc-if value="{{eIsProp}}" hint-placeholder-val="{{false}}">
-<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">This step pages the CEO, so it can’t move above L2.</span>
+<span style="font-size: 12px; color: var(--aura-fg-secondary); line-height: 1.5">This step tells Management, so it stays at L2 or later.</span>
 </sc-if>
 <div style="display: flex; gap: 10px; padding: 10px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.45"><span style="font-family: var(--font-mono); font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap">{{ePrevAt}}</span><span style="color: {{ePrevColor}}">{{ePrev}}</span></div>
 <div style="display: flex; align-items: center; gap: 8px; padding-top: 4px">
@@ -271,22 +276,22 @@ class Component extends DCLogic {
   constructor(props) {
     super(props);
     var p = this.base();
-    this.state = { pol: 'Tier 1 DOWN', p: p, saved: JSON.parse(JSON.stringify(p)), remDown: '15', remProb: '60', sRemDown: '15', sRemProb: '60', site: 'MuvMi', saveOpen: false, note: '', tried: false, n: 0, edit: null, eTried: false };
+    this.state = { pol: 'Tier 1 DOWN', p: p, saved: JSON.parse(JSON.stringify(p)), remDown: '15', remProb: '60', sRemDown: '15', sRemProb: '60', site: 'MuvMi', saveOpen: false, note: '', tried: false, n: 0, edit: null, eTried: false, mgNone: false };
   }
   base() {
     function S(delay, cond, who, ch, tag, note, fyi) { return { delay: delay, cond: cond, who: who, ch: ch, tag: tag || '', note: note || '', fyi: !!fyi }; }
     var t23 = function () {
       return [
         S(0, 'DOWN confirmed · posted at any hour', ['Owner / on-call'], ['chat', 'space', 'email'], '', 'Tier 2–3 have no on-call, so this is the owner. Outside response hours it still posts, but the timers below wait until 09:00.'),
-        S(15, 'No acknowledgement', ['Backup', 'Admin (Tao)'], ['chat', 'email']),
-        S(30, 'Still no acknowledgement', ['Admin (Tao)'], ['chat'], '', 'Reminder to Tao. No CEO page — the CEO sees it in the daily digest.')
+        S(15, 'No acknowledgement', ['Backup', 'Admin'], ['chat', 'email']),
+        S(30, 'Still no acknowledgement', ['Admin'], ['chat'], '', 'Reminder to Tao. No CEO page — the CEO sees it in the daily digest.')
       ];
     };
     return {
       t1: [
         S(0, 'DOWN confirmed', ['Owner / on-call'], ['chat', 'space', 'email'], '', 'Chat @mention and Alerts Space are locked on. Owner by day (Mon–Fri 09:00–18:00), the person on call otherwise. Only they are @mentioned; the backup is named in plain text.'),
-        S(15, 'No acknowledgement', ['Backup', 'Admin (Tao)'], ['chat', 'email'], '', 'Posts “@Ploy please acknowledge · Tao FYI” in the same thread.'),
-        S(30, 'No acknowledgement', ['CEO'], ['chat', 'email', 'voice'], 'ceo'),
+        S(15, 'No acknowledgement', ['Backup', 'Admin'], ['chat', 'email'], '', 'Posts “@Ploy please acknowledge · Tao FYI” in the same thread.'),
+        S(30, 'No acknowledgement', ['Management'], ['chat', 'email'], '', 'Asked to step in and find someone — call the owner or backup, reassign, or acknowledge. Chat @mention + email, no voice call.'),
         S(60, 'Still DOWN — sent even after acknowledge', ['CEO', 'Site AM'], ['chat', 'email'], '', '', true)
       ],
       t2: t23(),
@@ -310,6 +315,9 @@ class Component extends DCLogic {
       voice: { label: 'Voice call · configured, off until approved', icon: 'lock', tone: 'warning' }
     };
     var steps = st.p[k];
+    var NOMG = !!st.mgNone;
+    function hasMg(x) { return x.who.indexOf('Management') >= 0; }
+    function late(x) { return hasMg(x) || x.who.indexOf('CEO') >= 0; }
     function setSteps(ns) { var p = copy(st.p); p[k] = ns; self.setState({ p: p }); }
     function fmtDelay(d) { return d === 0 ? '+0 · immediately' : '+' + d + ' min'; }
     function stepErrs(pk, list, i) {
@@ -320,10 +328,14 @@ class Component extends DCLogic {
         if (!(sN.delay >= 15)) e.push('Must be at least +15 min.');
         else if (sN.delay <= list[i - 1].delay) e.push('Must be later than L' + (i - 1) + ' (+' + list[i - 1].delay + ' min).');
       }
-      if (sN.tag && i < 2) e.push('A step that pages the CEO can’t sit above L2.');
       if (sN.who.indexOf('CEO') >= 0) {
-        if (pk !== 't1') e.push('The CEO is paged only on Tier 1 DOWN — remove CEO from this step.');
-        else if (i < 2) e.push('The CEO can be paged only from L2 onward.');
+        if (pk !== 't1') e.push('The CEO is told only on Tier 1 DOWN — remove CEO from this step.');
+        else if (i < 2) e.push('The CEO can be told only from L2 onward.');
+      }
+      if (hasMg(sN)) {
+        if (pk !== 't1') e.push('Management is used only on Tier 1 DOWN — remove it from this step.');
+        else if (i < 2) e.push('Management can be told only from L2.');
+        else if (NOMG) e.push('Nobody is Management yet — set someone on Users & roles.');
       }
       return e;
     }
@@ -333,28 +345,29 @@ class Component extends DCLogic {
     function canSwap(list, a, b) { // a<b, swapping contents of a and b
       if (a === 0) return false;
       if (list[a].fyi || list[b].fyi) return false;
-      if (list[b].tag && a < 2) return false;
-      if (list[a].tag && b < 2) return false;
+      if (late(list[b]) && a < 2) return false;
+      if (late(list[a]) && b < 2) return false;
       return true;
     }
     var NAME = { t1: 'Tier 1 DOWN', t2: 'Tier 2 DOWN', t3: 'Tier 3 DOWN', pr: 'PROBLEM' };
+    function disp(w) { return w === 'Management' ? (NOMG ? 'Management · nobody yet' : 'Management · Vee, Pim') : w; }
     var view = steps.map(function (s, i) {
       var L = 'L' + i;
       var upOk = i > 0 && canSwap(steps, i - 1, i);
       var downOk = i < steps.length - 1 && canSwap(steps, i, i + 1);
       var fyiNear = s.fyi || (steps[i - 1] && steps[i - 1].fyi) || (steps[i + 1] && steps[i + 1].fyi);
-      var upWhy = i === 0 ? 'L0 is pinned' : (i === 1 ? 'L0 is pinned — nothing can move above it' : (!upOk ? (s.fyi || steps[i - 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'A step that pages the CEO can’t move above L2') : 'Move ' + L + ' earlier'));
-      var downWhy = i === 0 ? 'L0 is pinned' : (i === steps.length - 1 ? 'Already the last step' : (!downOk ? (s.fyi || steps[i + 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'L' + (i + 1) + ' pages the CEO — it can’t move up to L' + i) : 'Move ' + L + ' later'));
+      var upWhy = i === 0 ? 'L0 is pinned' : (i === 1 ? 'L0 is pinned — nothing can move above it' : (!upOk ? (s.fyi || steps[i - 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'A Management or CEO step can’t move above L2') : 'Move ' + L + ' earlier'));
+      var downWhy = i === 0 ? 'L0 is pinned' : (i === steps.length - 1 ? 'Already the last step' : (!downOk ? (s.fyi || steps[i + 1].fyi ? 'The CEO + AM FYI step keeps its place' : 'L' + (i + 1) + ' tells ' + (hasMg(steps[i + 1]) ? 'Management' : 'the CEO') + ' — it can’t move up to L' + i) : 'Move ' + L + ' later'));
       var fyi = !!s.fyi;
       var errs = stepErrs(k, steps, i);
       var err = errs.join(' ');
       return {
-        level: L, when: fmtDelay(s.delay), cond: s.cond, who: s.who,
+        level: L, when: fmtDelay(s.delay), cond: s.cond, who: s.who.map(disp),
         ch: s.ch.map(function (c) { return CH[c]; }), noCh: !s.ch.filter(function (c) { return c !== 'voice'; }).length, errs: errs,
         pinned: i === 0,
         hasTag: false, tag: s.tag, hasNote: !!s.note, note: s.note,
         hasErr: !!err, err: err,
-        hasAdmin: s.who.indexOf('Admin (Tao)') >= 0,
+        hasAdmin: k === 't1' && s.who.indexOf('Admin') >= 0 && !NOMG,
         hasFyi: fyi,
         fyi: 'Acknowledge stops L1–L2 only. If the site is still DOWN at +' + s.delay + ' min, ' + s.who.join(' + ') + (s.who.length > 1 ? ' get' : ' gets') + ' an FYI — Chat @mention + email, never a voice call. Recovered by then → nothing is sent.',
         noUp: !upOk, noDown: !downOk, noDel: i === 0 || fyi,
@@ -377,17 +390,18 @@ class Component extends DCLogic {
     var t1like = k === 't1' || (k === 'pr' && SITES.t1.some(function (x) { return x[0] === cur[0]; }));
     var R = {
       'Owner / on-call': t1like ? cur[1] + ' (day) · Ploy (night)' : cur[1] + ' · no on-call',
-      'Backup': cur[2], 'Admin (Tao)': 'Tao · only active Admin', 'CEO': 'CEO', 'Site AM': cur[3]
+      'Backup': cur[2], 'Admin': NOMG ? 'Tao' : 'Tao · Vee, Pim left out (Management)', 'Management': NOMG ? 'Nobody yet' : 'Vee, Pim', 'CEO': 'CEO', 'Site AM': cur[3]
     };
     var used = [];
     steps.forEach(function (s) { s.who.forEach(function (w) { if (used.indexOf(w) < 0) used.push(w); }); });
     if (k !== 'pr' && k !== 't3' && used.indexOf('Site AM') < 0) used.push('Site AM');
     var tokens = used.map(function (t, i) { return { token: t, name: R[t], border: i ? '1px solid var(--aura-border-subtle)' : 'none' }; });
     function first(who) { return who === 'Owner / on-call' ? (t1like ? cur[1] : cur[1]) : R[who]; }
-    function nobody(s) { return !s.ch.filter(function (c) { return c !== 'voice'; }).length || !s.who.length; }
-    function tgt(s) { return nobody(s) ? 'notifies nobody (' + (s.who.length ? 'no channel ticked' : 'no one picked') + ')' : names(s); }
+    function mgOnly(s) { return NOMG && s.who.length > 0 && s.who.every(function (w) { return w === 'Management'; }); }
+    function nobody(s) { return !s.ch.filter(function (c) { return c !== 'voice'; }).length || !s.who.length || mgOnly(s); }
+    function tgt(s) { return nobody(s) ? 'notifies nobody (' + (mgOnly(s) ? 'nobody is Management yet' : (s.who.length ? 'no channel ticked' : 'no one picked')) + ')' : names(s); }
     function col(s) { return nobody(s) ? 'var(--aura-fg-danger)' : 'var(--aura-fg-primary)'; }
-    function names(s) { return s.who.map(function (w) { return w === 'Owner / on-call' ? cur[1] : (w === 'Site AM' ? cur[3] : (w === 'Admin (Tao)' ? 'Tao' : R[w])); }).join(' + ') + (s.ch.indexOf('space') >= 0 ? ' + Alerts Space' : ''); }
+    function names(s) { return s.who.filter(function (w) { return !(NOMG && w === 'Management'); }).map(function (w) { return w === 'Owner / on-call' ? cur[1] : (w === 'Site AM' ? cur[3] : (w === 'Admin' ? 'Tao' : (w === 'Management' ? 'Management — Vee, Pim' : R[w]))); }).join(' + ') + (s.ch.indexOf('space') >= 0 ? ' + Alerts Space' : ''); }
     function hm(h, m) { h = h + Math.floor(m / 60); m = m % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
     var preview = [], previewCase;
     if (k === 't1') {
@@ -451,7 +465,7 @@ class Component extends DCLogic {
     if (rpErr) errors.push('PROBLEM reminder: “' + st.remProb + '” isn’t valid — enter whole minutes above 0.');
     // edit dialog
     var ed = st.edit;
-    var ROLES = ['Owner / on-call', 'Backup', 'Admin (Tao)', 'CEO', 'Site AM'];
+    var ROLES = ['Owner / on-call', 'Backup', 'Admin', 'Management', 'CEO', 'Site AM'];
     var eVals = { editOpen: !!ed };
     if (ed) {
       var idx = ed.isNew ? steps.length : ed.idx;
@@ -482,32 +496,30 @@ class Component extends DCLogic {
         eDelayErr: dErr, eDelayHint: pinned ? 'Pinned — fires immediately.' : dHint,
         eRoles: ROLES.map(function (r) {
           var on = ed.who.indexOf(r) >= 0;
-          var locked = (pinned && r === 'Owner / on-call') || (ed.fyi && (r === 'CEO' || r === 'Site AM')) || (r === 'CEO' && !on && (k !== 't1' || idx < 2));
-          return { label: r + (r === 'Admin (Tao)' ? ' · only Admin' : ''), on: on, locked: locked, toggle: function () {
+          var locked = (pinned && r === 'Owner / on-call') || (ed.fyi && (r === 'CEO' || r === 'Site AM')) || (r === 'CEO' && !on && (k !== 't1' || idx < 2)) || (r === 'Management' && !on && (k !== 't1' || idx < 2 || NOMG || ed.fyi));
+          return { label: r, on: on, locked: locked, toggle: function () {
             if (locked) return;
             var w = ed.who.slice(); if (on) w.splice(w.indexOf(r), 1); else w.push(r);
             w.sort(function (a, b) { return ROLES.indexOf(a) - ROLES.indexOf(b); });
             var patch = { who: w };
-            if (r === 'CEO' && !ed.fyi) {
-              if (w.indexOf('CEO') >= 0) patch.tag = 'ceo';
-              else { patch.tag = ''; patch.ch = ed.ch.filter(function (c) { return c !== 'voice'; }); }
-            }
             setEd(patch);
           } };
         }),
-        eCeoNote: ed.fyi ? 'CEO + Site AM are fixed on this step: it’s the Tier 1 step that still sends an FYI after acknowledge (never a call). It can’t be removed.' : (k !== 't1' ? 'CEO isn’t available here — the CEO is paged only on Tier 1 DOWN, from L2 onward. On this policy the CEO sees incidents in the daily digest.' : (idx < 2 ? 'CEO is available from L2 onward.' : 'Adding CEO keeps this step at L2 or later.')),
+        eCeoNote: ed.fyi ? 'CEO + Site AM are fixed on this step: it’s the Tier 1 step that still sends an FYI after acknowledge (never a call). It can’t be removed.' : (k !== 't1' ? 'CEO isn’t available here — on Tier 1 DOWN the CEO gets only the L3 FYI. On this policy the CEO sees incidents in the daily digest.' : (idx < 2 ? 'CEO is available from L2 onward.' : 'The CEO gets the L3 FYI. Adding CEO here keeps this step at L2 or later.')),
+        eMgNote: (function () { var on = ed.who.indexOf('Management') >= 0; if (ed.fyi) return 'Management isn’t on the FYI step — they act at L2.'; if (k !== 't1') return 'Management is used only on Tier 1 DOWN'; if (idx < 2) return 'Management can be told only from L2'; if (NOMG) return 'Nobody is Management yet — set someone on Users & roles'; return on ? 'Management = Vee, Pim · Chat @mention + email, no voice.' : 'Management = Vee, Pim. Chat @mention + email, no voice.'; })(),
+        eMgColor: !ed.fyi && k === 't1' && idx >= 2 && NOMG ? 'var(--aura-fg-warning)' : 'var(--aura-fg-secondary)',
         eLockDesc: pinned ? 'Locked on for L0' : '',
         eVoice: ed.ch.indexOf('voice') >= 0,
         eVoiceLabel: ed.ch.indexOf('voice') >= 0 ? 'Voice call · Configured · off until approved' : 'Voice call',
-        eVoiceDesc: ed.ch.indexOf('voice') >= 0 ? 'Set up on this step but stays off until the CEO approves voice calls and Twilio is set up (~$23–26 / month).' : (ed.fyi ? 'Never on this step — the FYI goes by Chat @mention + email only.' : 'Only the L2 CEO step can carry a voice call, and it stays off until approved.'),
+        eVoiceDesc: ed.ch.indexOf('voice') >= 0 ? 'Set up on this step but stays off until the CEO approves voice calls and Twilio is set up (~$23–26 / month).' : (ed.fyi ? 'Never on this step — the FYI goes by Chat @mention + email only.' : (ed.who.indexOf('Management') >= 0 ? 'No voice on a Management step — they’re told by Chat @mention + email.' : 'No step carries a voice call now. It stays configured and off until the CEO approves (Twilio, ~$23–26 / month).')),
         eNoCh: !ed.ch.filter(function (c) { return c !== 'voice'; }).length,
-        eWhoHint: whoErr ? (st.eTried ? 'Pick at least one person.' : 'Pick who this step notifies. Tokens resolve per site — see the preview.') : 'Tokens resolve per site. Admin (Tao) is the only active Admin until Second Admin joins.',
+        eWhoHint: whoErr ? (st.eTried ? 'Pick at least one person.' : 'Pick who this step notifies. Tokens resolve per site — see the preview.') : (NOMG ? 'Tokens resolve per site. Admin = Tao.' : 'Tokens resolve per site. Admin = Tao — Vee and Pim are Management, so they get L2 instead.'),
         eWhoColor: whoErr && st.eTried ? 'var(--aura-fg-danger)' : 'var(--aura-fg-secondary)',
         eChat: ed.ch.indexOf('chat') >= 0, eSpace: ed.ch.indexOf('space') >= 0, eEmail: ed.ch.indexOf('email') >= 0,
         setEChat: function (v) { if (pinned) return; var c = ed.ch.filter(function (x) { return x !== 'chat'; }); if (v) c.unshift('chat'); setEd({ ch: c }); },
         setESpace: function (v) { if (pinned) return; var c = ed.ch.filter(function (x) { return x !== 'space'; }); if (v) c.push('space'); setEd({ ch: c }); },
         setEEmail: function (v) { var c = ed.ch.filter(function (x) { return x !== 'email'; }); if (v) c.push('email'); setEd({ ch: c }); },
-        eIsProp: !!ed.tag,
+        eIsProp: ed.who.indexOf('Management') >= 0,
         ePrevAt: at,
         ePrev: 'L' + idx + ' → ' + tgt(tmp) + (nobody(tmp) ? '' : ' (' + cur[0] + ')'),
         ePrevColor: col(tmp),
@@ -518,7 +530,7 @@ class Component extends DCLogic {
           var ns = copy(steps);
           var chs = ed.ch.slice(); if (pinned) { if (chs.indexOf('chat') < 0) chs.unshift('chat'); if (chs.indexOf('space') < 0) chs.push('space'); }
           if (ed.isNew) ns.push({ delay: dN, cond: 'No acknowledgement', who: ed.who.slice(), ch: chs, tag: ed.tag || '', note: '', fyi: false });
-          else { ns[idx].who = ed.who.slice(); ns[idx].ch = chs; ns[idx].tag = ed.fyi ? '' : (ed.tag || ''); if (!pinned) ns[idx].delay = dN; }
+          else { ns[idx].who = ed.who.slice(); ns[idx].ch = chs; ns[idx].tag = ''; if (!pinned) ns[idx].delay = dN; }
           var p2 = copy(st.p); p2[k] = ns; self.setState({ p: p2, edit: null, eTried: false });
         }
       };
@@ -544,8 +556,10 @@ class Component extends DCLogic {
       stepHint: 'L0 is pinned. Every step needs at least one channel. Each later step is at least +15 min and later than the one before; delays stay with the level when you reorder.',
       addStep: function () { var last = steps[steps.length - 1]; self.setState({ edit: { idx: steps.length, isNew: true, delay: String(last.delay + 30), who: [], ch: ['chat', 'email'], tag: '', fyi: false }, eTried: false }); },
       hasAckCase: k === 't1', ackCase: ackCase, ackCaseLabel: ackLabel,
-      propTitle: 'Voice call on L' + propIdx + ' is off until approved',
-      propBody: 'The CEO step at L' + propIdx + ' is live (approved, D-009) and sends a Chat @mention and email. Its voice call is configured but stays off until the CEO approves voice calls (Twilio, ~$23–26 / month). It can’t move above L2.',
+      propTitle: 'Voice call · configured, off',
+      propBody: 'No Tier 1 step carries a voice call since L2 moved to Management. Voice stays configured and off until the CEO approves voice calls (Twilio, ~$23–26 / month). Management and the L3 FYI are never called.',
+      mgViews: ['Management: Vee, Pim', 'Nobody is Management yet'], mgView: NOMG ? 'Nobody is Management yet' : 'Management: Vee, Pim',
+      setMgView: function (e) { var v = e && e.target ? e.target.value : e; self.setState({ mgNone: v === 'Nobody is Management yet' }); },
       hasErrors: errors.length > 0, errors: errors, hasWarns: warns.length > 0, warns: warns,
       remDownErr: rdErr, remProbErr: rpErr,
       hasPolMsg: !!(polErr(k, steps) || polWarn(k, steps)), polMsg: polErr(k, steps) || polWarn(k, steps),
@@ -560,7 +574,7 @@ class Component extends DCLogic {
       remDown: st.remDown, remProb: st.remProb,
       setRemDown: function (e) { self.setState({ remDown: e && e.target ? e.target.value : e }); },
       setRemProb: function (e) { self.setState({ remProb: e && e.target ? e.target.value : e }); },
-      showVoice: k === 't1' && steps.some(function (s) { return s.tag; }),
+      showVoice: k === 't1',
       dirty: changes > 0,
       dirtyLabel: changes + (changes === 1 ? ' unsaved change' : ' unsaved changes'),
       dirtyHint: touched.length ? 'In ' + touched.map(function (pk) { return NAME[pk]; }).join(', ') : 'Reminder interval',
@@ -568,7 +582,7 @@ class Component extends DCLogic {
       save: function () { self.setState({ saveOpen: true, tried: false }); },
       saveOpen: st.saveOpen,
       closeSave: function () { self.setState({ saveOpen: false }); },
-      saveDesc: 'Check each step before it goes live. New incidents use the new policy straight away.',
+      saveDesc: 'Check each step before it goes live. New incidents use the new policy straight away; open incidents keep the plan they started with.',
       diff: diff,
       affects: 'Affects ' + sites + ' sites · ' + (open.length === 1 ? '1 open incident (' + open[0] + ') keeps its current timers' : (open.length ? open.length + ' open incidents (' + open.join(', ') + ') keep their current timers' : 'no open incidents')),
       note: st.note,
