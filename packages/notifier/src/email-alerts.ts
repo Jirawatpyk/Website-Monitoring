@@ -1254,6 +1254,8 @@ export interface StepEmailInput extends EmailBaseInput {
   acked?: { by: string; at: Date } | null;
   /** The next level if nobody acknowledges: "L3 (CEO + Bua, no call) at 10:48". */
   nextStep?: string | null;
+  /** D-078: on the L1 email, the Management step after it — "Management (Vee, Pim) at 10:18". */
+  managementNext?: { names: readonly string[]; at: Date } | null;
   /** The step carries a voice call that stays off until approved (Tier 1 L2, D-009). */
   voiceConfigured?: boolean;
   /** `informed` with the roles the L2 lede names: "Arm (owner)", "Ploy (backup)", "Tao". */
@@ -1431,10 +1433,20 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
   const sinceDetected = formatDuration(
     Math.max(0, Math.floor((sentAt.getTime() - input.confirmedAt.getTime()) / 60_000)),
   );
+  // EmailAlert L1 (D-078): "Management (Vee, Pim) at 10:18" — only on a DOWN, where L2 is theirs.
+  const mg =
+    down && input.managementNext?.names.length
+      ? {
+          who: `Management (${input.managementNext.names.join(', ')})`,
+          at: formatTime(input.managementNext.at),
+        }
+      : null;
   const ask = input.fallback
     ? `${owner} hasn’t acknowledged. The Google Chat reply couldn’t be delivered, so this email is the alert.`
     : input.asFyi
-      ? `For your information — ${input.asked ?? 'the next person'} has been asked to acknowledge. Nothing needed from you.`
+      ? mg
+        ? `For your information — ${input.asked ?? 'the next person'} has been asked to acknowledge. Nothing needed from you; if nobody acknowledges by ${mg.at}, ${mg.who} step in.`
+        : `For your information — ${input.asked ?? 'the next person'} has been asked to acknowledge. Nothing needed from you.`
       : down
         ? `${owner} hasn’t acknowledged. Please acknowledge — you’re the next person for this incident.`
         : `${owner} hasn’t acknowledged. Please take it — you’re the next person for this incident.`;
@@ -1471,6 +1483,7 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
             ] as [string, string],
           ]
         : []),
+      ...(mg ? [['Next step', `${mg.who} at ${mg.at} if still not acknowledged`] as [string, string]] : []),
     ],
     buttons:
       input.asFyi && !input.fallback

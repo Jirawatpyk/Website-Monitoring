@@ -265,6 +265,15 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
         ? { who: after.targets.flatMap((t) => tokenWords(i, t)).join(' + '), at: afterAt }
         : null,
     alreadyTold: alreadyTold || null,
+    // EmailAlert L1 (D-078): the Management step next, by name.
+    managementNext:
+      kind === 'ask' &&
+      after &&
+      afterAt &&
+      after.targets.includes('management') &&
+      i.ladder?.management?.length
+        ? { names: i.ladder.management.map((p) => p.display_name), at: afterAt }
+        : null,
     // "Open it to see the latest, or call Tao." — the Admin the CEO can ring.
     admin: i.ladder?.admins[0]?.display_name ?? i.ladder?.management?.[0]?.display_name ?? null,
     acked: typeof ctx.ackedBy === 'string' && ackedAt ? { by: ctx.ackedBy, at: ackedAt } : null,

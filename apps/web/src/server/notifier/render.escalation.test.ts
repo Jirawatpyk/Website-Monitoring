@@ -350,6 +350,27 @@ describe('render — L2 Management (D-078)', () => {
     );
     expect(m.text).toContain('Next step: L3 FYI (CEO + Bua, no call) at 10:48');
   });
+
+  it('the L1 emails name Management next (EmailAlert L1)', () => {
+    const l1 = (to: { id: string; display_name: string; email: string }, asFyi: boolean) =>
+      renderEmail(
+        row(
+          'step_fired',
+          { level: 1, severity: 'down', elapsedMin: 15, mentioned: ['u-ploy'], fyi: ['u-tao'], asFyi },
+          { channel: 'email', user_id: to.id },
+        ),
+        { ...t1, state: 'escalated', escalation_level: 1 },
+        to,
+        appUrl,
+        thread,
+      )!;
+    expect(l1({ id: 'u-ploy', display_name: 'Ploy', email: 'ploy@example.test' }, false).text).toContain(
+      'Next step: Management (Vee) at 10:18 if still not acknowledged',
+    );
+    expect(l1({ id: 'u-tao', display_name: 'Tao', email: 'tao@example.test' }, true).text).toContain(
+      'Nothing needed from you; if nobody acknowledges by 10:18, Management (Vee) step in.',
+    );
+  });
 });
 
 describe('render — the ladder (S08, D-034)', () => {

@@ -784,6 +784,7 @@ export function renderEmail(
         stopped: step.stopped,
         nextStep: byHandOf(ctx) ? null : step.nextStep,
         fyiNext: byHandOf(ctx) ? null : step.fyiNext,
+        managementNext: byHandOf(ctx) ? null : step.managementNext,
         voiceConfigured: step.voiceConfigured,
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
         level,
