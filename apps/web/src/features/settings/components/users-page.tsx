@@ -189,8 +189,9 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
     {
       key: 'role',
       label: 'Role',
-      // §43.3: 204 px, the Management badge wraps under the role when it must
-      width: 204,
+      // §43.3 draws 204 px, but at 820 the table then scrolls sideways (838/770, layout guard): keep 120
+      // and let the Management badge wrap under the role — it fits the column on its own line.
+      width: 120,
       render: (r) => (
         <span className="flex flex-wrap items-center gap-1.5">
           <RoleBadge role={r.role} />
