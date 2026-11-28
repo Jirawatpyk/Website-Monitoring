@@ -1,7 +1,7 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
 import { formatIncidentId, type Role } from '@dxt/shared';
-import type { UsersData } from './model';
+import { ceoStepsLine, type UsersData } from './model';
 import { SIGNIN_ACTIONS, type SecurityData } from './security-model';
 
 const OPEN_SWAP = ['waiting', 'accepted'];
@@ -19,28 +19,36 @@ function check<T>(what: string, r: { data: T; error: { message: string } | null 
  */
 export async function loadUsersData(db: DbClient, viewerId: string, now: Date): Promise<UsersData> {
   const nowIso = now.toISOString();
-  const [people, invites, sessions, sites, clients, rotation, shifts, swaps, acks] = await Promise.all([
-    db
-      .from('profiles')
-      .select('id, display_name, email, role, google_chat_user_id, is_management')
-      .eq('is_active', true),
-    db.rpc('pending_invites'),
-    db.rpc('list_sessions'),
-    db.from('sites').select('id, name, is_active, primary_owner_id, backup_owner_id').order('name'),
-    db.from('clients').select('id, name, am_user_id').order('name'),
-    db.from('oncall_rotation').select('user_id, position').order('position'),
-    db
-      .from('oncall_shifts')
-      .select('id, user_id, starts_at, ends_at')
-      .gt('ends_at', nowIso)
-      .order('starts_at'),
-    db.from('oncall_swaps').select('id, requester_id, counterpart_id').in('status', OPEN_SWAP),
-    db
-      .from('incidents')
-      .select('number, acked_by, sites!inner(name)')
-      .not('acked_by', 'is', null)
-      .in('state', [...OPEN_INCIDENT]),
-  ]);
+  const [people, invites, sessions, sites, clients, rotation, shifts, swaps, acks, policies, steps] =
+    await Promise.all([
+      db
+        .from('profiles')
+        .select('id, display_name, email, role, google_chat_user_id, is_management')
+        .eq('is_active', true),
+      db.rpc('pending_invites'),
+      db.rpc('list_sessions'),
+      db.from('sites').select('id, name, is_active, primary_owner_id, backup_owner_id').order('name'),
+      db.from('clients').select('id, name, am_user_id').order('name'),
+      db.from('oncall_rotation').select('user_id, position').order('position'),
+      db
+        .from('oncall_shifts')
+        .select('id, user_id, starts_at, ends_at')
+        .gt('ends_at', nowIso)
+        .order('starts_at'),
+      db.from('oncall_swaps').select('id, requester_id, counterpart_id').in('status', OPEN_SWAP),
+      db
+        .from('incidents')
+        .select('number, acked_by, sites!inner(name)')
+        .not('acked_by', 'is', null)
+        .in('state', [...OPEN_INCIDENT]),
+      // D-078: whether a step goes to Management, and the CEO's Tier 1 steps, from the policies.
+      db.from('escalation_policies').select('id, severity, tier'),
+      db.from('escalation_steps').select('policy_id, level, delay_min, targets, fyi'),
+    ]);
+  const t1 = (check('escalation_policies', policies) ?? []).find(
+    (p) => p.severity === 'down' && p.tier === 1,
+  );
+  const allSteps = check('escalation_steps', steps) ?? [];
 
   const lastUsed = new Map<string, string>();
   for (const s of check('list_sessions', sessions) ?? []) {
@@ -92,6 +100,12 @@ export async function loadUsersData(db: DbClient, viewerId: string, now: Date): 
       label: `${formatIncidentId(i.number)} · ${siteName(i.sites)}`,
       ackedBy: i.acked_by!,
     })),
+    managementUsed: allSteps.some((s) => s.targets.includes('management')),
+    ceoSteps: ceoStepsLine(
+      allSteps
+        .filter((s) => s.policy_id === t1?.id)
+        .map((s) => ({ level: s.level, delayMin: s.delay_min, targets: s.targets, fyi: s.fyi })),
+    ),
   };
 }
 

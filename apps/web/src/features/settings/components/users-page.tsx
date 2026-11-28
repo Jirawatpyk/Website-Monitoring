@@ -308,7 +308,8 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
             <span className="hidden md:inline">What each role can do</span>
           </h2>
           <p className="m-0 hidden text-sm text-fg-secondary md:block">
-            “Own” = sites where the person is primary or backup owner, or clients where they are Site AM.
+            “Own” = sites where the person is primary or backup owner, or clients where they are Site AM ·
+            Management is a tag on Admins, not a role.
           </p>
         </div>
         <div className="hidden md:block">

@@ -201,6 +201,23 @@ describe('the lede (code review)', () => {
     expect(m.text).toContain('It took effect straight away. You left the on-call rotation.');
     expect(m.text).not.toContain('WHAT MOVED');
   });
+
+  it('D-078: an Admin who was Management is told the tag went with the role', () => {
+    const m = buildAccountEmail({
+      ...nok,
+      fromRole: 'admin',
+      toRole: 'responder',
+      facts: { ...nok.facts, moves: [], left_rotation: false, left_management: true },
+    });
+    expect(m.text).toContain('It took effect straight away. You also left Management.');
+    const both = buildAccountEmail({
+      ...nok,
+      fromRole: 'admin',
+      toRole: 'viewer',
+      facts: { ...nok.facts, moves: [], left_rotation: true, left_management: true },
+    });
+    expect(both.text).toContain('You left the on-call rotation. You also left Management.');
+  });
 });
 
 describe('movedRows', () => {

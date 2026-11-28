@@ -6,7 +6,9 @@ import {
   changeDialogText,
   gainsLoses,
   managementBlockedWhy,
+  ceoStepsLine,
   managementDialog,
+  managementRoleBox,
   missingPicks,
   oncallOf,
   reassignPayload,
@@ -80,7 +82,7 @@ describe('Management (D-078, spec §43.3–5)', () => {
       who,
     );
     expect(w.title).toBe('Set Vee as Management?');
-    expect(w.lines[0]).toMatch(first);
+    expect(w.rows[0]!.text).toMatch(first);
     // D-078 (3b): from the next step; the email promise sits in the description
     expect(w.description).toBe(
       used
@@ -95,7 +97,7 @@ describe('Management (D-078, spec §43.3–5)', () => {
       managementUsed: true,
       people: people([vee]).map((p) => (p.id === 'tao' ? { ...p, management: true } : p)),
     });
-    expect(managementDialog(d, vee).lines).toContain(
+    expect(managementDialog(d, vee).rows.map((r) => r.text)).toContain(
       'Every active Admin would then be Management, so L1 tells only the backup — no Admin.',
     );
   });
@@ -109,18 +111,66 @@ describe('Management (D-078, spec §43.3–5)', () => {
     });
     const w = managementDialog(d, { ...vee, management: true });
     expect(w.title).toBe('Remove Vee from Management?');
-    expect(w.lines).toEqual([
-      'No longer gets the L2 step on Tier 1 DOWN.',
-      'Told at L1 again as an Admin (Chat + email).',
-      'L2 still goes to Tao.',
+    expect(w.rows).toEqual([
+      { icon: 'minus', text: 'No longer gets the L2 step on Tier 1 DOWN.' },
+      { icon: 'plus', text: 'Told at L1 again as an Admin (Chat + email).' },
+      { icon: 'info', text: 'L2 still goes to Tao.' },
     ]);
-    expect(w.done).toBe('Vee removed from Management · logged');
+    expect(w.refuse).toBeNull();
+    expect(w.done).toBe('Vee left Management · Tier 1 DOWN L2 now goes to Tao · logged');
   });
 
-  it('the role dialog says the tag goes with the role (§43.5)', () => {
-    expect(changeDialogText('Vee', false, false, true)).toBe(
-      'Takes effect as soon as you confirm. Vee will also leave Management.',
+  it('remove the last one while a step uses it: only the refusal (§43.5)', () => {
+    const d = data({ managementUsed: true, people: people([{ ...vee, management: true }]) });
+    const w = managementDialog(d, { ...vee, management: true });
+    expect(w.refuse).toBe(
+      'Can’t remove: Tier 1 DOWN L2 goes to Management and Vee is the last one. Change the L2 step on Escalation first, or set someone else as Management.',
     );
+    expect(w.rows).toEqual([]);
+    expect(w.description).toBeUndefined();
+    // Nothing uses the token yet: removing the last one is fine.
+    expect(managementDialog({ ...d, managementUsed: false }, { ...vee, management: true }).refuse).toBeNull();
+  });
+
+  it('the role dialog box: the tag goes with the role; the last one blocks (§43.5)', () => {
+    const mgVee = { ...vee, management: true };
+    const tagged = (more: UsersData['people'], used = true) =>
+      data({ managementUsed: used, people: people([mgVee, ...more]) });
+    expect(managementRoleBox(tagged([]), mgVee, false, 'admin')).toBeNull();
+    expect(managementRoleBox(tagged([]), vee, true, 'viewer')).toBeNull();
+    expect(managementRoleBox(tagged([], false), mgVee, false, 'responder')).toEqual({
+      title: 'Vee will also leave Management.',
+      lines: [],
+      blocks: false,
+    });
+    const pim = { ...vee, id: 'pim', name: 'Pim', management: true };
+    expect(managementRoleBox(tagged([pim]), mgVee, true, 'viewer')).toEqual({
+      title: 'Vee will also leave Management.',
+      lines: ['Tier 1 DOWN L2 still goes to Pim.'],
+      blocks: false,
+    });
+    expect(managementRoleBox(tagged([]), mgVee, true, 'viewer')).toMatchObject({
+      blocks: true,
+      lines: [
+        expect.stringMatching(
+          /^Can’t deactivate: Tier 1 DOWN L2 goes to Management and Vee is the last one./,
+        ),
+      ],
+    });
+    expect(managementRoleBox(tagged([]), mgVee, false, 'responder')?.lines[0]).toMatch(
+      /^Can’t change the role:/,
+    );
+  });
+
+  it('the CEO’s steps come from the Tier 1 policy (§43.1)', () => {
+    const l3 = { level: 3, delayMin: 60, targets: ['ceo', 'site_am'], fyi: true };
+    expect(ceoStepsLine([{ level: 1, delayMin: 15, targets: ['backup'] }, l3])).toBe(
+      'Tier 1 DOWN · L3 FYI (+60 min, also after an ack)',
+    );
+    expect(ceoStepsLine([{ level: 2, delayMin: 30, targets: ['ceo'] }, l3])).toBe(
+      'Tier 1 DOWN · L2 (+30 min) · L3 FYI (+60 min, also after an ack)',
+    );
+    expect(ceoStepsLine([])).toBeNull();
   });
 });
 
@@ -213,7 +263,7 @@ describe('usageOf — Used in (§14.9, Done-when 2)', () => {
     expect(owner.sites![0]!.hint).toBe('Backup here: Arm');
     expect(owner.sites![0]!.options.map((o) => o.value)).toEqual(['tao', 'ploy']);
     expect(items[1]!.sites![0]!.options.map((o) => o.value)).toEqual(['tao', 'arm']);
-    expect(items[5]!.detail).toMatch(/gets the CEO step on Tier 1 DOWN/);
+    expect(items[5]!.detail).toMatch(/gets the CEO’s steps: none on any policy/);
     expect(usageSummary(items)).toBe('3 of 3 need a new person');
   });
 

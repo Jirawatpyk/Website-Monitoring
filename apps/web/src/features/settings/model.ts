@@ -88,21 +88,66 @@ export interface UsersData {
   emailOn?: boolean;
   /** D-078: an escalation step goes to Management — until one does, the tag changes nobody's alerts. */
   managementUsed?: boolean;
+  /**
+   * The Tier 1 DOWN steps that name the CEO, read from the policy (`ceoStepsLine`): "Tier 1 DOWN · L3 FYI
+   * (+60 min, also after an ack)". Null when no step names the CEO.
+   */
+  ceoSteps?: string | null;
+}
+
+/**
+ * The CEO's Tier 1 DOWN steps in words (Users board `esc`, §43.1): since D-078 the L3 FYI only; an
+ * L2 CEO page reads "L2 (+30 min)". Null when no step names the CEO.
+ */
+export function ceoStepsLine(
+  t1Down: readonly { level: number; delayMin: number; targets: readonly string[]; fyi?: boolean }[],
+): string | null {
+  const parts = [...t1Down]
+    .filter((s) => s.targets.includes('ceo'))
+    .sort((a, b) => a.level - b.level)
+    .map((s) =>
+      s.fyi ? `L${s.level} FYI (+${s.delayMin} min, also after an ack)` : `L${s.level} (+${s.delayMin} min)`,
+    );
+  return parts.length ? `Tier 1 DOWN · ${parts.join(' · ')}` : null;
+}
+
+/** "Vee", "Vee and Pim", "Vee, Pim and Ann". */
+const andList = (n: readonly string[]) =>
+  n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n.at(-1)}` : (n[0] ?? '');
+
+/**
+ * The role dialog's Management box (Users board `mgRole`, §43.5): an Admin tagged Management who is
+ * demoted or deactivated leaves it. With a step on Management and nobody else tagged, it is the
+ * last-Management refusal (`private.assert_management_left` refuses it too) and blocks the save.
+ */
+export function managementRoleBox(
+  d: UsersData,
+  p: Person,
+  deactivate: boolean,
+  newRole: Role,
+): { title: string; lines: string[]; blocks: boolean } | null {
+  if (!p.management || (!deactivate && newRole === 'admin')) return null;
+  const title = `${p.name} will also leave Management.`;
+  if (!d.managementUsed) return { title, lines: [], blocks: false };
+  const rest = d.people.filter((x) => x.management && x.id !== p.id).map((x) => x.name);
+  return rest.length
+    ? { title, lines: [`Tier 1 DOWN L2 still goes to ${andList(rest)}.`], blocks: false }
+    : {
+        title,
+        lines: [
+          `Can’t ${deactivate ? 'deactivate' : 'change the role'}: Tier 1 DOWN L2 goes to Management and ${p.name} is the last one. Change the L2 step on Escalation first, or set someone else as Management.`,
+        ],
+        blocks: true,
+      };
 }
 
 /** The role-change / deactivate dialog's description (spec §14.9, §34). */
-export function changeDialogText(
-  name: string,
-  deactivate: boolean,
-  emailOn: boolean,
-  management = false,
-): string {
+export function changeDialogText(name: string, deactivate: boolean, emailOn: boolean): string {
   const mail = emailOn ? ` ${name} gets an email saying what changed.` : '';
-  // D-078 (§43.5): the tag is an Admin's only — a role change or a deactivation takes it
-  const leaves = management ? ` ${name} will also leave Management.` : '';
+  // D-078 (§43.5): leaving Management is the dialog's own box (`managementRoleBox`).
   return deactivate
-    ? `${name} loses access at once — every device is signed out — and stops getting alerts and digests. Past acknowledgements and notes stay in the audit log; an Admin can give access back by adding them again.${leaves}${mail}`
-    : `Takes effect as soon as you confirm.${leaves}${mail}`;
+    ? `${name} loses access at once — every device is signed out — and stops getting alerts and digests. Past acknowledgements and notes stay in the audit log; an Admin can give access back by adding them again.${mail}`
+    : `Takes effect as soon as you confirm.${mail}`;
 }
 
 const canOwn = (role: Role) => role === 'admin' || role === 'responder';
@@ -345,7 +390,7 @@ export function usageOf(d: UsersData, personId: string, target: Target, now: Dat
     items.push({
       key: 'ceo',
       label: 'Escalation · CEO step',
-      detail: `${person.name} is the only one who gets the CEO step on Tier 1 DOWN — L2 will reach the Site AM only until another Stakeholder who manages no client is added.`,
+      detail: `${person.name} is the only one who gets the CEO’s steps (${d.ceoSteps ?? 'none on any policy'}) — they reach the Site AM only until another Stakeholder who manages no client is added.`,
       need: false,
       info: true,
       warn: true,
@@ -354,7 +399,7 @@ export function usageOf(d: UsersData, personId: string, target: Target, now: Dat
     items.push({
       key: 'ceo',
       label: 'Escalation · CEO step',
-      detail: `As a Stakeholder who manages no client, ${person.name} gets the CEO step on Tier 1 DOWN (L2 and L3).`,
+      detail: `As a Stakeholder who manages no client, ${person.name} gets the CEO’s steps: ${d.ceoSteps ?? 'none on any policy — the daily digest'}.`,
       need: false,
       info: true,
     });
@@ -410,7 +455,7 @@ export const INVITE_HINTS: Record<StaffRole, string> = {
   admin: 'Manages sites, people and escalation, and gets monitor-fault emails.',
   responder: 'Can own sites and join the on-call rotation once they sign in.',
   stakeholder:
-    'Can be a client’s Site AM. While they manage no client they get the CEO step on Tier 1 DOWN (L2 and L3).',
+    'Can be a client’s Site AM. While they manage no client they get the CEO’s steps on Escalation.',
   viewer: 'Sees the dashboard and history. Gets no alerts.',
 };
 
@@ -501,6 +546,12 @@ export function oneAdminBanner(d: UsersData): { title: string; body: string } | 
 export const countLine = (d: UsersData) =>
   `${d.people.length + d.invites.length} people · Google Workspace accounts only · role changes are logged`;
 
+/** One line of the Management confirm, with its icon (Users board `mgLines`). */
+export interface ManagementRow {
+  icon: 'plus' | 'minus' | 'info' | 'warn';
+  text: string;
+}
+
 /** D-078 (§43.6): the sheet fact of a Management Admin. */
 export const MANAGEMENT_FACT = 'Gets the L2 step on Tier 1 DOWN';
 
@@ -522,43 +573,71 @@ export function managementBlockedWhy(p: Person): string | null {
 export function managementDialog(
   d: UsersData,
   p: Person,
-): { title: string; description: string | undefined; lines: string[]; placeholder: string; done: string } {
+): {
+  title: string;
+  description: string | undefined;
+  rows: ManagementRow[];
+  /** The last-Management refusal (§43.5): the dialog shows only this, with Open Escalation / Close. */
+  refuse: string | null;
+  placeholder: string;
+  done: string;
+} {
   const on = !p.management;
   const others = d.people.filter((x) => x.management && x.id !== p.id).map((x) => x.name);
-  const and = (n: string[]) => (n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n.at(-1)}` : (n[0] ?? ''));
+  const and = andList;
   // D-078 (3b): people are resolved when a step fires — the board's "incidents opened after" isn't built
   const mail = d.emailOn ? ` ${p.name} gets an email saying what changed.` : '';
   const description = d.managementUsed
     ? `Takes effect from the next escalation step that fires.${on ? ` ${p.name} stays an Admin.` : ''}${mail}`
     : mail.trim() || undefined;
-  const lines: string[] = [];
+  const rows: ManagementRow[] = [];
+  const refuse =
+    !on && d.managementUsed && !others.length
+      ? `Can’t remove: Tier 1 DOWN L2 goes to Management and ${p.name} is the last one. Change the L2 step on Escalation first, or set someone else as Management.`
+      : null;
   if (!d.managementUsed) {
-    lines.push(
-      on
+    rows.push({
+      icon: 'info',
+      text: on
         ? 'No escalation step goes to Management yet — nothing changes until Tier 1 DOWN L2 is set to Management on Escalation.'
         : "No escalation step goes to Management yet — removing it changes nobody's alerts.",
-    );
+    });
   } else if (on) {
-    lines.push(
-      'Gets the L2 step on Tier 1 DOWN (+30 min, @mentioned in Chat + email).',
-      'No longer told at L1 as an Admin.',
+    rows.push(
+      { icon: 'plus', text: 'Gets the L2 step on Tier 1 DOWN (+30 min, @mentioned in Chat + email).' },
+      { icon: 'minus', text: 'No longer told at L1 as an Admin.' },
     );
+    // Allowed (D-078, Tao 28 Nov): a warning, not a refusal.
     const outside = d.people.filter((x) => x.role === 'admin' && !x.management && x.id !== p.id);
     if (!outside.length)
-      lines.push('Every active Admin would then be Management, so L1 tells only the backup — no Admin.');
-  } else {
-    lines.push('No longer gets the L2 step on Tier 1 DOWN.', 'Told at L1 again as an Admin (Chat + email).');
-    if (others.length) lines.push(`L2 still goes to ${and(others)}.`);
+      rows.push({
+        icon: 'warn',
+        text: 'Every active Admin would then be Management, so L1 tells only the backup — no Admin.',
+      });
+  } else if (!refuse) {
+    rows.push(
+      { icon: 'minus', text: 'No longer gets the L2 step on Tier 1 DOWN.' },
+      { icon: 'plus', text: 'Told at L1 again as an Admin (Chat + email).' },
+      { icon: 'info', text: `L2 still goes to ${and(others)}.` },
+    );
   }
   return {
     title: on ? `Set ${p.name} as Management?` : `Remove ${p.name} from Management?`,
-    description,
-    lines,
+    description: refuse ? undefined : description,
+    rows,
+    refuse,
     // the board's placeholders (never a real or sample name)
     placeholder: on
       ? 'e.g. Ops lead — can find someone when nobody answers'
       : 'e.g. Moving to the product team',
-    done: on ? `${p.name} is Management · logged` : `${p.name} removed from Management · logged`,
+    // the board's success lines once a step goes to Management (Users board `confirmMg`)
+    done: !d.managementUsed
+      ? on
+        ? `${p.name} is Management · logged`
+        : `${p.name} removed from Management · logged`
+      : on
+        ? `${p.name} is now Management · gets Tier 1 DOWN L2 · logged`
+        : `${p.name} left Management · Tier 1 DOWN L2 now goes to ${others.join(', ')} · logged`,
   };
 }
 
@@ -578,7 +657,7 @@ export function sheetFacts(d: UsersData, r: UserRow): { k: string; v: string }[]
     r.role === 'stakeholder'
       ? clients.length
         ? `Site AM for ${clients.join(', ')}`
-        : 'Gets the CEO step on Tier 1 DOWN (L2 and L3)'
+        : (d.ceoSteps ?? 'The daily digest — no escalation step names the CEO')
       : [
           owner.length ? `Owner of ${owner.length} — ${owner.join(', ')}` : null,
           backup.length ? `backup on ${backup.length} — ${backup.join(', ')}` : null,

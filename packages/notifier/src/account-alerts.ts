@@ -25,6 +25,8 @@ export interface AccountFacts {
   was_am: boolean;
   manages_clients: boolean;
   left_rotation: boolean;
+  /** D-078: the person was Management and the tag went with the role (absent on older events). */
+  left_management?: boolean;
   /** The other active Admins, for a promotion to Admin. */
   admins: string[];
   moves: AccountMove[];
@@ -223,7 +225,11 @@ export function buildAccountEmail(input: AccountEmailInput): EmailMessage {
   // The board's promotion lists what comes, not what stays.
   if (diff.keep && !promoted)
     sections.push({ kind: 'list', title: 'YOU KEEP', mark: '·', color: C.secondary, items: [diff.keep] });
-  const rotationNote = facts.left_rotation ? ['You left the on-call rotation.'] : [];
+  const rotationNote = [
+    ...(facts.left_rotation ? ['You left the on-call rotation.'] : []),
+    // D-078 (§43.5): the tag is an Admin's only — the Users dialog said so before the change.
+    ...(facts.left_management ? ['You also left Management.'] : []),
+  ];
   sections.push(...moved(rotationNote));
   // An Admin keeps what a Responder held (nothing moves); someone with no sites isn't told they stay.
   // The board's promotion lede, for a Responder: their sites and shifts stay.
@@ -231,7 +237,7 @@ export function buildAccountEmail(input: AccountEmailInput): EmailMessage {
     promoted && fromRole === 'responder'
       ? 'Your sites and on-call shifts stay as they are.'
       : 'It took effect straight away.';
-  const tail = !rows.length && rotationNote.length ? `${first} ${rotationNote[0]}` : first;
+  const tail = !rows.length && rotationNote.length ? `${first} ${rotationNote.join(' ')}` : first;
 
   const pre = promoted
     ? `${facts.actor} made you an Admin · ${at}`

@@ -4,7 +4,7 @@
 -- person can't go while a step names Management (§43.5).
 begin;
 \ir _helpers.psql
-select plan(19);
+select plan(20);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -141,6 +141,15 @@ update public.profiles set is_management = true where id = pg_temp.uid('vee');
 update public.profiles set is_management = false where id = pg_temp.uid('tao');
 select is((select count(*)::int from public.escalation_people((select id from inc where name = 'a'), '["every_admin"]')),
   2, 'noAm: Tao and Vee (Management) both');
+
+-- ── The role-change email says the tag went with the role (PR 3b) ─────────
+update public.profiles set is_management = true where id = pg_temp.uid('tao');
+select tests.authenticate_as(pg_temp.uid('tao'));
+select public.change_user_role(pg_temp.uid('vee'), 'responder');
+reset role;
+select is((select facts->'left_management' from public.account_events
+           where user_id = pg_temp.uid('vee') and kind = 'role_changed'),
+  'true'::jsonb, 'role change away from Admin: left_management');
 
 select * from finish();
 rollback;

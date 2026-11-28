@@ -60,6 +60,9 @@ export const PROBLEM_WORDS: Record<string, string> = {
   needs_chat: 'Add a Google Chat id first — Management is @mentioned.',
   management_needs_chat: 'They’re Management, so they need a Chat id — remove them from Management first.',
   no_session: 'Sign in again to continue.',
+  // D-078 (§43.5): private.assert_management_left — a policy step or an open incident's plan names Management.
+  last_management:
+    'Tier 1 DOWN L2 goes to Management and they’re the last one — change the L2 step on Escalation first, or set someone else as Management.',
 };
 
 /** Refusals that mean the page is out of date: reload it so "Used in" shows what's there now. */

@@ -31,6 +31,8 @@ import {
   gainsLoses,
   INVITE_HINTS,
   managementDialog,
+  managementRoleBox,
+  type ManagementRow,
   missingPicks,
   reassignPayload,
   STAFF_ROLES,
@@ -318,6 +320,8 @@ export function RoleDialog({
     );
   };
   const secondAdmin = !deact && newRole === 'admin' && admins(data).length === 1;
+  // D-078 (§43.5): the tag leaves with the role; the last Management person can't go while a step uses it.
+  const mgBox = managementRoleBox(data, person, deact, newRole);
   // Owners need a Chat id (D-015): the only pool that can be empty for that reason.
   const nobody = 'Nobody else can own this site — give an active Admin or Responder a Chat id first.';
   return (
@@ -326,7 +330,7 @@ export function RoleDialog({
       onClose={onClose}
       size="md"
       title={deact ? `Deactivate ${person.name}?` : `Change ${person.name}’s role`}
-      description={changeDialogText(person.name, deact, !!data.emailOn, !!person.management)}
+      description={changeDialogText(person.name, deact, !!data.emailOn)}
       footer={
         <Foot>
           <Button variant="secondary" onClick={onClose}>
@@ -336,7 +340,7 @@ export function RoleDialog({
             variant={deact ? 'danger' : 'primary'}
             icon={deact ? <IconBan /> : <IconCheck />}
             loading={pending}
-            disabled={blocked.length > 0}
+            disabled={blocked.length > 0 || !!mgBox?.blocks}
             onClick={save}
           >
             {deact ? `Deactivate ${person.name}` : `Change to ${ROLE_LABELS[newRole]}`}
@@ -375,7 +379,18 @@ export function RoleDialog({
                 Monitor-fault emails go to {admins(data)[0]?.name} and {person.name} from now on.
               </Alert>
             )}
+            {newRole === 'admin' && (
+              // Users board `adminNote`: the tag is set on its own, never by a promotion.
+              <p className="m-0 text-xs text-fg-secondary">
+                {person.name} isn’t Management — set that separately from the ⋯ menu.
+              </p>
+            )}
           </>
+        )}
+        {mgBox && (
+          <Alert tone={mgBox.blocks ? 'warning' : 'info'} title={mgBox.title}>
+            {mgBox.lines.join(' ')}
+          </Alert>
         )}
         <section className="flex flex-col gap-3" aria-labelledby="used-in-h">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -678,47 +693,79 @@ export function ManagementDialog({
       title={w?.title ?? ''}
       description={w?.description}
       footer={
-        <Foot>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            // the board: primary + check for both — removing the tag destroys nothing (spec-checker L6)
-            variant="primary"
-            icon={<IconCheck />}
-            loading={pending}
-            onClick={() => {
-              if (!note.trim()) {
-                setTried(true);
-                setRefused((n) => n + 1);
-                return;
-              }
-              if (person) run(() => setManagement({ userId: person.id, on, note }));
-            }}
-          >
-            {on ? 'Set as Management' : 'Remove from Management'}
-          </Button>
-        </Foot>
+        w?.refuse ? (
+          // §43.5: only the refusal, Open Escalation / Close
+          <Foot>
+            <Button variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+            <Button variant="primary" href="/escalation">
+              Open Escalation
+            </Button>
+          </Foot>
+        ) : (
+          <Foot>
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              // the board: primary + check for both — removing the tag destroys nothing (spec-checker L6)
+              variant="primary"
+              icon={<IconCheck />}
+              loading={pending}
+              onClick={() => {
+                if (!note.trim()) {
+                  setTried(true);
+                  setRefused((n) => n + 1);
+                  return;
+                }
+                if (person) run(() => setManagement({ userId: person.id, on, note }));
+              }}
+            >
+              {on ? 'Set as Management' : 'Remove from Management'}
+            </Button>
+          </Foot>
+        )
       }
     >
-      <div className="flex flex-col gap-4">
-        <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-sm">
-          {w?.lines.map((l) => (
-            <li key={l}>{l}</li>
-          ))}
-        </ul>
-        <Textarea
-          ref={noteRef}
-          label="Note"
-          placeholder={w?.placeholder}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          error={tried && !note.trim() ? 'Add a short note — it goes in the audit log' : undefined}
-          rows={2}
-          required
-        />
-        <Refusal error={error} />
-      </div>
+      {w?.refuse ? (
+        <Alert tone="warning" role="alert">
+          {w.refuse}
+        </Alert>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+            {w?.rows.map((r) => (
+              <li key={r.text} className="flex gap-2">
+                <span
+                  className={`flex pt-0.5 ${r.icon === 'warn' ? 'text-alert-warning-fg' : 'text-fg-secondary'}`}
+                >
+                  {ROW_ICON[r.icon]}
+                </span>
+                <span>{r.text}</span>
+              </li>
+            ))}
+          </ul>
+          <Textarea
+            ref={noteRef}
+            label="Note"
+            placeholder={w?.placeholder}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            error={tried && !note.trim() ? 'Add a short note — it goes in the audit log' : undefined}
+            rows={2}
+            required
+          />
+          <Refusal error={error} />
+        </div>
+      )}
     </Dialog>
   );
 }
+
+const ROW_ICON: Record<ManagementRow['icon'], React.ReactNode> = {
+  plus: <IconPlus size="sm" aria-hidden />,
+  minus: <IconMinus size="sm" aria-hidden />,
+  info: <IconInfo size="sm" aria-hidden />,
+  warn: <IconTriangleAlert size="sm" aria-hidden />,
+};

@@ -174,8 +174,16 @@ describe('UsersPageView (Users, MUsers)', () => {
     );
     await user.keyboard('{Escape}');
     await openMenu('Tao', 'Remove from Management…');
+    // Tao is the last one and Tier 1 L2 goes to Management: only the refusal (§43.5).
     const dialog = await screen.findByRole('dialog', { name: 'Remove Tao from Management?' });
-    expect(within(dialog).getByText('Told at L1 again as an Admin (Chat + email).')).toBeInTheDocument();
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(
+      /^Can’t remove: Tier 1 DOWN L2 goes to Management and Tao is the last one./,
+    );
+    expect(within(dialog).queryByLabelText(/Note/)).toBeNull();
+    expect(within(dialog).getByRole('link', { name: 'Open Escalation' })).toHaveAttribute(
+      'href',
+      '/escalation',
+    );
   });
 
   it('Clear Chat id asks first, and focus follows the confirm in and out', async () => {
