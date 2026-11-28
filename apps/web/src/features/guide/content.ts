@@ -134,13 +134,21 @@ export interface Topic extends TopicLike {
 
 // ── Words from the facts ───────────────────────────────────────────────────
 
-const TARGET_ORDER: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'ceo', 'site_am'];
+const TARGET_ORDER: readonly EscalationTarget[] = [
+  'owner',
+  'backup',
+  'admins',
+  'management',
+  'ceo',
+  'site_am',
+];
 
 /** A step's people in the guide's words: the Admin token names every active Admin (D-034). */
 const TARGET_WORDS: Record<EscalationTarget, string> = {
   owner: 'owner',
   backup: 'backup',
   admins: 'every Admin',
+  management: 'Management',
   ceo: 'CEO',
   site_am: 'site AM',
 };

@@ -284,6 +284,74 @@ describe('render — L2 and the L3 FYI (S10)', () => {
   });
 });
 
+// D-078 (spec §43): Tier 1 DOWN with L2 = Management (Vee) — the plan an incident opens with after the switch.
+describe('render — L2 Management (D-078)', () => {
+  const vee = { id: 'u-vee', display_name: 'Vee', google_chat_user_id: 'VEE' };
+  const ceo = { id: 'u-ceo', display_name: 'CEO', google_chat_user_id: 'CEO' };
+  const bua = { id: 'u-bua', display_name: 'Bua', google_chat_user_id: 'BUA' };
+  const mgmtPlan = {
+    ...plan,
+    steps: [
+      ...plan.steps,
+      { level: 2, delayMin: 30, targets: ['management'], channels: ['chat', 'email'] },
+      { level: 3, delayMin: 60, targets: ['ceo', 'site_am'], channels: ['chat', 'email'], fyi: true },
+    ],
+  };
+  const t1: IncidentFacts = {
+    ...incident,
+    sites: { ...incident.sites, client: { am: bua } } as IncidentFacts['sites'],
+    escalation_plan: mgmtPlan,
+    ladder: { admins: [tao], management: [vee], ceo: [ceo], hours: HOURS },
+  };
+
+  it('L1 says Management comes next, by the token', () => {
+    const m = renderChat(
+      row('step_fired', {
+        level: 1,
+        severity: 'down',
+        elapsedMin: 15,
+        mentioned: ['u-ploy'],
+        fyi: ['u-tao'],
+      }),
+      { ...t1, state: 'escalated', escalation_level: 1 },
+      appUrl,
+      new Date('2026-09-25T03:03:42Z'),
+    )!;
+    expect(m.text).toMatch(/· Management at 10:18$/);
+  });
+
+  it('L2 @mentions Management and asks them to step in; the FYI is ahead', () => {
+    const m = renderChat(
+      row('step_fired', { level: 2, severity: 'down', elapsedMin: 30, mentioned: ['u-vee'], fyi: [] }),
+      { ...t1, state: 'escalated', escalation_level: 2 },
+      appUrl,
+      new Date('2026-09-25T03:18:42Z'),
+    )!;
+    expect(m.text).toBe(
+      '<users/VEE> ESCALATED · L2 · MuvMi DOWN 30 min, not acknowledged · please step in — find someone to take it · Arm, Ploy, Tao informed',
+    );
+    expect(JSON.stringify(m.cardsV2)).toContain('CEO + Bua get an FYI at 10:48');
+  });
+
+  it('Management’s L2 email: the footer says why, and the next step is the FYI', () => {
+    const m = renderEmail(
+      row(
+        'step_fired',
+        { level: 2, severity: 'down', elapsedMin: 30, mentioned: ['u-vee'], fyi: [], asFyi: false },
+        { channel: 'email', user_id: 'u-vee' },
+      ),
+      { ...t1, state: 'escalated', escalation_level: 2 },
+      { id: 'u-vee', display_name: 'Vee', email: 'vee@example.test' },
+      appUrl,
+      thread,
+    )!;
+    expect(m.text).toContain(
+      'You got this because you’re Management — Tier 1 DOWN comes to you at L2 when nobody acknowledges in 30 min.',
+    );
+    expect(m.text).toContain('Next step: L3 FYI (CEO + Bua, no call) at 10:48');
+  });
+});
+
 describe('render — the ladder (S08, D-034)', () => {
   it('the DOWN card promises the L1 time and names Ploy, Tao', () => {
     const m = renderChat(

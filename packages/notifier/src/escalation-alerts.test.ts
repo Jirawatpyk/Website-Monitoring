@@ -175,6 +175,42 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
     );
   });
 
+  // D-078 (spec §43.10): Management at L2, and L1's next line.
+  const vee = { name: 'Vee', chatUserId: 'VEE' };
+  const pim = { name: 'Pim', chatUserId: 'PIM' };
+  it('L1 names Management next: "· Management at 10:18"', () => {
+    const msg = step({
+      asked: [{ ...ploy, role: 'backup' }],
+      fyi: [tao],
+      next: { who: 'Management', at: bkk('2026-09-25T10:18:41') },
+    });
+    expect(msg.text).toMatch(/· Tao FYI · Management at 10:18$/);
+    expect(JSON.stringify(msg.cardsV2)).toContain('Next: Management at 10:18.');
+  });
+
+  it('L2 (Management): @mentions them, asks them to step in, and to ask for a status note', () => {
+    const msg = step({
+      level: 2,
+      elapsedMin: 30,
+      kind: 'management',
+      asked: [
+        { ...vee, role: 'Management' },
+        { ...pim, role: 'Management' },
+      ],
+      informed: ['Arm', 'Ploy', 'Tao'],
+      informedRoles: ['Arm (owner)', 'Ploy (backup)', 'Tao'],
+      fyiNext: { who: 'CEO + Bua', at: bkk('2026-09-25T10:48:41') },
+    });
+    expect(msg.text).toBe(
+      '<users/VEE> <users/PIM> ESCALATED · L2 · MuvMi DOWN 30 min, not acknowledged · please step in — find someone to take it · Arm, Ploy, Tao informed',
+    );
+    const card = JSON.stringify(msg.cardsV2);
+    expect(card).toContain(
+      'Nobody has acknowledged. Arm (owner), Ploy (backup) and Tao were asked. Call them, reassign, or acknowledge yourself — and ask for a status note: CEO + Bua get an FYI at 10:48 if it’s still down.',
+    );
+    expect(card).toContain('Open / acknowledge');
+  });
+
   it('L2 (CEO): @mentions the CEO, names who was told', () => {
     const msg = step({
       level: 2,
@@ -311,6 +347,29 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
     expect(m.text).toContain('Add a status note — they see it in the FYI.');
   });
 
+  it('with L2 = Management the ack names it: "L2 (Management) cancelled" (D-078)', () => {
+    const m = buildAcknowledgedEmail({
+      ...base,
+      recipientId: 'arm',
+      reason: 'owner',
+      ackedBy: 'Arm',
+      ackedAt: bkk('2026-09-25T10:07:40'),
+      startedAt: bkk('2026-09-25T09:48:12'),
+      confirmedAt: bkk('2026-09-25T09:48:41'),
+      stopped: {
+        severity: 'down',
+        backup: 'Ploy',
+        l1Fired: true,
+        stopsThrough: 2,
+        firedLevel: 1,
+        stopsWho: 'Management',
+        site: 'MuvMi',
+        fyi: { level: 3, at: bkk('2026-09-25T10:48:41'), who: 'CEO + Bua' },
+      },
+    });
+    expect(m.text).toContain('Escalation: L2 (Management) cancelled · L3 FYI at 10:48 if still down');
+  });
+
   it('the AM’s ACKNOWLEDGED email doesn’t ask them for a status note (D-078)', () => {
     const m = buildAcknowledgedEmail({
       ...base,
@@ -351,6 +410,26 @@ describe('S10 emails (EmailAlert L2 / L3)', () => {
       asked: 'CEO',
       ...over,
     });
+  it('L2 (Management): the ask, Already told, Next step, Acknowledge (§43.11)', () => {
+    const m = email({
+      kind: 'management',
+      asked: 'Vee',
+      informed: ['Arm', 'Ploy', 'Tao'],
+      informedRoles: ['Arm (owner)', 'Ploy (backup)', 'Tao'],
+      alreadyTold: 'Arm 09:48 · Ploy + Tao 10:03',
+      nextStep: 'L3 FYI (CEO + Bua, no call) at 10:48',
+      fyiNext: { who: 'CEO + Bua', at: bkk('2026-09-25T10:48:41') },
+    });
+    expect(m.html).toContain('ESCALATED · L2');
+    expect(m.html).toContain('MuvMi down 30 min — please step in');
+    expect(m.text).toContain(
+      'Nobody has acknowledged. Arm (owner), Ploy (backup) and Tao were asked. Call them, reassign, or acknowledge yourself — and ask for a status note: CEO + Bua get an FYI at 10:48 if it’s still down.',
+    );
+    expect(m.text).toContain('Next step: L3 FYI (CEO + Bua, no call) at 10:48');
+    expect(m.html).toContain('?ack=1');
+    expect(m.html).not.toContain('Configured · off until approved');
+  });
+
   it('L2 to the CEO: voice configured, next step L3', () => {
     const m = email({
       kind: 'ceo',

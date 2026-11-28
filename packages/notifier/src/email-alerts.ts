@@ -17,6 +17,7 @@ import {
   manualCause,
   manualConfirmedBy,
   manualWhen,
+  plainName,
   type ManualOpen,
   type ProblemFacts,
 } from './chat-alerts';
@@ -1242,7 +1243,9 @@ export interface StepEmailInput extends EmailBaseInput {
   /** The Chat reply couldn't be delivered: this email is the alert (D-016 fallback). */
   fallback?: boolean;
   /** S10: what the step is — as `StepAlertInput.kind` (default `ask`). */
-  kind?: 'ask' | 'ceo' | 'fyi' | 'reminder';
+  kind?: 'ask' | 'ceo' | 'management' | 'fyi' | 'reminder';
+  /** D-078: the FYI still ahead, for Management's "CEO + Bua get an FYI at 10:48". */
+  fyiNext?: { who: string; at: Date } | null;
   /** This reader's role at the step: the FYI words differ for the CEO and the site's AM. */
   readerIs?: 'ceo' | 'site_am' | 'other';
   /** Everyone told before this step: "Arm (owner), Ploy (backup) and Tao were asked". */
@@ -1280,7 +1283,10 @@ const byHandFact = (input: StepEmailInput): [string, string][] =>
     ? [['Sent', `By hand by ${input.byHand} — the status engine is down, so nothing escalates on its own`]]
     : [];
 
-function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder'): EmailMessage {
+function otherStepEmail(
+  input: StepEmailInput,
+  kind: 'ceo' | 'management' | 'fyi' | 'reminder',
+): EmailMessage {
   const { site } = input;
   const duration = formatDuration(input.elapsedMin);
   const informed = input.informed ?? [];
@@ -1294,6 +1300,33 @@ function otherStepEmail(input: StepEmailInput, kind: 'ceo' | 'fyi' | 'reminder')
       : `${duration} (confirmed down ${detected})`,
   ];
   const open = [{ label: 'Open incident', href: input.incidentUrl, primary: kind === 'ceo' }];
+  if (kind === 'management') {
+    // EmailAlert › L2 (Management), spec §43.11: one email per Management Admin, asked to step in.
+    const asked = input.informedRoles ?? informed;
+    const fyi = input.fyiNext
+      ? ` — and ask for a status note: ${plainName(input.fyiNext.who)} get an FYI at ${formatTime(input.fyiNext.at)} if it’s still down`
+      : '';
+    return render(input, {
+      template: 'down',
+      color: C.warning,
+      bar: C.warning,
+      label: `ESCALATED · L${input.level}`,
+      pre: `${site} down ${duration}, not acknowledged · please step in${informed.length ? ` · ${informed.join(', ')} informed` : ''}`,
+      headline: `${site} down ${duration} — please step in`,
+      lede: `Nobody has acknowledged. ${andList(asked)} ${informed.length > 1 ? 'were' : 'was'} asked. Call them, reassign, or acknowledge yourself${fyi}.`,
+      facts: [
+        ...byHandFact(input),
+        downFor,
+        ...(input.cause ? [['Cause', input.cause] as [string, string]] : []),
+        ...(input.alreadyTold ? [['Already told', input.alreadyTold] as [string, string]] : []),
+        ...(input.nextStep ? [['Next step', input.nextStep] as [string, string]] : []),
+      ],
+      buttons: [
+        { label: 'Acknowledge', href: `${input.incidentUrl}?ack=1`, primary: true },
+        { label: 'Open incident', href: input.incidentUrl, primary: false },
+      ],
+    });
+  }
   if (kind === 'ceo') {
     return render(input, {
       template: 'down',
