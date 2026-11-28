@@ -5,6 +5,7 @@ import {
   chatIdSchema,
   deactivateSchema,
   inviteSchema,
+  managementSchema,
   revokeSchema,
   signOutDeviceSchema,
   signOutUserSchema,
@@ -12,6 +13,7 @@ import {
   type ChatIdInput,
   type DeactivateInput,
   type InviteInput,
+  type ManagementInput,
   type RevokeInput,
   type SignOutDeviceInput,
   type SignOutUserInput,
@@ -51,6 +53,12 @@ export const PROBLEM_WORDS: Record<string, string> = {
   chat_id_taken: 'That Chat id belongs to someone else.',
   owner_needs_chat: 'They own a live site, so they need a Chat id — reassign the site first.',
   this_device: 'That’s this browser — use Sign out instead.',
+  // D-078 (§43): set_management (migration 20261128091534)
+  note_required: 'Add a short note — it goes in the audit log.',
+  note_too_long: 'Keep the note under 500 characters.',
+  not_admin: 'Only Admins can be Management.',
+  needs_chat: 'Add a Google Chat id first — Management is @mentioned.',
+  management_needs_chat: 'They’re Management, so they need a Chat id — remove them from Management first.',
   no_session: 'Sign in again to continue.',
 };
 
@@ -123,6 +131,18 @@ export async function setChatId(input: ChatIdInput, { db }: UsersDeps): Promise<
   // An empty id clears it (the SQL reads blank as none).
   const { error } = await db.rpc('set_chat_user_id', { p_user_id: p.data.userId, p_chat_id: p.data.chatId });
   return error ? refusal(error, 'Only an Admin can change someone else’s Chat id.') : { ok: true };
+}
+
+/** Set or remove the Management tag (D-078, §43): the SQL checks who, the note, and the Chat id. */
+export async function setManagement(input: ManagementInput, { db }: UsersDeps): Promise<UsersResult> {
+  const p = managementSchema.safeParse(input);
+  if (!p.success) return first(p.error.issues);
+  const { error } = await db.rpc('set_management', {
+    p_user_id: p.data.userId,
+    p_on: p.data.on,
+    p_note: p.data.note,
+  });
+  return error ? refusal(error, 'Only an Admin can set who is Management.') : { ok: true };
 }
 
 /** `outcome`: how many devices went back to the Google sign-in. */

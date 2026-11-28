@@ -67,14 +67,14 @@ a{color:var(--aura-fg-accent)}
 <span><b style="font-weight: 600">View only on phones.</b> <span style="color: var(--aura-fg-secondary)">Admins change policies on a larger screen.</span></span>
 </div>
 
-<x-import component-from-global-scope="Aura.Alert" tone="warning" title="1 active Admin — monitor-fault alerts reach only {{admin}}">new@dxt was added as an Admin but hasn’t signed in yet.</x-import>
+<x-import component-from-global-scope="Aura.Alert" tone="warning" title="new@dxt hasn’t signed in yet">Added as an Admin Thu 24 Sep. Active Admins now: Tao, Vee and Pim.</x-import>
 <span style="font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">{{countLine}}</span>
 <span class="st-h">PEOPLE · {{n}}</span>
 <div class="st-sec">
 <sc-for list="{{people}}" as="p" hint-placeholder-count="9">
 <button type="button" class="st-card" aria-label="{{p.aria}}" onClick="{{p.open}}">
 <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.3">
-<span style="display: flex; align-items: center; gap: 8px"><span style="font-size: 14px; font-weight: 600">{{p.name}}</span><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="{{p.variant}}">{{p.role}}</x-import></span>
+<span style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px"><span style="font-size: 14px; font-weight: 600">{{p.name}}</span><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="{{p.variant}}">{{p.role}}</x-import><sc-if value="{{p.mg}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Management</x-import></sc-if></span>
 <span style="font-size: 12px; color: var(--aura-fg-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{p.sub}}</span>
 <span style="font-size: 12px; color: {{p.metaColor}}; font-weight: {{p.metaWeight}}">{{p.meta}}</span>
 </span>
@@ -97,7 +97,7 @@ a{color:var(--aura-fg-accent)}
 
 </sc-if>
 
-<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Settings › Users &amp; roles at 390 (§35, D-062). View only (§22.5): no role change, invite, deactivate or hand-over controls, no “Open on desktop”. Settings pages: a “Settings page” select under the top bar — four pages since S17 (§35.1, §41). Each person is a card — name + role badge, email (or “Not signed in yet · added Thu 24 Sep”, “· AM”), one status line (on call now / next shift · last active); tap → sheet with alert channels, owner · backup, on-call and last active. The role matrix is one role at a time: a Role select over a 10-row ✓ / — list with the limits written out. STATE: Default · Person sheet · Role matrix · Stakeholder · No access. Mock data — compute it.</div>
+<div style="flex-shrink: 0; padding: 8px 12px; border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); background: var(--aura-bg-canvas); font-size: 12px; line-height: 1.45; color: var(--aura-fg-secondary)">Spec · Settings › Users &amp; roles at 390 (§35, D-062). View only (§22.5): no role change, invite, deactivate or hand-over controls, no “Open on desktop”. Settings pages: a “Settings page” select under the top bar — four pages since S17 (§35.1, §41). Each person is a card — name + role badge, email (or “Not signed in yet · added Thu 24 Sep”, “· AM”), one status line (on call now / next shift · last active); tap → sheet with alert channels, owner · backup, on-call and last active. The role matrix is one role at a time: a Role select over a 10-row ✓ / — list with the limits written out. Management (§43): a neutral “Management” badge beside the role badge on Admins (wraps under the name when tight); the sheet adds “Management · Gets the L2 step on Tier 1 DOWN”; set / remove stays on desktop. STATE: Default · Person sheet · Person sheet · Management · Role matrix · Stakeholder · No access. Mock data — compute it.</div>
 </div>
 
 <x-import component-from-global-scope="Aura.BottomNav" items="{{bottom}}" value="" label="Sections"></x-import>
@@ -137,19 +137,21 @@ class Component extends DCLogic {
 
     var P = [
       ['Tao', 'Admin', 'Jirawat Piyakit · tao@[domain]', 'Admin backstop · active now', 0, { ch: 'Chat · Email', own: 'Owner of 6 sites · backup on 1', oc: 'Admin backstop — not in the weekly rotation', last: 'Active now' }],
+      ['Vee', 'Admin', 'vee@[domain]', 'Today 08:40', 0, { ch: 'Chat · Email', own: '—', oc: '—', last: 'Today 08:40', mg: true }],
+      ['Pim', 'Admin', 'pim@[domain]', 'Thu 24 Sep', 0, { ch: 'Chat · Email', own: '—', oc: '—', last: 'Thu 24 Sep', mg: true }],
       ['new@dxt', 'Admin', 'Not signed in yet · added Thu 24 Sep', 'Can’t get alerts until first sign-in', 2, { ch: 'Not set up yet — signs in first', own: '—', oc: '—', last: 'Not signed in yet' }],
       ['Arm', 'Responder', 'arm@[domain]', 'Next on call 5 Oct · today 10:05', 0, { ch: 'Chat · Email', own: 'Owner of 3 — Bangkok Airways – Taiwan, Bangkok Airways – China, MuvMi · backup on 2 — ENEOS Industrial, realme.link', oc: 'Next: Mon 5 Oct → Mon 12 Oct', last: 'Today 10:05' }],
       ['Ploy', 'Responder', 'ploy@[domain]', 'On call now · today 09:58', 1, { ch: 'Chat · Email', own: 'Owner of 4 — ENEOS Industrial, Fuji Links, Tubtong, VOCA · backup on 6', oc: 'On call now until Mon 28 Sep 09:00', last: 'Today 09:58' }],
       ['Nok', 'Responder', 'nok@[domain]', 'Next on call 28 Sep · yesterday 18:10', 0, { ch: 'Chat · Email', own: 'Owner of 4 — realme.link, WeCare Studio, Cando Asia, WeCare Asia · backup on 8', oc: 'Next: Mon 28 Sep → Mon 5 Oct', last: 'Yesterday 18:10' }],
       ['Thee', 'Stakeholder', 'thee@[domain] · AM', 'today 09:02', 0, { ch: 'Chat · Email', own: 'Site AM for ENEOS, realme, Fuji Links, ORCA', oc: '—', last: 'Today 09:02' }],
       ['Bua', 'Stakeholder', 'bua@[domain] · AM', 'today 09:30', 0, { ch: 'Chat · Email', own: 'Site AM for Bangkok Airways, MuvMi, Tubtong, Cando Asia, WeCare', oc: '—', last: 'Today 09:30' }],
-      ['CEO', 'Stakeholder', 'ceo@[domain]', 'Mon 21 Sep', 0, { ch: 'Chat · Email', own: 'In escalation: Tier 1 DOWN L2 and L3', oc: '—', last: 'Mon 21 Sep' }],
+      ['CEO', 'Stakeholder', 'ceo@[domain]', 'Mon 21 Sep', 0, { ch: 'Chat · Email', own: 'In escalation: Tier 1 DOWN L3 FYI (+60 min, also after an ack)', oc: '—', last: 'Mon 21 Sep' }],
       ['Mint', 'Viewer', 'mint@[domain]', 'No Chat id · Wed 23 Sep', 0, { ch: 'No Chat id — a Viewer gets no alerts', own: '—', oc: '—', last: 'Wed 23 Sep' }]
     ];
     var people = P.map(function (p) {
-      return { name: p[0], role: p[1], variant: VAR[p[1]], sub: p[2], meta: p[3],
+      return { name: p[0], role: p[1], variant: VAR[p[1]], sub: p[2], meta: p[3], mg: !!p[5].mg,
         metaColor: p[4] === 1 ? 'var(--aura-fg-primary)' : 'var(--aura-fg-secondary)', metaWeight: p[4] === 1 ? 600 : 400,
-        aria: p[0] + ', ' + p[1] + ', ' + p[3] + '. Show details',
+        aria: p[0] + ', ' + p[1] + (p[5].mg ? ', Management' : '') + ', ' + p[3] + '. Show details',
         open: function () { self.setState({ open: p[0] }); } };
     });
     var cur = P.filter(function (p) { return p[0] === st.open; })[0] || P[3];
@@ -176,8 +178,8 @@ class Component extends DCLogic {
         : { label: r[0], icon: 'check', color: 'var(--aura-fg-secondary)', textColor: 'var(--aura-fg-primary)', hasNote: true, note: v };
     });
     return Object.assign(COMMON, {
-      viewOpts: ['Default', 'Person sheet', 'Role matrix · Stakeholder', 'No access'].map(function (v) { return { value: v, label: v }; }), view: V,
-      setView: function (e) { var v = e && e.target ? e.target.value : e; self.setState({ view: v, open: v === 'Person sheet' ? 'Ploy' : '', role: v === 'Role matrix · Stakeholder' ? 'Stakeholder' : 'Responder' });
+      viewOpts: ['Default', 'Person sheet', 'Person sheet · Management', 'Role matrix · Stakeholder', 'No access'].map(function (v) { return { value: v, label: v }; }), view: V,
+      setView: function (e) { var v = e && e.target ? e.target.value : e; self.setState({ view: v, open: v === 'Person sheet' ? 'Ploy' : (v === 'Person sheet · Management' ? 'Vee' : ''), role: v === 'Role matrix · Stakeholder' ? 'Stakeholder' : 'Responder' });
         if (v === 'Role matrix · Stakeholder') setTimeout(function () { var el = document.querySelector('.r3-scroll'); if (el) el.scrollTop = 900; }, 80); },
       admin: 'Tao', n: P.length,
       countLine: P.length + ' people · Google Workspace accounts only · role changes are logged',
@@ -187,8 +189,8 @@ class Component extends DCLogic {
       matrix: matrix,
       roleFoot: (st.role === 'Client' ? 'Client · Phase 3: ' : st.role + ': ') + yes + ' of ' + M.length + ' allowed. “Own” = only where they are owner, backup or Site AM.',
       sheetOpen: !!st.open && !NOACC,
-      s: { name: cur[0], desc: cur[1] + ' · ' + cur[2],
-        kv: [{ k: 'Role', v: cur[1] }, { k: 'Alert channels', v: cur[5].ch }, { k: cur[1] === 'Stakeholder' ? 'Clients and escalation' : 'Owner · backup', v: cur[5].own }, { k: 'On-call', v: cur[5].oc }, { k: 'Last active', v: cur[5].last }] }
+      s: { name: cur[0], desc: cur[1] + (cur[5].mg ? ' · Management' : '') + ' · ' + cur[2],
+        kv: [{ k: 'Role', v: cur[1] }].concat(cur[5].mg ? [{ k: 'Management', v: 'Gets the L2 step on Tier 1 DOWN' }] : []).concat([ { k: 'Alert channels', v: cur[5].ch }, { k: cur[1] === 'Stakeholder' ? 'Clients and escalation' : 'Owner · backup', v: cur[5].own }, { k: 'On-call', v: cur[5].oc }, { k: 'Last active', v: cur[5].last }]) }
     });
   }
 }

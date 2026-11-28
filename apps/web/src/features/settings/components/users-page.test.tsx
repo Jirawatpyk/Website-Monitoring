@@ -10,6 +10,7 @@ const actions = vi.hoisted(() => ({
   changeUserRole: vi.fn(),
   deactivateUser: vi.fn(),
   setChatId: vi.fn(),
+  setManagement: vi.fn(),
   loadHandover: vi.fn(),
 }));
 const router = vi.hoisted(() => ({ refresh: vi.fn(), replace: vi.fn() }));
@@ -135,6 +136,46 @@ describe('UsersPageView (Users, MUsers)', () => {
     await waitFor(() =>
       expect(actions.inviteUser).toHaveBeenCalledWith({ email: 'Someone@X', role: 'responder' }),
     );
+  });
+
+  // D-078 (§43.3–4): the ⋯ item under Change role, its confirm with a note, the badge.
+  it('Set as Management: says nothing changes yet, needs a note, then sets it', async () => {
+    actions.setManagement.mockResolvedValue({ ok: true });
+    render(<UsersPageView data={data} now={NOW} />);
+    const user = await openMenu('Tao', 'Set as Management…');
+    const dialog = await screen.findByRole('dialog', { name: 'Set Tao as Management?' });
+    expect(within(dialog).getByText(/No escalation step goes to Management yet/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Set as Management' }));
+    expect(actions.setManagement).not.toHaveBeenCalled();
+    await waitFor(() => expect(within(dialog).getByLabelText(/Note/)).toHaveFocus());
+    await user.type(within(dialog).getByLabelText(/Note/), 'Bua review');
+    await user.click(within(dialog).getByRole('button', { name: 'Set as Management' }));
+    await waitFor(() =>
+      expect(actions.setManagement).toHaveBeenCalledWith({ userId: TAO, on: true, note: 'Bua review' }),
+    );
+    expect(await screen.findByTestId('users-count')).toHaveTextContent('Tao is Management · logged');
+    // focus back on the row's ⋯ once the dialog has closed (spec-checker L12)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Actions for Tao' })).toHaveFocus());
+  });
+
+  it("a Responder can't be Management; a Management Admin shows the badge and is removed the same way", async () => {
+    const tagged = {
+      ...data,
+      managementUsed: true,
+      people: data.people.map((p) => (p.id === TAO ? { ...p, management: true } : p)),
+    };
+    render(<UsersPageView data={tagged} now={NOW} />);
+    expect(screen.getAllByText('Management').length).toBeGreaterThan(0);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Actions for Nok' }));
+    expect(await screen.findByRole('menuitem', { name: /Set as Management…/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await user.keyboard('{Escape}');
+    await openMenu('Tao', 'Remove from Management…');
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Tao from Management?' });
+    expect(within(dialog).getByText('Told at L1 again as an Admin (Chat + email).')).toBeInTheDocument();
   });
 
   it('Clear Chat id asks first, and focus follows the confirm in and out', async () => {

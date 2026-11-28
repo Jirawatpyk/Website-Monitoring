@@ -52,6 +52,18 @@ export const chatIdSchema = z.object({
 });
 export type ChatIdInput = z.infer<typeof chatIdSchema>;
 
+/** Set or remove the Management tag (D-078, §43.4): a note goes in the audit log. */
+export const managementSchema = z.object({
+  userId: z.uuid(),
+  on: z.boolean(),
+  note: z
+    .string()
+    .trim()
+    .min(1, 'Add a short note — it goes in the audit log.')
+    .max(500, 'Keep the note under 500 characters.'),
+});
+export type ManagementInput = z.infer<typeof managementSchema>;
+
 /** Sign a person out everywhere (Security, Admin; D-062 item 5). */
 export const signOutUserSchema = z.object({ userId: z.uuid() });
 export type SignOutUserInput = z.infer<typeof signOutUserSchema>;

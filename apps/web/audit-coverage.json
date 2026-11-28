@@ -56,6 +56,9 @@
     "features/settings/actions.ts#setChatId": {
       "rpc": ["set_chat_user_id"]
     },
+    "features/settings/actions.ts#setManagement": {
+      "rpc": ["set_management"]
+    },
     "features/settings/actions.ts#signOutEverywhere": {
       "rpc": ["sign_out_user_everywhere"]
     },

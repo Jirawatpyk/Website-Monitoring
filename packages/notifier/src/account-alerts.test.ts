@@ -214,3 +214,41 @@ describe('movedRows', () => {
     ]);
   });
 });
+
+// D-078 (spec §43.4): set as / removed from Management — one email, no role lists, nothing moved.
+describe('buildAccountEmail · Management (D-078)', () => {
+  const mg = (kind: 'management_set' | 'management_removed', others: string[]): AccountEmailInput => ({
+    ...base,
+    kind,
+    fromRole: 'admin',
+    toRole: 'admin',
+    // as the database writes it (set_management): only actor and others — no moves (message-checker H1)
+    facts: { actor: 'Tao', others } as unknown as AccountEmailInput['facts'],
+  });
+
+  it('set: subject, who and when, what comes with it, who else is Management', () => {
+    const m = buildAccountEmail(mg('management_set', ['Pim']));
+    expect(m.subject).toBe('You’re now Management in DxT Monitor');
+    expect(m.text).toContain('Tao set you as Management · Fri 25 Sep 10:08. Your role stays Admin.');
+    expect(m.text).toContain('WHAT COMES WITH MANAGEMENT');
+    expect(m.text).toContain('You get the L2 step on Tier 1 DOWN (+30 min, @mentioned in Chat + email)');
+    expect(m.text).toContain('You’re no longer told as an Admin on escalation steps (any tier).');
+    expect(m.headers?.References).toBe('<account-e1@monitor.example.com>');
+    expect(m.text).toContain('Management now: Pim and you.');
+    expect(m.text).toContain('Role: Admin · Management');
+    // the role email's parts never show
+    expect(m.text).not.toContain('YOU CAN NOW');
+    expect(m.text).not.toContain('WHAT MOVED TO SOMEONE ELSE');
+    expect(m.text).toContain('You got this because your Management tag in DxT Monitor changed.');
+  });
+
+  it('removed: back at L1, and who is left', () => {
+    const m = buildAccountEmail(mg('management_removed', []));
+    expect(m.subject).toBe('You’re no longer Management in DxT Monitor');
+    expect(m.text).toContain('You’re told as an Admin on escalation steps again (Chat + email).');
+    expect(m.text).toContain('Nobody is Management now.');
+    expect(buildAccountEmail(mg('management_removed', ['Pim', 'Vee'])).text).toContain(
+      'Management now: Pim and Vee.',
+    );
+  });
+});

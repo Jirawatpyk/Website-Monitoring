@@ -875,14 +875,14 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "created_at": string,"display_name": string,"email": string,"google_chat_user_id": string | null,"id": string,"is_active": boolean,"notify_email": boolean,"phone": string | null,"role": Database["public"]['Enums']["app_role"],"timezone": string,"updated_at": string
+                    "created_at": string,"display_name": string,"email": string,"google_chat_user_id": string | null,"id": string,"is_active": boolean,"is_management": boolean,"notify_email": boolean,"phone": string | null,"role": Database["public"]['Enums']["app_role"],"timezone": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"display_name": string,"email": string,"google_chat_user_id"?: string | null,"id": string,"is_active"?: boolean,"notify_email"?: boolean,"phone"?: string | null,"role": Database["public"]['Enums']["app_role"],"timezone"?: string,"updated_at"?: string
+                    "created_at"?: string,"display_name": string,"email": string,"google_chat_user_id"?: string | null,"id": string,"is_active"?: boolean,"is_management"?: boolean,"notify_email"?: boolean,"phone"?: string | null,"role": Database["public"]['Enums']["app_role"],"timezone"?: string,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"display_name"?: string,"email"?: string,"google_chat_user_id"?: string | null,"id"?: string,"is_active"?: boolean,"notify_email"?: boolean,"phone"?: string | null,"role"?: Database["public"]['Enums']["app_role"],"timezone"?: string,"updated_at"?: string
+                    "created_at"?: string,"display_name"?: string,"email"?: string,"google_chat_user_id"?: string | null,"id"?: string,"is_active"?: boolean,"is_management"?: boolean,"notify_email"?: boolean,"phone"?: string | null,"role"?: Database["public"]['Enums']["app_role"],"timezone"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -1520,6 +1520,9 @@ isOneToOne: false
                            },
 "set_chat_user_id":
 { Args: { "p_chat_id": string,"p_user_id": string }; Returns: undefined
+                           },
+"set_management":
+{ Args: { "p_note": string,"p_on": boolean,"p_user_id": string }; Returns: undefined
                            },
 "set_oncall_checklist":
 { Args: { "p_dnd_allowed": boolean,"p_mentions_only": boolean }; Returns: undefined

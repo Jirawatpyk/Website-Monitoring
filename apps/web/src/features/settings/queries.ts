@@ -20,7 +20,10 @@ function check<T>(what: string, r: { data: T; error: { message: string } | null 
 export async function loadUsersData(db: DbClient, viewerId: string, now: Date): Promise<UsersData> {
   const nowIso = now.toISOString();
   const [people, invites, sessions, sites, clients, rotation, shifts, swaps, acks] = await Promise.all([
-    db.from('profiles').select('id, display_name, email, role, google_chat_user_id').eq('is_active', true),
+    db
+      .from('profiles')
+      .select('id, display_name, email, role, google_chat_user_id, is_management')
+      .eq('is_active', true),
     db.rpc('pending_invites'),
     db.rpc('list_sessions'),
     db.from('sites').select('id, name, is_active, primary_owner_id, backup_owner_id').order('name'),
@@ -57,6 +60,7 @@ export async function loadUsersData(db: DbClient, viewerId: string, now: Date): 
         role: p.role as Role,
         chatLinked: !!p.google_chat_user_id?.trim(),
         lastActive: lastUsed.get(p.id) ?? null,
+        management: p.is_management,
       }))
       .sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.name.localeCompare(b.name)),
     invites: (check('pending_invites', invites) ?? []).map((i) => ({

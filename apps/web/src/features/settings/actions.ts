@@ -17,6 +17,7 @@ import type {
   ChatIdInput,
   DeactivateInput,
   InviteInput,
+  ManagementInput,
   RevokeInput,
   SignOutDeviceInput,
   SignOutUserInput,
@@ -82,6 +83,11 @@ export async function loadHandover(): Promise<OncallData | null> {
 /** Anyone their own (Profile, PR 3), an Admin anyone's — the SQL holds that rule. */
 export async function setChatId(input: ChatIdInput) {
   return run(input, m.setChatId, { adminOnly: false });
+}
+
+/** Set or remove the Management tag (D-078); the person gets an account email. */
+export async function setManagement(input: ManagementInput) {
+  return run(input, m.setManagement, { send: true });
 }
 
 /** Security: an Admin signs someone out on every device (D-062 item 5). */

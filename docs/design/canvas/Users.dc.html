@@ -18,7 +18,7 @@ a{color:#6d28d9}a:hover{color:#5b21b6}
 main > *{flex-shrink:0}
 </style>
 </helmet>
-<div style="width: 1440px; height: 1468px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
+<div style="width: 1440px; height: 1584px; display: flex; background: var(--aura-bg-canvas); color: var(--aura-fg-primary); font-family: var(--font-sans); font-size: 14px; line-height: 1.7">
 
 <aside style="width: 240px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; background: var(--aura-bg-canvas); border-right: 1px solid var(--aura-border-default)">
 <div style="height: 72px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 10px">
@@ -55,7 +55,7 @@ main > *{flex-shrink:0}
 <div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: var(--aura-alert-warning-bg); border: 1px solid var(--aura-alert-warning-border); border-radius: var(--aura-radius-lg); font-size: 13px; line-height: 1.5">
 <span style="display: flex; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="md"></x-import></span>
 <div style="flex-grow: 1; display: flex; flex-direction: column">
-<span style="font-weight: 600; color: var(--aura-alert-warning-fg)">1 active Admin — monitor-fault alerts reach only Tao</span>
+<span style="font-weight: 600; color: var(--aura-alert-warning-fg)">{{bannerTitle}}</span>
 <span>{{bannerText}}</span>
 </div>
 <sc-if value="{{hasInvite}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="Aura.Button" variant="secondary" size="sm" icon="mail" on-click="{{resend}}">{{resendLabel}}</x-import></sc-if>
@@ -71,10 +71,10 @@ main > *{flex-shrink:0}
 <div class="aura-table__head" style="text-transform: uppercase">
 <div class="aura-table__gutter"></div>
 <div class="aura-table__th" style="flex: 1 1 0; min-width: 0">Name</div>
-<div class="aura-table__th" style="width: 124px">Role</div>
+<div class="aura-table__th" style="width: 204px">Role</div>
 <div class="aura-table__th" style="width: 140px">Alert channels</div>
 <div class="aura-table__th" style="width: 184px">2-step</div>
-<div class="aura-table__th" style="width: 108px">Owner · backup</div>
+<div class="aura-table__th" style="width: 100px">Owner · backup</div>
 <div class="aura-table__th" style="width: 124px">On-call</div>
 <div class="aura-table__th" style="width: 116px">Last active</div>
 <div class="aura-table__th" style="width: 48px"></div>
@@ -90,14 +90,14 @@ main > *{flex-shrink:0}
 <span style="font-size: 12px; color: var(--aura-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{m2.email}}</span>
 </div>
 </div>
-<div class="aura-table__td" style="width: 124px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="{{m2.roleVariant}}">{{m2.role}}</x-import></div>
+<div class="aura-table__td" style="width: 204px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="{{m2.roleVariant}}">{{m2.role}}</x-import><sc-if value="{{m2.mg}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="Aura.Badge" tone="neutral" variant="outline">Management</x-import></sc-if></div>
 <div class="aura-table__td" style="width: 140px; display: flex; align-items: center; gap: 10px; line-height: 1.3; font-size: 12px; color: var(--aura-fg-secondary)">
 <sc-if value="{{m2.chat}}" hint-placeholder-val="{{true}}"><span style="display: flex; align-items: center; gap: 4px; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="bell" size="sm" label="Google Chat linked"></x-import>Chat</span></sc-if>
 <sc-if value="{{m2.email2}}" hint-placeholder-val="{{true}}"><span style="display: flex; align-items: center; gap: 4px; color: var(--aura-fg-primary)"><x-import component-from-global-scope="Aura.Icon" name="mail" size="sm" label="Email linked"></x-import>Email</span></sc-if>
 <sc-if value="{{m2.noCh}}" hint-placeholder-val="{{false}}"><span>{{m2.chNote}}</span></sc-if>
 </div>
 <div class="aura-table__td" style="width: 184px; display: flex; align-items: center; line-height: 1"><x-import component-from-global-scope="Aura.Badge" tone="{{m2.svTone}}" variant="{{m2.svVariant}}" icon="{{m2.svIcon}}">{{m2.sv}}</x-import></div>
-<div class="aura-table__td" style="width: 108px; line-height: 55px; font-variant-numeric: tabular-nums">{{m2.owns}}</div>
+<div class="aura-table__td" style="width: 100px; line-height: 55px; font-variant-numeric: tabular-nums">{{m2.owns}}</div>
 <div class="aura-table__td" style="width: 124px; line-height: 55px; color: {{m2.ocColor}}; font-weight: {{m2.ocWeight}}">{{m2.oncall}}</div>
 <div class="aura-table__td" style="width: 116px; line-height: 55px; color: var(--aura-fg-secondary); white-space: nowrap">{{m2.last}}</div>
 <div class="aura-table__td" style="width: 48px; display: flex; align-items: center; justify-content: flex-end; padding-right: 0; line-height: 1">
@@ -111,13 +111,15 @@ main > *{flex-shrink:0}
 <div class="aura-menu" role="menu" aria-label="{{menuLabel}}" style="position: absolute; top: {{menuTop}}px; right: 16px; z-index: 20; min-width: 220px; line-height: 1.4">
 <button type="button" role="menuitem" class="aura-menu__item" onClick="{{openRole}}" disabled="{{roleOff}}"><x-import component-from-global-scope="Aura.Icon" name="users" size="sm"></x-import><span class="aura-menu__label">Change role…</span></button>
 <sc-if value="{{roleOff}}" hint-placeholder-val="{{false}}"><span style="display: block; padding: 0 8px 6px 32px; font-size: 12px; color: var(--aura-fg-secondary); white-space: normal; max-width: 200px">{{roleOffWhy}}</span></sc-if>
+<button type="button" role="menuitem" class="aura-menu__item" onClick="{{openMg}}" disabled="{{mgOff}}"><x-import component-from-global-scope="Aura.Icon" name="arrow-up-right" size="sm"></x-import><span class="aura-menu__label">{{mgLabel}}</span></button>
+<sc-if value="{{mgOff}}" hint-placeholder-val="{{false}}"><span style="display: block; padding: 0 8px 6px 32px; font-size: 12px; color: var(--aura-fg-secondary); white-space: normal; max-width: 200px">{{mgOffWhy}}</span></sc-if>
 <sc-if value="{{menuLive}}" hint-placeholder-val="{{false}}"><button type="button" role="menuitem" class="aura-menu__item" onClick="{{openHand}}"><x-import component-from-global-scope="Aura.Icon" name="arrow-up-down" size="sm"></x-import><span class="aura-menu__label">Hand over shift…</span></button></sc-if>
 <sc-if value="{{menuInvite}}" hint-placeholder-val="{{false}}"><button type="button" role="menuitem" class="aura-menu__item" onClick="{{resendMenu}}"><x-import component-from-global-scope="Aura.Icon" name="mail" size="sm"></x-import><span class="aura-menu__label">{{resendLabel}}</span></button></sc-if>
 <sc-if value="{{menuMember}}" hint-placeholder-val="{{true}}"><a role="menuitem" class="aura-menu__item" href="Security.dc.html"><x-import component-from-global-scope="Aura.Icon" name="lock" size="sm"></x-import><span class="aura-menu__label">Sign-in &amp; devices</span></a></sc-if>
 <div role="separator" class="aura-menu__sep"></div>
 <sc-if value="{{menuInvite}}" hint-placeholder-val="{{false}}"><button type="button" role="menuitem" class="aura-menu__item aura-menu__item--danger" onClick="{{openRevoke}}"><x-import component-from-global-scope="Aura.Icon" name="x" size="sm"></x-import><span class="aura-menu__label">Revoke invite…</span></button></sc-if>
 <sc-if value="{{menuMember}}" hint-placeholder-val="{{true}}"><button type="button" role="menuitem" class="aura-menu__item aura-menu__item--danger" onClick="{{openDeact}}" disabled="{{deactOff}}"><x-import component-from-global-scope="Aura.Icon" name="ban" size="sm"></x-import><span class="aura-menu__label">Deactivate…</span></button></sc-if>
-<sc-if value="{{deactOff}}" hint-placeholder-val="{{false}}"><span style="display: block; padding: 0 8px 6px 32px; font-size: 12px; color: var(--aura-fg-secondary); white-space: normal; max-width: 200px">You can’t deactivate the only active Admin.</span></sc-if>
+<sc-if value="{{deactOff}}" hint-placeholder-val="{{false}}"><span style="display: block; padding: 0 8px 6px 32px; font-size: 12px; color: var(--aura-fg-secondary); white-space: normal; max-width: 200px">You can’t deactivate yourself — another Admin can.</span></sc-if>
 </div>
 </sc-if>
 </div>
@@ -126,7 +128,7 @@ main > *{flex-shrink:0}
 <section style="display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
 <h2 style="margin: 0; font-size: 24px; line-height: 1.3; font-weight: 600">What each role can do</h2>
-<span style="font-size: 13px; color: var(--aura-fg-secondary)">“Own” = sites where the person is primary or backup owner</span>
+<span style="font-size: 13px; color: var(--aura-fg-secondary)">“Own” = sites where the person is primary or backup owner · Management is a tag on Admins, not a role</span>
 </div>
 <div class="aura-table">
 <div class="aura-table__head" style="text-transform: uppercase">
@@ -174,6 +176,18 @@ main > *{flex-shrink:0}
 <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-weight: 600">{{adminNoteTitle}}</span><sc-for list="{{adminNotes}}" as="an" hint-placeholder-count="2"><span>{{an}}</span></sc-for></div>
 </div>
 </sc-if>
+<sc-if value="{{hasMgRole}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; gap: 10px; padding: 12px 14px; border: 1px solid {{mgRoleBorder}}; background: {{mgRoleBg}}; border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: {{mgRoleColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{mgRoleIcon}}" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-weight: 600">{{mgRoleTitle}}</span><sc-for list="{{mgRoleLines}}" as="ml" hint-placeholder-count="1"><span>{{ml}}</span></sc-for></div>
+</div>
+</sc-if>
+</sc-if>
+<sc-if value="{{hasMgDeact}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; gap: 10px; padding: 12px 14px; border: 1px solid {{mgRoleBorder}}; background: {{mgRoleBg}}; border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<span style="display: flex; padding-top: 2px; color: {{mgRoleColor}}"><x-import component-from-global-scope="Aura.Icon" name="{{mgRoleIcon}}" size="sm"></x-import></span>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-weight: 600">{{mgRoleTitle}}</span><sc-for list="{{mgRoleLines}}" as="ml" hint-placeholder-count="1"><span>{{ml}}</span></sc-for></div>
+</div>
 </sc-if>
 <div style="display: flex; flex-direction: column; gap: 10px">
 <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px"><span style="font-family: var(--font-mono); font-size: 11px; color: var(--aura-fg-tertiary)">USED IN</span><span style="font-size: 12px; color: var(--aura-fg-secondary)">{{usedSummary}}</span></div>
@@ -222,7 +236,7 @@ main > *{flex-shrink:0}
 
 <x-import component-from-global-scope="Aura.Dialog" open="{{revOpen}}" on-close="{{closeRevoke}}" title="Revoke Second Admin’s invite?" description="The invite link stops working now. Nothing else changes." size="sm" auto-focus="{{no}}">
 <div style="display: flex; flex-direction: column; gap: 16px">
-<div style="display: flex; gap: 10px; padding: 12px 14px; border: 1px solid var(--aura-alert-warning-border); background: var(--aura-alert-warning-bg); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span>Tao stays the only active Admin, so monitor-fault alerts keep reaching only Tao until another Admin joins. Invite someone new afterwards.</span></div>
+<div style="display: flex; gap: 10px; padding: 12px 14px; border: 1px solid var(--aura-border-default); background: var(--aura-bg-canvas); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="info" size="sm"></x-import></span><span>Tao, Vee and Pim stay the active Admins. You can invite someone else afterwards.</span></div>
 <x-import component-from-global-scope="Aura.Textarea" label="Reason" required="{{yes}}" rows="{{two}}" placeholder="e.g. Wrong address — re-inviting the right person" value="{{revNote}}" on-change="{{setRevNote}}" error="{{revErr}}"></x-import>
 <div style="display: flex; align-items: center; gap: 8px">
 <span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Logged in the audit log</span>
@@ -255,14 +269,37 @@ main > *{flex-shrink:0}
 </div>
 </div>
 </x-import>
+<x-import component-from-global-scope="Aura.Dialog" open="{{mgOpen}}" on-close="{{closeMg}}" title="{{mgTitle}}" description="{{mgDesc}}" size="md" auto-focus="{{no}}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<sc-if value="{{mgRefuse}}" hint-placeholder-val="{{false}}">
+<div role="alert" style="display: flex; gap: 10px; padding: 12px 14px; border: 1px solid var(--aura-alert-warning-border); background: var(--aura-alert-warning-bg); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5"><span style="display: flex; padding-top: 2px; color: var(--aura-alert-warning-fg)"><x-import component-from-global-scope="Aura.Icon" name="triangle-alert" size="sm"></x-import></span><span>{{mgRefuseText}}</span></div>
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="flex-grow: 1"></span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" href="Escalation.dc.html" icon="arrow-up-right">Open Escalation</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" on-click="{{closeMg}}">Close</x-import>
+</div>
+</sc-if>
+<sc-if value="{{mgCan}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--aura-border-default); border-radius: var(--aura-radius-md); font-size: 13px; line-height: 1.5">
+<sc-for list="{{mgLines}}" as="ln" hint-placeholder-count="2"><span style="display: flex; gap: 8px"><span style="display: flex; padding-top: 2px; color: var(--aura-fg-secondary)"><x-import component-from-global-scope="Aura.Icon" name="{{ln.icon}}" size="sm"></x-import></span><span>{{ln.t}}</span></span></sc-for>
+</div>
+<x-import component-from-global-scope="Aura.Textarea" label="Note" required="{{yes}}" rows="{{two}}" placeholder="{{mgPh}}" value="{{mgNote}}" on-change="{{setMgNote}}" error="{{mgErr}}"></x-import>
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="flex-grow: 1; font-size: 12px; color: var(--aura-fg-secondary)">Logged in the audit log</span>
+<x-import component-from-global-scope="Aura.Button" variant="secondary" on-click="{{closeMg}}">Cancel</x-import>
+<x-import component-from-global-scope="Aura.Button" variant="primary" icon="check" on-click="{{confirmMg}}">{{mgCta}}</x-import>
+</div>
+</sc-if>
+</div>
+</x-import>
 </main>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1468}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1584}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { menu: null, role: null, mode: 'role', newRole: 'Viewer', re: {}, tried: false, resent: false, inv: false, invEmail: '', invRole: 'Responder', invTried: false, invited: '', done: '', rev: false, revNote: '', revTried: false, revoked: false, hand: false, handTo: 'Arm', handWhen: 'tonight', handNote: '', handTried: false, handTested: {}, handedTo: '' };
+    this.state = { menu: null, role: null, mode: 'role', newRole: 'Viewer', re: {}, tried: false, resent: false, inv: false, invEmail: '', invRole: 'Responder', invTried: false, invited: '', done: '', rev: false, revNote: '', revTried: false, revoked: false, hand: false, handTo: 'Arm', handWhen: 'tonight', handNote: '', handTried: false, handTested: {}, handedTo: '', mgmt: { Vee: true, Pim: true }, mg: null, mgNote: '', mgTried: false };
   }
   renderVals() {
     var self = this;
@@ -278,6 +315,8 @@ class Component extends DCLogic {
     function Art(w) { return /^[AEIOU]/.test(w) ? 'An ' : 'A '; }
     var P = {
       Tao: { sub: 'Jirawat Piyakit · [email]', role: 'Admin', ch: 'both', sv: 'On', owns: '6 · 1', oc: 'Admin backstop', last: 'Now', sites: [] },
+      Vee: { sub: '[email]', role: 'Admin', ch: 'both', sv: 'On', owns: '—', oc: '—', last: 'Today 08:40', sites: [] },
+      Pim: { sub: '[email]', role: 'Admin', ch: 'both', sv: 'On', owns: '—', oc: '—', last: 'Thu 24 Sep', sites: [] },
       'Second Admin': { sub: 'Invited Thu 24 Sep · expires 1 Oct', role: 'Admin', ch: 'invite', sv: 'Needed', owns: '—', oc: '—', last: 'Not joined', sites: [] },
       Arm: { sub: '[email]', role: 'Responder', ch: 'both', sv: 'On', owns: '3 · 2', oc: 'Next: 5 Oct', last: 'Today 10:05',
         sites: ['Bangkok Airways – Taiwan', 'Bangkok Airways – China', 'MuvMi'], backups: ['ENEOS Industrial', 'realme.link'],
@@ -294,11 +333,12 @@ class Component extends DCLogic {
       Bua: { sub: '[email] · AM', role: 'Stakeholder', ch: 'both', sv: 'On', owns: '—', oc: '—', last: 'Today 09:30', sites: [],
         am: ['Bangkok Airways', 'MuvMi', 'Tubtong', 'Cando Asia', 'WeCare'], amEsc: 'Tier 1 DOWN L3 FYI + client-update pings for Bangkok Airways and MuvMi (incl. INC-0142 now)' },
       CEO: { sub: '[email]', role: 'Stakeholder', ch: 'both', sv: 'On', owns: '—', oc: '—', last: 'Mon 21 Sep', sites: [],
-        esc: 'Tier 1 DOWN · L2 (+30 min) and L3 (+60 min, FYI after ack)' },
+        esc: 'Tier 1 DOWN · L3 FYI (+60 min, also after an ack)' },
       Mint: { sub: '[email]', role: 'Viewer', ch: 'viewer', sv: 'Off5', owns: '—', oc: '—', last: 'Wed 23 Sep', sites: [] }
     };
     if (st.handedTo) { P.Ploy.oc = 'Handed to ' + st.handedTo; P[st.handedTo].oc = 'Covering Ploy'; }
-    var names = ['Tao', 'Second Admin', 'Arm', 'Ploy', 'Nok', 'Thee', 'Bua', 'CEO', 'Mint'].filter(function (n) { return !(st.revoked && n === 'Second Admin'); });
+    var MG = Object.keys(st.mgmt).filter(function (n) { return st.mgmt[n]; });
+    var names = ['Tao', 'Vee', 'Pim', 'Second Admin', 'Arm', 'Ploy', 'Nok', 'Thee', 'Bua', 'CEO', 'Mint'].filter(function (n) { return !(st.revoked && n === 'Second Admin'); });
     var people = names.map(function (n) {
       var d = P[n];
       var open = st.menu === n;
@@ -308,6 +348,7 @@ class Component extends DCLogic {
         sv: SV[d.sv][3], svTone: SV[d.sv][0], svIcon: SV[d.sv][1], svVariant: SV[d.sv][2],
         owns: d.owns, oncall: d.oc,
         ocColor: d.oc === 'On call now' || d.oc === 'Covering Ploy' ? 'var(--aura-fg-primary)' : 'var(--aura-fg-secondary)', ocWeight: d.oc === 'On call now' || d.oc === 'Covering Ploy' ? '600' : '400',
+        mg: !!st.mgmt[n],
         last: d.last, menuLabel: 'Actions for ' + n, menuOpen: open, z: open ? 20 : 'auto',
         roleOff: n === 'Tao' || n === 'Second Admin',
         toggle: function () { self.setState({ menu: open ? null : n }); },
@@ -360,7 +401,7 @@ class Component extends DCLogic {
       if (d.backups) used.push({ key: 'backup', label: 'Backup on ' + d.backups.length + ' sites', detail: d.backups.join(' · '), need: !canOwn, perSite: d.backups, slot: 1 });
       if (d.incs) used.push({ key: 'inc', label: 'Holds 1 open incident', detail: d.incs, need: !canAck, opts: others(['Arm', 'Nok', 'Tao']), selLabel: 'Hand INC-0141 to' });
       if (d.shifts) used.push({ key: 'shift', label: 'On-call shifts', detail: d.shifts, need: deact || !(nr === 'Responder' || nr === 'Admin'), opts: others(['Arm', 'Ploy', 'Nok']), selLabel: d.liveShift ? 'Hand tonight’s shift to' : 'Take over these shifts' });
-      if (d.esc) used.push({ key: 'esc', label: 'Escalation · CEO token', detail: d.esc, need: deact || nr === 'Viewer', opts: [{ value: 'Tao', label: 'Tao (Admin)' }, { value: 'remove', label: 'Remove L2–L3 from Tier 1 DOWN' }], selLabel: 'CEO steps go to' });
+      if (d.esc) used.push({ key: 'esc', label: 'Escalation · CEO token', detail: d.esc, need: deact || nr === 'Viewer', opts: [{ value: 'Tao', label: 'Tao (Admin)' }, { value: 'remove', label: 'Remove the CEO from the L3 FYI' }], selLabel: 'The CEO’s L3 FYI goes to' });
       if (d.am) used.push({ key: 'am', label: 'Site AM of ' + d.am.length + ' clients', detail: d.am.join(', ') + ' · ' + d.amEsc, need: deact || !(nr === 'Stakeholder' || nr === 'Admin'), opts: others(['Thee', 'Bua', 'Tao']).map(function (o) { return { value: o.value, label: o.value + (o.value === 'Tao' ? ' (Admin)' : ' (AM)') }; }), selLabel: 'New AM for these clients' });
     }
     var missing = false;
@@ -398,11 +439,22 @@ class Component extends DCLogic {
     if (d && !deact && nr === 'Admin') {
       if (d.sv !== 'On') adminNote = { t: who + ' has 2-step off', warn: true, lines: [
         who + ' becomes an Admin now but can view + acknowledge only until 2-step is on — Admin actions (users, sites, escalation, reviews) stay locked.',
-        'Once 2-step is on, ' + who + ' is a second active Admin and also gets monitor-fault emails. ' + who + ' gets an email with the steps.'] };
-      else adminNote = { t: 'Adds a second active Admin', warn: false, lines: [
+        'Once 2-step is on, ' + who + ' counts as an active Admin and also gets monitor-fault emails. ' + who + ' gets an email with the steps.'] };
+      else adminNote = { t: 'Adds an active Admin', warn: false, lines: [
         who + ' has 2-step on, so Admin actions work straight away.',
-        'Monitor-fault emails go to Tao and ' + who + ' from now on — no longer only Tao.'] };
+        'Monitor-fault emails also go to ' + who + ' from now on. ' + who + ' isn’t Management — set that separately from the ⋯ menu.'] };
     }
+    var mgRole = null;
+    if (d && st.mgmt[who] && (deact || nr !== 'Admin')) {
+      var rest = MG.filter(function (x) { return x !== who; });
+      mgRole = rest.length ? { t: who + ' will also leave Management.', warn: false, lines: ['Tier 1 DOWN L2 still goes to ' + rest.join(' and ') + '.'] }
+        : { t: who + ' will also leave Management.', warn: true, lines: ['Can’t ' + (deact ? 'deactivate' : 'change the role') + ': Tier 1 DOWN L2 goes to Management and ' + who + ' is the last one. Change the L2 step on Escalation first, or set someone else as Management.'] };
+      if (!rest.length) missing = true;
+    }
+    // management dialog
+    var mw = st.mg, mIs = !!(mw && st.mgmt[mw]);
+    var mRest = MG.filter(function (x) { return x !== mw; });
+    var mRefuse = !!mw && mIs && mRest.length === 0;
     var READY = {
       Arm: { n: '3 of 3', ok: true, checks: [['Alerts Space: notify for @mentions only', true], ['Space allowed through Do Not Disturb', true], ['Test alert received on this phone · Mon 14 Sep', true]], warn: '' },
       Nok: { n: '3 of 3', ok: true, checks: [['Alerts Space: notify for @mentions only', true], ['Space allowed through Do Not Disturb', true], ['Test alert received on this phone · Tue 1 Sep', true]], warn: 'Nok is on call next (Mon 28 Sep → 5 Oct) — this makes it back-to-back. Nok has 2-step off: fine until Mon 5 Oct.' }
@@ -423,11 +475,35 @@ class Component extends DCLogic {
       resend: function () { self.setState({ resent: true }); },
       resendLabel: st.resent ? 'Sent again · expires 2 Oct' : 'Resend invite',
       countLine: st.done ? st.done : (st.invited ? 'Invite sent to ' + st.invited + ' · expires Fri 2 Oct · shows here once they sign in' : names.length + ' people · Google Workspace accounts only · 2-step required for everyone from Mon 5 Oct · role changes are logged'),
-      bannerText: st.revoked ? 'Second Admin’s invite was revoked Fri 10:08. Invite another Admin so monitor-fault alerts don’t depend on one person.' : 'Second Admin was invited Thu 24 Sep 09:12 and hasn’t signed in yet. The invite expires Thu 1 Oct.',
+      bannerTitle: st.revoked ? 'Second Admin’s invite was revoked' : 'Second Admin hasn’t joined yet',
+      bannerText: st.revoked ? 'Revoked Fri 10:08. Tao, Vee and Pim stay the active Admins — invite again if you still need a fourth.' : 'Invited Thu 24 Sep 09:12 as an Admin and hasn’t signed in yet. The invite expires Thu 1 Oct. Active Admins now: Tao, Vee and Pim.',
       hasInvite: !st.revoked,
       menuLive: st.menu === 'Ploy' && !st.handedTo, menuInvite: st.menu === 'Second Admin', menuMember: st.menu !== 'Second Admin',
       deactOff: st.menu === 'Tao',
-      roleOffWhy: st.menu === 'Second Admin' ? 'Not joined yet — the role can change after they sign in. To use a different role now, revoke and invite again.' : (st.revoked ? 'You’re the only active Admin — invite another Admin first.' : 'You’re the only active Admin until Second Admin joins.'),
+      roleOffWhy: st.menu === 'Second Admin' ? 'Not joined yet — the role can change after they sign in. To use a different role now, revoke and invite again.' : 'You can’t change your own role — another Admin can.',
+      mgLabel: st.menu && st.mgmt[st.menu] ? 'Remove from Management…' : 'Set as Management…',
+      mgOff: !!st.menu && (P[st.menu].role !== 'Admin' || P[st.menu].ch !== 'both'),
+      mgOffWhy: st.menu && P[st.menu].role !== 'Admin' ? 'Only Admins can be Management' : 'Add a Google Chat id first — Management is @mentioned.',
+      openMg: function () { var n = st.menu; if (!n || P[n].role !== 'Admin' || P[n].ch !== 'both') return; self.setState({ menu: null, mg: n, mgNote: '', mgTried: false }); },
+      mgOpen: !!mw, closeMg: function () { self.setState({ mg: null }); },
+      mgTitle: mw ? (mIs ? 'Remove ' + mw + ' from Management?' : 'Set ' + mw + ' as Management?') : '',
+      mgDesc: mRefuse ? '' : (mIs ? 'Takes effect for incidents opened after you confirm. ' + mw + ' gets an email saying what changed.' : 'Takes effect for incidents opened after you confirm. ' + mw + ' stays an Admin and gets an email saying what changed.'),
+      mgRefuse: mRefuse, mgCan: !!mw && !mRefuse,
+      mgRefuseText: 'Can’t remove: Tier 1 DOWN L2 goes to Management and ' + (mw || '') + ' is the last one. Change the L2 step on Escalation first, or set someone else as Management.',
+      mgLines: mIs ? [{ icon: 'minus', t: 'No longer gets the L2 step on Tier 1 DOWN.' }, { icon: 'plus', t: 'Told at L1 again as an Admin (Chat + email).' }, { icon: 'info', t: 'L2 still goes to ' + mRest.join(' and ') + '.' }]
+        : [{ icon: 'plus', t: 'Gets the L2 step on Tier 1 DOWN (+30 min, @mentioned in Chat + email).' }, { icon: 'minus', t: 'No longer told at L1 as an Admin.' }].concat(['Tao', 'Vee', 'Pim'].filter(function (x) { return x !== mw && !st.mgmt[x]; }).length ? [] : [{ icon: 'triangle-alert', t: 'Every active Admin would then be Management, so L1 tells only the backup — no Admin.' }]),
+      mgPh: mIs ? 'e.g. Moving to the product team' : 'e.g. Ops lead — can find someone when nobody answers',
+      mgNote: st.mgNote, setMgNote: function (e) { self.setState({ mgNote: e && e.target ? e.target.value : e }); },
+      mgErr: st.mgTried && !st.mgNote.trim() ? 'Add a short note — it goes in the audit log' : '',
+      mgCta: mIs ? 'Remove from Management' : 'Set as Management',
+      confirmMg: function () { if (!st.mgNote.trim()) { self.setState({ mgTried: true }); return; } var m = JSON.parse(JSON.stringify(st.mgmt)); m[mw] = !mIs; var left = Object.keys(m).filter(function (x) { return m[x]; }); self.setState({ mg: null, mgmt: m, invited: '', done: mIs ? mw + ' left Management · Tier 1 DOWN L2 now goes to ' + left.join(', ') + ' · logged' : mw + ' is now Management · gets Tier 1 DOWN L2 · logged' }); },
+      noUse: !!d && used.length === 0 && !mgRole,
+      hasMgRole: !!mgRole && !deact, hasMgDeact: !!mgRole && deact,
+      mgRoleTitle: mgRole ? mgRole.t : '', mgRoleLines: mgRole ? mgRole.lines : [],
+      mgRoleIcon: mgRole && mgRole.warn ? 'triangle-alert' : 'info',
+      mgRoleColor: mgRole && mgRole.warn ? 'var(--aura-alert-warning-fg)' : 'var(--aura-fg-secondary)',
+      mgRoleBorder: mgRole && mgRole.warn ? 'var(--aura-alert-warning-border)' : 'var(--aura-border-default)',
+      mgRoleBg: mgRole && mgRole.warn ? 'var(--aura-alert-warning-bg)' : 'var(--aura-bg-canvas)',
       resendMenu: function () { self.setState({ resent: true, menu: null, done: 'Invite sent again to Second Admin · expires Fri 2 Oct · logged' }); },
       openRevoke: function () { self.setState({ menu: null, rev: true, revNote: '', revTried: false }); },
       revOpen: st.rev, closeRevoke: function () { self.setState({ rev: false }); },
@@ -477,7 +553,7 @@ class Component extends DCLogic {
       openRole: function () { var n = st.menu; var d0 = P[n]; self.setState({ menu: null, role: n, mode: 'role', newRole: d0.role === 'Responder' ? 'Viewer' : (d0.role === 'Viewer' ? 'Responder' : 'Viewer'), re: {}, tried: false }); },
       openDeact: function () { var n = st.menu; self.setState({ menu: null, role: n, mode: 'deact', re: {}, tried: false }); },
       isRole: !deact, isDeact: deact,
-      usedIn: usedIn, noUse: !!d && used.length === 0,
+      usedIn: usedIn,
       usedSummary: used.length ? (needN ? needN + ' of ' + used.length + ' need a new person' : 'Nothing needs reassigning') : '',
       roles: ROLES.map(function (r, i) { return { label: r, phase: r === 'Client', w: W[i] }; }),
       matrix: M.map(function (r) { return { label: r[0], cells: r[1].map(cell) }; }),

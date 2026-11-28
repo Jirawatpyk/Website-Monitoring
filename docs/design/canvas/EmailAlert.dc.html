@@ -162,14 +162,14 @@ color-scheme: dark;;color-scheme:dark}
 <span>The first email’s Message-ID is stored; every later email sets <span style="font-family: var(--font-mono); font-size: 11px">In-Reply-To</span> and <span style="font-family: var(--font-mono); font-size: 11px">References</span> to it.</span>
 <span>The status word goes first in the preheader and the body, so it still shows in a phone notification.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">PROBLEM thread:</b> same rules, its own subject (e.g. <span style="font-family: var(--font-mono); font-size: 11px">Fuji Links · Tier 2 · INC-0141</span>). PROBLEM, ACKNOWLEDGED and RECOVERED all reply to the first PROBLEM email. A site that fails again while the incident is open stays in the same thread.</span>
-<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Flapping:</b> RECOVERED emails are held like the Chat replies; one summary email goes in the incident thread after 15 min of continuous OK. DOWN AGAIN / PROBLEM AGAIN are Chat only — no email.</span>
+<span><b style="font-weight: 600; color: var(--aura-fg-primary)">Flapping:</b> RECOVERED emails are held like the Chat replies; one summary email goes in the incident thread after 15 min of continuous OK, to everyone already emailed about it — including a CEO or Site AM who got the L3 FYI. DOWN AGAIN / PROBLEM AGAIN are Chat only — no email.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Auto-resolved:</b> a PROBLEM that clears within 5 min of being flagged with no acknowledgement gets one RECOVERED email on the first OK round, saying no root cause is needed.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Admin system emails</b> aren’t about one incident: their own subject per outage with its start time (so separate outages don’t merge into one mail thread), one email when it starts, no “back up” email.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Resolved email:</b> when someone resolves the incident (always by hand), one RESOLVED email goes in this same thread to everyone emailed about this DOWN incident — for INC-0142 Arm, Ploy, Tao and Bua. Held 10 s for Undo, like the ack.</span>
 </div>
 <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; background: var(--aura-bg-surface); border: 1px dashed var(--aura-border-control); border-radius: var(--aura-radius-md); font-size: 12px; line-height: 1.5; color: var(--aura-fg-secondary)">
 <span style="font-weight: 600; color: var(--aura-fg-primary)">Spec note — recipients &amp; build</span>
-<span>Recipients follow the escalation step: L0 owner by day / on-call at night · L1 backup + Tao · L2 CEO · L3 FYI to CEO + AM (Tier 1, even after an ack). The client-update track emails the AM. Each email is sent per person with its own footer.</span>
+<span>Recipients follow the escalation step: L0 owner by day / on-call at night · L1 backup + Admins who aren’t Management (Tao) · L2 Management (Vee, Pim) · L3 FYI to CEO + AM (Tier 1, even after an ack). Incidents opened before the change keep their old plan. The client-update track emails the AM. Each email is sent per person with its own footer.</span>
 <span>Tier 2–3 L2 (+30 min, no ack) is a reminder email to Tao only — no CEO. Ack and resolve emails are held until the 10 s Undo window closes.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">PROBLEM:</b> amber, never red. L0 emails the owner only; the backup is first emailed with the 60-min reminder (+60 min, no ack). A Tier 2–3 PROBLEM outside response hours is held until 09:00. No client-update email — that track is for DOWN.</span>
 <span><b style="font-weight: 600; color: var(--aura-fg-primary)">Admin system emails</b> (browser verifier unavailable, fewer than 2 probe locations) go to every active Admin — today only Tao.</span>
@@ -196,7 +196,8 @@ class Component extends DCLogic {
     function P(label, href) { return Object.assign({ label: label, href: href }, PRIM); }
     function Sd(label, href) { return Object.assign({ label: label, href: href }, SEC); }
     var OPEN = Sd('Open incident', 'Incident.dc.html');
-    var ACKS = 'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).';
+    var ACKS0 = 'Acknowledged by Arm → L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).';
+    var ACKS = ACKS0 + ' Add a status note — they see it in the FYI.';
     var E = {
       'Down': {
         sentTo: 'Sent 09:48 to Arm only — by day the owner is asked first. Ploy (backup) is first emailed at L1, 10:03.',
@@ -209,12 +210,12 @@ class Component extends DCLogic {
       },
       'L1': {
         sentTo: 'Sent 10:03 to Ploy and Tao, one email each. Arm already has the Down email in this thread.',
-        bar: AMBER, labelColor: AMBER, label: 'ESCALATED · L1', preStatus: 'ESCALATED · L1 —', pre: 'MuvMi down 15 min, not acknowledged · Next: CEO at 10:18',
+        bar: AMBER, labelColor: AMBER, label: 'ESCALATED · L1', preStatus: 'ESCALATED · L1 —', pre: 'MuvMi down 15 min, not acknowledged · Next: Management at 10:18',
         headline: 'MuvMi still down — 15 min, no ack',
-        facts: [{ k: 'Down for', v: '15 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Already told', v: 'Arm — Chat + email 09:48' }, { k: 'Next step', v: 'CEO at 10:18 if still not acknowledged' }],
+        facts: [{ k: 'Down for', v: '15 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Already told', v: 'Arm — Chat + email 09:48' }, { k: 'Next step', v: 'Management (Vee, Pim) at 10:18 if still not acknowledged' }],
         people: {
           'Ploy': { to: 'Ploy <ploy@[domain]>', lede: 'Arm hasn’t acknowledged. Please acknowledge — you’re the next person for this incident.', btns: [P('Acknowledge', 'MLogin.dc.html'), OPEN], why: 'You got this because you’re backup for MuvMi and it wasn’t acknowledged in 15 min.' },
-          'Tao': { to: 'Tao <tao@[domain]>', lede: 'For your information — Ploy has been asked to acknowledge. Nothing needed from you unless it reaches the CEO.', btns: [OPEN], why: 'You got this because you’re the Admin — L1 keeps you informed.' }
+          'Tao': { to: 'Tao <tao@[domain]>', lede: 'For your information — Ploy has been asked to acknowledge. Nothing needed from you; if nobody acknowledges by 10:18, Management (Vee, Pim) step in.', btns: [OPEN], why: 'You got this because you’re the Admin — L1 keeps you informed.' }
         }
       },
       'Client update': {
@@ -230,31 +231,43 @@ class Component extends DCLogic {
         sentTo: 'Sent 10:07:50 (held 10 s for Undo) to everyone already emailed about this incident: Arm, Ploy, Tao, Bua.',
         bar: GREY, labelColor: GREY, label: 'ACKNOWLEDGED', preStatus: 'ACKNOWLEDGED —', pre: 'by Arm 10:07 · MuvMi still down · L1–L2 stopped',
         headline: 'Arm has MuvMi',
-        facts: [{ k: 'Acknowledged', v: 'Arm at 10:07' }, { k: 'Down for', v: '19 min so far (confirmed down 09:48:41)' }, { k: 'Escalation', v: 'L2 cancelled · acked · L3 FYI at 10:48 if still down' }, { k: 'Client update', v: 'Due 10:03 · Bua (AM) notified — she sends it' }],
+        facts: [{ k: 'Acknowledged', v: 'Arm at 10:07' }, { k: 'Down for', v: '19 min so far (confirmed down 09:48:41)' }, { k: 'Escalation', v: 'L2 (Management) cancelled · L3 FYI at 10:48 if still down' }, { k: 'Client update', v: 'Due 10:03 · Bua (AM) notified — she sends it' }],
         people: {
           'Arm': { to: 'Arm <arm@[domain]>', lede: ACKS, btns: [OPEN], why: 'You got this because you acknowledged this incident.' },
           'Ploy': { to: 'Ploy <ploy@[domain]>', lede: ACKS, btns: [OPEN], why: 'You got this because you were asked to acknowledge at L1.' },
           'Tao': { to: 'Tao <tao@[domain]>', lede: ACKS, btns: [OPEN], why: 'You got this because you were informed at L1.' },
-          'Bua': { to: 'Bua <bua@[domain]>', lede: ACKS + ' The client update is still yours to send.', btns: [P('Open draft', 'Incident.dc.html'), OPEN], why: 'You got this because you were emailed about the client update at 10:03.' }
+          'Bua': { to: 'Bua <bua@[domain]>', lede: ACKS0 + ' The client update is still yours to send.', btns: [P('Open draft', 'Incident.dc.html'), OPEN], why: 'You got this because you were emailed about the client update at 10:03.' }
         }
       },
-      'L2 (CEO)': {
-        sentTo: 'Goes to the CEO at +30 min when nobody has acknowledged (for INC-0142: 10:18). Arm acknowledged at 10:07, so this was never sent.',
-        bar: AMBER, labelColor: AMBER, label: 'ESCALATED · L2', preStatus: 'ESCALATED · L2 —', pre: 'MuvMi down 30 min, not acknowledged · Arm, Ploy, Tao informed',
-        headline: 'MuvMi down 30 min — nobody has acknowledged',
-        facts: [{ k: 'Down for', v: '30 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Already told', v: 'Arm 09:48 · Ploy + Tao 10:03 · Bua (client update) 10:03' }, { k: 'Voice call', v: 'Configured · off until approved' }, { k: 'Next step', v: 'L3 (CEO + Bua, no call) at 10:48' }],
+      'L2 (Management)': {
+        sentTo: 'Goes to Management — Vee and Pim, one email each — at +30 min when nobody has acknowledged (for INC-0142: 10:18), with the Chat @mention. Arm acknowledged at 10:07, so this was never sent. Incidents opened before the change keep their old plan (L2 to the CEO).',
+        bar: AMBER, labelColor: AMBER, label: 'ESCALATED · L2', preStatus: 'ESCALATED · L2 —', pre: 'MuvMi down 30 min, not acknowledged · please step in · Arm, Ploy, Tao informed',
+        headline: 'MuvMi down 30 min — please step in',
+        facts: [{ k: 'Down for', v: '30 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Already told', v: 'Arm 09:48 · Ploy + Tao 10:03 · Bua (client update) 10:03' }, { k: 'Next step', v: 'L3 FYI (CEO + Bua, no call) at 10:48' }],
         people: {
-          'CEO': { to: 'CEO <ceo@[domain]>', lede: 'MuvMi (Tier 1) has been down 30 min and nobody on the team has acknowledged. Arm (owner), Ploy (backup) and Tao were asked. Open it to see the latest, or call Tao.', btns: [P('Open incident', 'Incident.dc.html')], why: 'You got this because a Tier 1 site was down 30 min without an acknowledgement (L2, the step you approved).' }
+          'Vee': { to: 'Vee <vee@[domain]>', lede: 'Nobody has acknowledged. Arm (owner), Ploy (backup) and Tao were asked. Call them, reassign, or acknowledge yourself — and ask for a status note: CEO + Bua get an FYI at 10:48 if it’s still down.', btns: [P('Acknowledge', 'MLogin.dc.html'), OPEN], why: 'You got this because you’re Management — Tier 1 DOWN comes to you at L2 when nobody acknowledges in 30 min.' },
+          'Pim': { to: 'Pim <pim@[domain]>', lede: 'Nobody has acknowledged. Arm (owner), Ploy (backup) and Tao were asked. Call them, reassign, or acknowledge yourself — and ask for a status note: CEO + Bua get an FYI at 10:48 if it’s still down.', btns: [P('Acknowledge', 'MLogin.dc.html'), OPEN], why: 'You got this because you’re Management — Tier 1 DOWN comes to you at L2 when nobody acknowledges in 30 min.' }
         }
       },
       'L3 FYI (CEO + Bua)': {
-        sentTo: 'Tier 1 only: sent at +60 min if the site is still DOWN, even after an ack — email + Chat mention, never a call. For INC-0142 it would have gone at 10:48; MuvMi recovered at 10:31, so it wasn’t sent.',
+        sentTo: 'Tier 1 only: sent at +60 min if the site is still DOWN, even after an ack — email + Chat mention, never a call. For INC-0142 it would have gone at 10:48; MuvMi recovered at 10:31, so it wasn’t sent. Status is the latest status note; with none it reads “No status note yet”.',
         bar: GREY, labelColor: GREY, label: 'FYI · L3', preStatus: 'FYI —', pre: 'MuvMi still down 60 min · acknowledged by Arm 10:07 · no action needed',
         headline: 'MuvMi still down after 60 min — Arm is on it',
-        facts: [{ k: 'Down for', v: '60 min (confirmed down 09:48:41)' }, { k: 'Cause', v: CAUSE }, { k: 'Acknowledged', v: 'Arm at 10:07 · L1–L2 stopped' }, { k: 'Client update', v: 'Marked by Bua 10:12 — “Called MuvMi ops, ETA shared”' }, { k: 'Next step', v: 'Recovery email when it’s back · no more escalation' }],
+        facts: [{ k: 'Cause', v: CAUSE }, { k: 'Down for', v: '1 h (confirmed down 09:48)' }, { k: 'Acknowledged', v: 'Arm at 10:07 · L1–L2 stopped' }, { k: 'Status', v: 'Arm 10:30 — restarting Redis' }, { k: 'Client update', v: 'Marked by Bua 10:12 — “Called MuvMi ops, ETA shared”' }, { k: 'Next update', v: 'Email when it’s back · no more escalation' }],
         people: {
           'CEO': { to: 'CEO <ceo@[domain]>', lede: 'For your information — no action needed. Arm acknowledged at 10:07 and is working on it. This goes out because a Tier 1 site is still down after an hour.', btns: [P('Open incident', 'Incident.dc.html')], why: 'You got this because MuvMi (Tier 1) is still down after 60 min — the FYI step that runs even after an acknowledgement. No call.' },
           'Bua': { to: 'Bua <bua@[domain]>', lede: 'For your information — MuvMi is still down after an hour and Arm is on it. If the client needs a second update, the draft on the incident page is current.', btns: [P('Open incident', 'Incident.dc.html')], why: 'You got this because you’re the AM for MuvMi and a Tier 1 site is still down after 60 min.' }
+        }
+      },
+      'Flapping summary (after the FYI)': {
+        sentTo: 'Wording example — if MuvMi had flapped after the 10:48 FYI instead of recovering at 10:31. Sent 11:17, after 15 min of continuous OK to everyone emailed about this incident: Arm, Ploy, Tao, Bua and the CEO (FYI at 10:48).',
+        bar: 'var(--aura-fg-positive)', labelColor: GREEN, label: 'RECOVERED', preStatus: 'RECOVERED —', pre: 'MuvMi stable for 15 min · flapped ×3 · root cause needed',
+        headline: 'MuvMi is stable again',
+        facts: [{ k: 'Down 3 times', v: 'since 09:48 · last back 11:02' }, { k: 'Stable since', v: '11:02 — OK for 15 min' }, { k: 'Acknowledged', v: 'Arm at 10:07' }, { k: 'Still to do', v: 'Root cause (Arm)' }],
+        people: {
+          'Arm': { to: 'Arm <arm@[domain]>', lede: 'MuvMi flapped 3 times and has been stable for 15 min. Needs a root cause before it can be resolved.', btns: [P('Add root cause', 'Incident.dc.html')], why: 'You got this because you own MuvMi.' },
+          'CEO': { to: 'CEO <ceo@[domain]>', lede: 'MuvMi flapped 3 times and has been stable for 15 min. Nothing needed from you. Arm adds the root cause.', btns: [OPEN], why: 'You got this because you were emailed about this incident.' },
+          'Bua': { to: 'Bua <bua@[domain]>', lede: 'MuvMi flapped 3 times and has been stable for 15 min. Nothing needed from you. Arm adds the root cause.', btns: [OPEN], why: 'You got this because you were emailed about this incident.' }
         }
       },
       'Recovered': {
@@ -540,7 +553,7 @@ class Component extends DCLogic {
       }
     };
     var TH = {
-      'MuvMi · DOWN': { subject: 'MuvMi · Tier 1 · INC-0142', E: E, events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (CEO)', 'L3 FYI (CEO + Bua)', 'Recovered'], first: 'Down', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
+      'MuvMi · DOWN': { subject: 'MuvMi · Tier 1 · INC-0142', E: E, events: ['Down', 'L1', 'Client update', 'Acknowledged', 'L2 (Management)', 'L3 FYI (CEO + Bua)', 'Recovered', 'Flapping summary (after the FYI)'], first: 'Down', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · PROBLEM': { subject: 'Fuji Links · Tier 2 · INC-0141', E: F, events: ['PROBLEM', 'Acknowledged', 'Recovered'], first: 'PROBLEM', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'Fuji Links · auto-resolved': { subject: 'Fuji Links · Tier 2 · INC-0151', E: FA, events: ['Recovered (auto-resolved)'], first: 'Recovered (auto-resolved)', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read. Discuss in the Chat thread.' },
       'DxT AI · new cause (SSL → Keyword)': { subject: 'DxT AI · Tier 3 · INC-0136', E: NC, events: Object.keys(NC), first: 'New cause · not acknowledged yet', foot: 'Times in Thailand time (UTC+7). This is an automated record — replies aren’t read.' },

@@ -406,7 +406,7 @@ class Component extends DCLogic {
         : { level: 'L0', offset: '0 min', at: '09:48:43', hhmm: '09:48', who: 'Arm (owner, business hours) @mention + Alerts Space', short: '@Arm + Alerts Space · Chat + email', sent: true },
       NIGHT ? { level: 'L1', offset: '+15 min', at: '10:03:43', hhmm: '10:03', who: 'Tao — backup Ploy is already paged as on call', short: '“@Tao please acknowledge” in the thread + email (Ploy, the backup, was paged at L0)', sent: true }
         : { level: 'L1', offset: '+15 min', at: '10:03:43', hhmm: '10:03', who: 'Ploy (backup) + Tao', short: '“@Ploy please acknowledge · Tao FYI” in the thread + email', sent: true },
-      { level: 'L2', offset: '+30 min', at: '10:18:43', hhmm: '10:18', who: 'CEO @mention + email (voice call off until approved)', short: 'CEO @mention + email', sent: false, proposal: false, stopOnAck: true },
+      { level: 'L2', offset: '+30 min', at: '10:18:43', hhmm: '10:18', who: 'Management (Vee, Pim) @mention + email · step in, find someone', short: 'Vee + Pim (Management) @mention + email — step in, find someone', sent: false, proposal: false, stopOnAck: true },
       { level: 'L3', offset: '+60 min', at: '10:48:43', hhmm: '10:48', who: acked ? 'CEO + Bua (AM) · FYI @mention + email, no call' : 'CEO + Bua (AM) @mention + email', short: acked ? 'FYI to CEO + Bua (@mention + email, no call) if MuvMi is still down' : 'CEO + Bua (AM) @mention + email if MuvMi is still down', sent: false, fyi: true }
     ];
     var ladder = steps.map(function (s) {
@@ -427,7 +427,7 @@ class Component extends DCLogic {
     steps.forEach(function (s) {
       if (s.sent) timeline.push({ at: s.at, icon: s.level === 'L0' ? 'bell' : 'arrow-up-right', color: s.level === 'L0' ? 'var(--aura-fg-primary)' : 'var(--aura-alert-warning-fg)', title: s.level === 'L0' ? 'L0 alert sent' : 'Escalated to ' + s.level + ' — no ack in 15 min', detail: s.short, scheduled: false });
     });
-    var POSTACK = 'L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call).';
+    var POSTACK = 'L1–L2 stopped. If MuvMi is still down at 10:48, CEO + Bua get an FYI (no call). Add a status note — they see it in the FYI.';
     if (later) {
       timeline.push({ at: '10:07:40', icon: 'check', color: 'var(--aura-fg-positive)', title: 'Acknowledged by Arm · Chat card', detail: 'Acknowledged by Arm → ' + POSTACK + ' Posted to Chat + email and incident.acknowledged webhook sent 10:07:50, after the 10 s undo window.', scheduled: false });
       timeline.push({ at: '10:12:05', icon: 'circle-check', color: 'var(--aura-fg-positive)', title: 'Client update marked by Bua', detail: '“Called MuvMi ops, ETA shared” · client-update track closed', scheduled: false });
@@ -442,7 +442,7 @@ class Component extends DCLogic {
     steps.forEach(function (s) {
       if (s.sent) return;
       if (s.stopOnAck && acked) return;
-      timeline.push({ at: s.at, icon: 'clock', color: 'var(--aura-fg-tertiary)', title: s.stopOnAck ? 'L2 · CEO step' : (acked ? 'L3 · FYI if still down' : 'L3 if still down'), detail: s.short, scheduled: true });
+      timeline.push({ at: s.at, icon: 'clock', color: 'var(--aura-fg-tertiary)', title: s.stopOnAck ? 'L2 · Management' : (acked ? 'L3 · FYI if still down' : 'L3 if still down'), detail: s.short, scheduled: true });
     });
     var TH = 'เรียนทีม MuvMi\nขณะนี้เว็บไซต์ของท่านไม่สามารถเข้าใช้งานได้ ตั้งแต่เวลา 09:48 น. ทีม DxT ตรวจพบแล้วและกำลังแก้ไข จะแจ้งความคืบหน้าภายใน [ETA] น.\nขออภัยในความไม่สะดวก — Bua, DxT Solutions';
     var EN = 'Hi MuvMi team,\nYour website has been unavailable since 09:48 (UTC+7). DxT detected it and is working on a fix. Next update by [ETA].\nSorry for the disruption — Bua, DxT Solutions';
@@ -496,7 +496,7 @@ class Component extends DCLogic {
       duration: later ? '24 min' : '19 min',
       latestLabel: later ? 'Latest · 10:12:10' : 'Latest · 10:07:10',
       escLevel: acked ? 'L1–L2 stopped' : (NIGHT ? 'L1 · Tao' : 'L1 · Ploy + Tao'),
-      escNext: acked ? 'L3 FYI at 10:48 if still down' : 'CEO step at 10:18 (in 11 min)',
+      escNext: acked ? 'L3 FYI at 10:48 if still down' : 'Management (Vee, Pim) at 10:18 (in 11 min)',
       ackBy: later ? 'Arm' : (acked ? 'Tao (you)' : '—'),
       ackMeta: later ? '10:07:40 · 19 min after confirmed down' : (acked ? '10:07:15 · 18 min after confirmed down' : '18 min since confirmed down'),
       resolveShort: 'Resolve locked · ' + condCount + ' of 3 conditions met',
@@ -614,7 +614,7 @@ class Component extends DCLogic {
       var LV = [
         { level: 'L0', when: '0 min · 02:31', who: 'Ploy (on call) @mention + Alerts Space · owner Nok not paged at night' },
         { level: 'L1', when: '+15 min · 02:46', who: 'Arm (backup) + Tao', btn: 'L1 (Arm, backup · Tao)', sendWho: [['Arm', 'backup', 'Chat @mention + email'], ['Tao', 'Admin', 'Chat @mention + email']], tl: 'Arm + Tao — “@Arm please acknowledge · Tao FYI” in the thread + email' },
-        { level: 'L2', when: '+30 min · 03:01', who: 'CEO @mention + email (voice call off until approved)', btn: 'L2 (CEO)', sendWho: [['CEO', 'L2', 'Chat @mention + email']], tl: 'CEO @mention + email' },
+        { level: 'L2', when: '+30 min · 03:01', who: 'Management (Vee, Pim) @mention + email', btn: 'L2 (Management · Vee, Pim)', sendWho: [['Vee', 'Management', 'Chat @mention + email'], ['Pim', 'Management', 'Chat @mention + email']], tl: 'Vee + Pim (Management) @mention + email — step in, find someone' },
         { level: 'L3', when: '+60 min · 03:31', who: 'CEO + Thee (AM) @mention + email', btn: 'L3 (CEO + Thee, Site AM)', sendWho: [['CEO', 'L3', 'Chat @mention + email'], ['Thee', 'Site AM', 'Chat @mention + email']], tl: 'CEO + Thee (AM) @mention + email' }
       ];
       var SENTAT = ['02:31', '02:35', '02:36', '02:37'];
