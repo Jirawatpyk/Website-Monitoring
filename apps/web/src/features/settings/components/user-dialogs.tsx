@@ -645,30 +645,47 @@ export function ManagementDialog({
   const [note, setNote] = useState('');
   const [tried, setTried] = useState(false);
   const [refused, setRefused] = useState(0);
+  // A fresh note for each person and each set / remove (spec-checker M1); the last person keeps the
+  // title while the dialog closes (L13).
+  const key = person ? `${person.id}:${!!person.management}` : '';
+  const [seen, setSeen] = useState(key);
+  const [last, setLast] = useState<Person | null>(person);
+  if (seen !== key) {
+    setSeen(key);
+    if (person) {
+      setLast(person);
+      setNote('');
+      setTried(false);
+    }
+  }
   const noteRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (refused > 0) noteRef.current?.focus();
   }, [refused]);
-  const w = person ? managementDialog(data, person) : null;
-  const on = !person?.management;
+  const shown = person ?? last;
+  const w = shown ? managementDialog(data, shown) : null;
+  const on = !shown?.management;
   const { error, pending, run } = useSubmit(() => {
     if (w) onDone(w.done);
     setNote('');
     setTried(false);
-  }, person?.id ?? '');
+  }, key);
   return (
     <Dialog
       open={!!person}
       onClose={onClose}
       size="md"
       title={w?.title ?? ''}
+      description={w?.description}
       footer={
         <Foot>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button
-            variant={on ? 'primary' : 'danger'}
+            // the board: primary + check for both — removing the tag destroys nothing (spec-checker L6)
+            variant="primary"
+            icon={<IconCheck />}
             loading={pending}
             onClick={() => {
               if (!note.trim()) {
@@ -693,7 +710,7 @@ export function ManagementDialog({
         <Textarea
           ref={noteRef}
           label="Note"
-          placeholder="e.g. Bua’s review — L2 goes to Management"
+          placeholder={w?.placeholder}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           error={tried && !note.trim() ? 'Add a short note — it goes in the audit log' : undefined}

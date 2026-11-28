@@ -3,7 +3,7 @@
 -- deactivation takes the tag with its own audit row; a Management person's Chat id can't be cleared.
 begin;
 \ir _helpers.psql
-select plan(17);
+select plan(21);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -85,6 +85,19 @@ reset role;
 select is(
   (select count(*)::int from public.account_events where user_id = pg_temp.uid('vee') and kind = 'management_removed'),
   1, 'the removal emails Vee too');
+
+-- ── A deactivation takes the tag too (db review L4) ──────────────────────
+select tests.authenticate_as(pg_temp.uid('tao'));
+select lives_ok(format($$select public.set_management(%L, true, 'Again')$$, pg_temp.uid('vee')), 'Vee set again');
+select lives_ok(format($$select public.deactivate_user(%L)$$, pg_temp.uid('vee')), 'Vee is deactivated');
+reset role;
+select is(
+  (select after ->> 'reason' from public.audit_log where action = 'user.management' and entity_id = pg_temp.uid('vee')
+     and (after ->> 'reason') is not null),
+  'deactivated', 'the deactivation cleared it, saying why');
+select throws_ok(
+  format($$update public.profiles set is_management = true where id = %L$$, pg_temp.uid('vee')),
+  '23514', null, 'the check refuses it on an inactive Admin');
 
 select * from finish();
 rollback;

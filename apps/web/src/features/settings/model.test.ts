@@ -81,7 +81,13 @@ describe('Management (D-078, spec §43.3–5)', () => {
     );
     expect(w.title).toBe('Set Vee as Management?');
     expect(w.lines[0]).toMatch(first);
-    expect(w.lines.at(-1)).toBe('Vee gets an email saying what changed.');
+    // D-078 (3b): from the next step; the email promise sits in the description
+    expect(w.description).toBe(
+      used
+        ? 'Takes effect from the next escalation step that fires. Vee stays an Admin. Vee gets an email saying what changed.'
+        : 'Vee gets an email saying what changed.',
+    );
+    expect(w.placeholder).not.toMatch(/Bua|Vee|Tao/);
   });
 
   it('set the last Admin outside Management: warns L1 then tells no Admin (allowed)', () => {

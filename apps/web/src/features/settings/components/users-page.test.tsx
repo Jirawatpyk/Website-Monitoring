@@ -154,6 +154,8 @@ describe('UsersPageView (Users, MUsers)', () => {
       expect(actions.setManagement).toHaveBeenCalledWith({ userId: TAO, on: true, note: 'Bua review' }),
     );
     expect(await screen.findByTestId('users-count')).toHaveTextContent('Tao is Management · logged');
+    // focus back on the row's ⋯ once the dialog has closed (spec-checker L12)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Actions for Tao' })).toHaveFocus());
   });
 
   it("a Responder can't be Management; a Management Admin shows the badge and is removed the same way", async () => {

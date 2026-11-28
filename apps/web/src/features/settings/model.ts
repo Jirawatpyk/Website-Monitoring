@@ -519,9 +519,18 @@ export function managementBlockedWhy(p: Person): string | null {
  * The confirm's words (§43.4). Until an escalation step goes to Management the tag changes nobody's
  * alerts, so it says that instead of promising the L2 step (D-078 item 3e).
  */
-export function managementDialog(d: UsersData, p: Person): { title: string; lines: string[]; done: string } {
+export function managementDialog(
+  d: UsersData,
+  p: Person,
+): { title: string; description: string | undefined; lines: string[]; placeholder: string; done: string } {
   const on = !p.management;
   const others = d.people.filter((x) => x.management && x.id !== p.id).map((x) => x.name);
+  const and = (n: string[]) => (n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n.at(-1)}` : (n[0] ?? ''));
+  // D-078 (3b): people are resolved when a step fires — the board's "incidents opened after" isn't built
+  const mail = d.emailOn ? ` ${p.name} gets an email saying what changed.` : '';
+  const description = d.managementUsed
+    ? `Takes effect from the next escalation step that fires.${on ? ` ${p.name} stays an Admin.` : ''}${mail}`
+    : mail.trim() || undefined;
   const lines: string[] = [];
   if (!d.managementUsed) {
     lines.push(
@@ -539,12 +548,16 @@ export function managementDialog(d: UsersData, p: Person): { title: string; line
       lines.push('Every active Admin would then be Management, so L1 tells only the backup — no Admin.');
   } else {
     lines.push('No longer gets the L2 step on Tier 1 DOWN.', 'Told at L1 again as an Admin (Chat + email).');
-    if (others.length) lines.push(`L2 still goes to ${others.join(', ')}.`);
+    if (others.length) lines.push(`L2 still goes to ${and(others)}.`);
   }
-  if (d.emailOn) lines.push(`${p.name} gets an email saying what changed.`);
   return {
     title: on ? `Set ${p.name} as Management?` : `Remove ${p.name} from Management?`,
+    description,
     lines,
+    // the board's placeholders (never a real or sample name)
+    placeholder: on
+      ? 'e.g. Ops lead — can find someone when nobody answers'
+      : 'e.g. Moving to the product team',
     done: on ? `${p.name} is Management · logged` : `${p.name} removed from Management · logged`,
   };
 }
@@ -574,7 +587,10 @@ export function sheetFacts(d: UsersData, r: UserRow): { k: string; v: string }[]
           .join(' · ') || '—';
   return [
     { k: 'Role', v: ROLE_LABELS[r.role] },
-    ...(r.management ? [{ k: 'Management', v: MANAGEMENT_FACT }] : []),
+    // until a step goes to Management the tag changes nobody's alerts (D-078 3e): say so, as the dialog does
+    ...(r.management
+      ? [{ k: 'Management', v: d.managementUsed ? MANAGEMENT_FACT : 'Not used by any escalation step yet' }]
+      : []),
     { k: 'Alert channels', v: r.channels },
     { k: r.role === 'stakeholder' ? 'Clients and escalation' : 'Owner · backup', v: own },
     { k: 'On-call', v: r.oncall.text },
