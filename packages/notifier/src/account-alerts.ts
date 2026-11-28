@@ -73,7 +73,7 @@ function managementEmail(
     ? `Management now: ${and([...others, 'you'])}.`
     : others.length
       ? `Management now: ${and(others)}.`
-      : 'Nobody else is Management now.';
+      : 'Nobody is Management now.';
   const pre = on
     ? `${facts.actor} set you as Management · ${at}`
     : `${facts.actor} removed you from Management · ${at}`;
@@ -87,7 +87,7 @@ function managementEmail(
     {
       color: C.secondary,
       bar: C.tertiary,
-      label: on ? 'MANAGEMENT' : 'MANAGEMENT REMOVED',
+      label: on ? 'SET AS MANAGEMENT' : 'MANAGEMENT REMOVED',
       pre,
       headline: on ? 'You’re now Management' : 'You’re no longer Management',
       lede: `${pre}. Your role stays ${ROLE_LABELS[input.fromRole]}.`,
@@ -103,14 +103,15 @@ function managementEmail(
           mark: on ? '!' : '·',
           color: on ? C.warning : C.secondary,
           items: on
-            ? [
-                'When a Tier 1 site is down and nobody has acknowledged it, the escalation step for Management @mentions you in Chat and emails you — step in: call the owner or backup, reassign, or acknowledge yourself.',
-                'You’re no longer told at L1 as an Admin.',
+            ? // the dialog's words (§43.4); D-078 3a: the Admin steps of every policy, not only Tier 1 L1
+              [
+                'You get the L2 step on Tier 1 DOWN (+30 min, @mentioned in Chat + email) — step in: call the owner or backup, reassign, or acknowledge yourself.',
+                'You’re no longer told as an Admin on escalation steps (any tier). Monitor-fault emails and system alerts still come to you.',
                 team,
               ]
             : [
-                'You no longer get the Management step on Tier 1 DOWN.',
-                'You’re told at L1 again as an Admin (Chat + email).',
+                'You no longer get the L2 step on Tier 1 DOWN.',
+                'You’re told as an Admin on escalation steps again (Chat + email).',
                 team,
               ],
         },
@@ -152,16 +153,16 @@ export function buildAccountEmail(input: AccountEmailInput): EmailMessage {
   const at = when(input.at);
   const headers = { References: `<account-${input.eventId}@${senderDomain(input.from)}>` };
   const footer = accountFooter(facts.actor);
+  // First: a Management event's facts are only { actor, others } — no moves (message-checker H1).
+  if (input.kind === 'management_set' || input.kind === 'management_removed') {
+    return managementEmail(input, at, headers, footer);
+  }
   const rows = movedRows(facts.moves);
   // The table only when something moved; a note with no rows joins the lede instead (code review).
   const moved = (notes: string[]): EmailSection[] =>
     rows.length
       ? [{ kind: 'table', title: 'WHAT MOVED TO SOMEONE ELSE', head: ['Place', 'Now with'], rows, notes }]
       : [];
-
-  if (input.kind === 'management_set' || input.kind === 'management_removed') {
-    return managementEmail(input, at, headers, footer);
-  }
 
   if (input.kind === 'deactivated' || input.toRole === null) {
     // Nothing moved: the note joins the lede instead of standing under an empty table.

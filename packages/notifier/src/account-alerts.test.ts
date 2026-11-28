@@ -222,15 +222,8 @@ describe('buildAccountEmail · Management (D-078)', () => {
     kind,
     fromRole: 'admin',
     toRole: 'admin',
-    facts: {
-      actor: 'Tao',
-      was_am: false,
-      manages_clients: false,
-      left_rotation: false,
-      admins: [],
-      moves: [],
-      others,
-    },
+    // as the database writes it (set_management): only actor and others — no moves (message-checker H1)
+    facts: { actor: 'Tao', others } as unknown as AccountEmailInput['facts'],
   });
 
   it('set: subject, who and when, what comes with it, who else is Management', () => {
@@ -238,7 +231,9 @@ describe('buildAccountEmail · Management (D-078)', () => {
     expect(m.subject).toBe('You’re now Management in DxT Monitor');
     expect(m.text).toContain('Tao set you as Management · Fri 25 Sep 10:08. Your role stays Admin.');
     expect(m.text).toContain('WHAT COMES WITH MANAGEMENT');
-    expect(m.text).toContain('You’re no longer told at L1 as an Admin.');
+    expect(m.text).toContain('You get the L2 step on Tier 1 DOWN (+30 min, @mentioned in Chat + email)');
+    expect(m.text).toContain('You’re no longer told as an Admin on escalation steps (any tier).');
+    expect(m.headers?.References).toBe('<account-e1@monitor.example.com>');
     expect(m.text).toContain('Management now: Pim and you.');
     expect(m.text).toContain('Role: Admin · Management');
     // the role email's parts never show
@@ -250,10 +245,10 @@ describe('buildAccountEmail · Management (D-078)', () => {
   it('removed: back at L1, and who is left', () => {
     const m = buildAccountEmail(mg('management_removed', []));
     expect(m.subject).toBe('You’re no longer Management in DxT Monitor');
-    expect(m.text).toContain('You’re told at L1 again as an Admin (Chat + email).');
-    expect(m.text).toContain('Nobody else is Management now.');
-    expect(buildAccountEmail(mg('management_removed', ['Vee', 'Pim'])).text).toContain(
-      'Management now: Vee and Pim.',
+    expect(m.text).toContain('You’re told as an Admin on escalation steps again (Chat + email).');
+    expect(m.text).toContain('Nobody is Management now.');
+    expect(buildAccountEmail(mg('management_removed', ['Pim', 'Vee'])).text).toContain(
+      'Management now: Pim and Vee.',
     );
   });
 });
