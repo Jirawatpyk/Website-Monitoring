@@ -5,7 +5,7 @@ import { IconBell, IconEye, IconLock, IconMail, IconUsers } from '@jirawatpyk/au
 import type { EscalationChannel } from '@dxt/shared';
 import { useMemo, useState, type ReactElement } from 'react';
 import { stepCondition, stepNote, targetLabels, type PolicyDraft } from '../model';
-import { hoursLabel, hoursOf, nobodyWhy, scenario, stepNames } from '../preview';
+import { hoursLabel, hoursOf, nobodyWhy, onlyManagement, scenario, stepNames } from '../preview';
 
 const upperFirst = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 import type { EscalationPageData } from '../types';
@@ -61,6 +61,7 @@ export function EscalationView({
   const fyiStep = policy.steps.find((s) => s.fyi);
   const example = scenario(policy, site, data.admins, hours, clock, {
     phone: true,
+    management: data.management,
     reminderMin: policy.severity === 'down' ? data.downReminder : data.problemReminder,
   });
   const title =
@@ -119,7 +120,9 @@ export function EscalationView({
         className="m-0 flex list-none flex-col rounded-aura-lg border border-border-default bg-bg-surface p-3.5 pl-3"
       >
         {policy.steps.map((s, i) => {
-          const names = site ? stepNames(policy.steps, i, site, data.admins) : targetLabels(s, data.admins);
+          const names = site
+            ? stepNames(policy.steps, i, site, data.admins, data.management)
+            : targetLabels(s, data.admins, data.management);
           const note = stepNote(policy, s, true, data.admins, hoursLabel(data.hours));
           return (
             <li key={s.level} className="group relative flex gap-3">
@@ -140,7 +143,9 @@ export function EscalationView({
                   </span>
                 </span>
                 <span>
-                  {names.join(' + ') || upperFirst(nobodyWhy(s, site, data.admins))}
+                  {/* MEscalation: "Vee, Pim" over the token "Management" (§43.8). */}
+                  {names.join(site && onlyManagement(s) ? ', ' : ' + ') ||
+                    upperFirst(nobodyWhy(s, site, data.admins, data.management))}
                   {s.channels.includes('space') ? ' + Alerts Space' : ''}
                 </span>
                 {site && (

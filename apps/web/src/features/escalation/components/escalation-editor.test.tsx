@@ -39,6 +39,7 @@ const data: EscalationPageData = {
   hours: { startMin: 540, endMin: 1080, days: [1, 2, 3, 4, 5], holidays: [] },
   sites: [{ id: 's1', name: 'MuvMi', tier: 1, owner: 'Arm', backup: 'Ploy', am: 'Bua' }],
   admins: ['Tao'],
+  management: [],
   openIncidents: [{ number: 142, key: 't1' }],
 };
 // Fri 25 Sep 2026 09:48 Bangkok.
@@ -161,7 +162,7 @@ describe('Escalation editor — guardrails (Done-when 3, spec §14.7, §15.5)', 
     it('a CEO step can’t move above L2; the CEO isn’t offered on Tier 2', () => {
       render(<EscalationEditor data={full} now={NOW} />);
       expect(
-        screen.getByRole('button', { name: 'A step that pages the CEO can’t move above L2' }),
+        screen.getByRole('button', { name: 'A Management or CEO step can’t move above L2' }),
       ).toBeDisabled();
       fireEvent.click(screen.getByRole('radio', { name: 'Tier 2 DOWN' }));
       openL1();
@@ -169,9 +170,105 @@ describe('Escalation editor — guardrails (Done-when 3, spec §14.7, §15.5)', 
       expect(within(d).getByRole('button', { name: 'CEO' })).toBeDisabled();
       expect(
         within(d).getByText(
-          'CEO isn’t available here — the CEO is paged only on Tier 1 DOWN, from L2 onward. On this policy the CEO sees incidents in the daily digest.',
+          'CEO isn’t available here — on Tier 1 DOWN the CEO gets only the L3 FYI. On this policy the CEO sees incidents in the daily digest.',
         ),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('D-078 — Management at Tier 1 DOWN L2 (§43.8–9, Escalation board)', () => {
+    const l2 = {
+      level: 2,
+      delayMin: 30,
+      targets: ['ceo' as const],
+      channels: ['chat' as const, 'email' as const, 'voice' as const],
+    };
+    const l3 = {
+      level: 3,
+      delayMin: 60,
+      targets: ['ceo' as const, 'site_am' as const],
+      channels: ['chat' as const, 'email' as const],
+      fyi: true,
+    };
+    const withMg = (management: string[]): EscalationPageData => ({
+      ...data,
+      management,
+      policies: data.policies.map((p) => (p.key === 't1' ? { ...p, steps: [l0, l1, l2, l3] } : p)),
+    });
+    const toManagement = () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Edit L2' }));
+      const d = dialog(/Edit L2/);
+      fireEvent.click(within(d).getByRole('button', { name: 'CEO' }));
+      fireEvent.click(within(d).getByRole('button', { name: 'Management' }));
+      return d;
+    };
+
+    it('L2 → Management drops voice and previews the names; L1 says who is left out', () => {
+      render(<EscalationEditor data={withMg(['Vee', 'Pim'])} now={NOW} />);
+      expect(
+        screen.getByText('Admins who are Management are left out here — they get L2.'),
+      ).toBeInTheDocument();
+      const d = toManagement();
+      expect(within(d).getByRole('checkbox', { name: 'Voice call' })).not.toBeChecked();
+      expect(
+        within(d).getByText('No voice on a Management step — they’re told by Chat @mention + email.'),
+      ).toBeInTheDocument();
+      expect(
+        within(d).getByText('Management = Vee, Pim · Chat @mention + email, no voice.'),
+      ).toBeInTheDocument();
+      expect(
+        within(d).getByText('This step tells Management, so it stays at L2 or later.'),
+      ).toBeInTheDocument();
+      expect(within(d).getByText(/L2 → Management — Vee, Pim \(MuvMi\)/)).toBeInTheDocument();
+      fireEvent.click(within(d).getByRole('button', { name: 'Apply to L2' }));
+      expect(screen.getByText('Management · Vee, Pim')).toBeInTheDocument();
+      expect(screen.getByText(/L2 → Management — Vee, Pim/)).toBeInTheDocument();
+      expect(screen.getByText('Tao · Vee, Pim left out (Management)')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'L2 tells Management — it can’t move up to L1' }),
+      ).toBeDisabled();
+    });
+
+    it('Management is locked on L1 and on Tier 2, each with its reason', () => {
+      render(<EscalationEditor data={withMg(['Vee'])} now={NOW} />);
+      openL1();
+      let d = dialog(/Edit L1 · Tier 1 DOWN/);
+      expect(within(d).getByRole('button', { name: 'Management' })).toBeDisabled();
+      expect(within(d).getByText('Management can be told only from L2')).toBeInTheDocument();
+      expect(
+        within(d).getByText(/Admin = Tao — Vee is Management, so they get L2 instead\./),
+      ).toBeInTheDocument();
+      fireEvent.click(within(d).getByRole('button', { name: 'Cancel' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Tier 2 DOWN' }));
+      expect(screen.queryByText('Admins who are Management are left out here — they get L2.')).toBeNull();
+      openL1();
+      d = dialog(/Edit L1 · Tier 2 DOWN/);
+      expect(within(d).getByRole('button', { name: 'Management' })).toBeDisabled();
+      expect(within(d).getByText('Management is used only on Tier 1 DOWN')).toBeInTheDocument();
+    });
+
+    it('nobody is Management: the token is locked with a warning', () => {
+      render(<EscalationEditor data={withMg([])} now={NOW} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit L2' }));
+      const d = dialog(/Edit L2/);
+      expect(within(d).getByRole('button', { name: 'Management' })).toBeDisabled();
+      expect(
+        within(d).getByText('Nobody is Management yet — set someone on Users & roles'),
+      ).toBeInTheDocument();
+    });
+
+    it('a saved Management step with nobody tagged blocks the save and previews nobody', () => {
+      const mg = { ...l2, targets: ['management' as const], channels: ['chat' as const, 'email' as const] };
+      const saved: EscalationPageData = {
+        ...data,
+        policies: data.policies.map((p) => (p.key === 't1' ? { ...p, steps: [l0, l1, mg, l3] } : p)),
+      };
+      render(<EscalationEditor data={saved} now={NOW} />);
+      expect(
+        screen.getByText('Nobody is Management yet — set someone on Users & roles.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Management · nobody yet')).toBeInTheDocument();
+      expect(screen.getByText(/L2 → notifies nobody \(nobody is Management yet\)/)).toBeInTheDocument();
     });
   });
 

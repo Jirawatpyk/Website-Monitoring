@@ -80,7 +80,10 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
     policy.severity === 'down'
       ? Number(draft.downReminder) || data.downReminder
       : Number(draft.problemReminder) || data.problemReminder;
-  const preview = scenario(policy, site, data.admins, hours, clock, { reminderMin });
+  const preview = scenario(policy, site, data.admins, hours, clock, {
+    reminderMin,
+    management: data.management,
+  });
   const rows = diff(saved, draft, data.admins);
   const summary = unsavedSummary(rows);
   const message = policyMessage(policy);
@@ -177,6 +180,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
                 policy={policy}
                 index={i}
                 admins={data.admins}
+                management={data.management}
                 hoursText={hoursText}
                 onEdit={(index) => setEditing({ index, adding: false })}
                 onDelete={(index) => {
@@ -236,7 +240,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
                     onChange={(e) => setSiteId(e.target.value)}
                   />
                   <dl className="m-0 flex flex-col rounded-aura-md border border-border-default px-3 py-1 text-sm">
-                    {tokenRows(site, data.admins, policy.steps).map((t, i) => (
+                    {tokenRows(site, data.admins, policy.steps, data.management).map((t, i) => (
                       <div
                         key={t.token}
                         className={`flex justify-between gap-3 py-1.5 ${i ? 'border-t border-border-subtle' : ''}`}
@@ -316,12 +320,21 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
             </div>
           </Card>
 
-          {voiceStep && (
+          {voiceStep ? (
             <Alert tone="warning" title={`Voice call on L${voiceStep.level} is off until approved`}>
               The CEO step at L{voiceStep.level} is live and sends a Chat @mention and email. Its voice call
               is configured but stays off until the CEO approves voice calls (Twilio, ~$23–26 / month). It
               can’t move above L2.
             </Alert>
+          ) : (
+            // Once Tier 1 L2 is Management no step carries voice (§43.1, Escalation board `showVoice`).
+            policy.key === 't1' && (
+              <Alert tone="warning" title="Voice call · configured, off">
+                No Tier 1 step carries a voice call since L2 moved to Management. Voice stays configured and
+                off until the CEO approves voice calls (Twilio, ~$23–26 / month). Management and the L3 FYI
+                are never called.
+              </Alert>
+            )
           )}
         </div>
       </div>
@@ -350,6 +363,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
           index={editing.index}
           adding={editing.adding}
           admins={data.admins}
+          management={data.management}
           site={site}
           hours={hours}
           now={clock}
@@ -367,7 +381,7 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
 
       {saveOpen && (
         <SaveDialog
-          problems={saveProblems(draft)}
+          problems={saveProblems(draft, data.management)}
           warnings={saveWarnings(draft)}
           rows={rows}
           affects={affectsLine(affectsSites, affectsOpen)}

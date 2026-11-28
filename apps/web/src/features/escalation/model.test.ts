@@ -21,7 +21,9 @@ import {
   reminderError,
   saveProblems,
   saveWarnings,
+  showsManagementLeftOut,
   stepErrors,
+  targetLabels,
   toSaveInput,
   unsavedSummary,
   type EscalationDraft,
@@ -94,6 +96,8 @@ const l3fyi: EscalationStep = {
   fyi: true,
 };
 const t1full = () => t1([l0, l1(), l2ceo, l3fyi]);
+// D-078: Tier 1 L2 → Management, Chat + email.
+const mgL2: EscalationStep = { level: 2, delayMin: 30, targets: ['management'], channels: ['chat', 'email'] };
 
 describe('S10 — the CEO, the FYI step, moving steps (Escalation board, §14.7, §15.5)', () => {
   it('the seed passes', () => {
@@ -132,8 +136,68 @@ describe('S10 — the CEO, the FYI step, moving steps (Escalation board, §14.7,
   it('a CEO step never lands above L2', () => {
     const steps = t1full().steps;
     expect(canSwap(steps, 1, 2)).toBe(false);
-    expect(moveLabels(steps, 1).down).toBe('L2 pages the CEO — it can’t move up to L1');
-    expect(moveLabels(steps, 2).up).toBe('A step that pages the CEO can’t move above L2');
+    expect(moveLabels(steps, 1).down).toBe('L2 tells the CEO — it can’t move up to L1');
+    expect(moveLabels(steps, 2).up).toBe('A Management or CEO step can’t move above L2');
+  });
+  // D-078 (§43.9): the rules `save_escalation_policies` refuses with management_* / voice_not_here.
+  it.each<[string, EscalationStep[], number, 't1' | 't2', string[] | undefined, string[]]>([
+    ['Management at L2 with people tagged', [l0, l1(), mgL2], 2, 't1', ['Vee'], []],
+    [
+      'nobody tagged',
+      [l0, l1(), mgL2],
+      2,
+      't1',
+      [],
+      ['Nobody is Management yet — set someone on Users & roles.'],
+    ],
+    ['the list not loaded', [l0, l1(), mgL2], 2, 't1', undefined, []],
+    [
+      'on L1',
+      [l0, { ...l1(), targets: ['management'] }],
+      1,
+      't1',
+      ['Vee'],
+      ['Management can be told only from L2.'],
+    ],
+    [
+      'on Tier 2',
+      [l0, l1(), mgL2],
+      2,
+      't2',
+      ['Vee'],
+      ['Management is used only on Tier 1 DOWN — remove it from this step.'],
+    ],
+    [
+      'with voice',
+      [l0, l1(), { ...mgL2, channels: ['chat', 'email', 'voice'] }],
+      2,
+      't1',
+      ['Vee'],
+      ['No voice on a Management step — they’re told by Chat @mention + email.'],
+    ],
+  ])('Management: %s', (_case, steps, i, key, management, want) => {
+    expect(stepErrors(steps, i, key, management)).toEqual(want);
+  });
+  it('a Management step never lands above L2; the labels say Management', () => {
+    const steps = [l0, l1(), mgL2, l3fyi];
+    expect(canSwap(steps, 1, 2)).toBe(false);
+    expect(moveLabels(steps, 1).down).toBe('L2 tells Management — it can’t move up to L1');
+    expect(targetLabels(mgL2, ['Tao'], ['Vee', 'Pim'])).toEqual(['Management · Vee, Pim']);
+    expect(targetLabels(mgL2, ['Tao'], [])).toEqual(['Management · nobody yet']);
+    expect(targetLabels(mgL2)).toEqual(['Management']);
+  });
+  it('the L1 Management line: Tier 1 Admin steps only; the phone says it in the note', () => {
+    const t2 = { ...t1(), key: 't2' as const, tier: 2 };
+    expect(showsManagementLeftOut(t1full(), l1())).toBe(true);
+    expect(showsManagementLeftOut(t2, l1())).toBe(false);
+    expect(showsManagementLeftOut(t1full(), l0)).toBe(false);
+    expect(stepNote(t1full(), l1(), true, ['Tao'], 'h')).toBe(
+      'Anyone already paged is left out. Admins who are Management are left out here — they get L2.',
+    );
+    expect(stepNote(t2, l1(), true, ['Tao'], 'h')).toBe('Anyone already paged is left out.');
+    expect(stepNote(t1full(), mgL2, true, [], 'h')).toBe(
+      'Asked to step in and find someone to take it. No voice call.',
+    );
   });
   it('swapping keeps each level’s delay', () => {
     const steps = [l0, l1(), { ...l1({ targets: ['admins'] }), level: 2, delayMin: 30 }];

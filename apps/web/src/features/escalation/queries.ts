@@ -39,7 +39,7 @@ export async function getEscalationPage(now = new Date()): Promise<EscalationPag
       .order('name'),
     db
       .from('profiles')
-      .select('display_name')
+      .select('display_name, is_management')
       .eq('role', 'admin')
       .eq('is_active', true)
       .order('display_name'),
@@ -129,7 +129,8 @@ export async function getEscalationPage(now = new Date()): Promise<EscalationPag
     problemReminder: settings.data!.problem_reminder_min,
     hours,
     sites: previewSites,
-    admins: (admins.data ?? []).map((a) => a.display_name),
+    admins: (admins.data ?? []).filter((a) => !a.is_management).map((a) => a.display_name),
+    management: (admins.data ?? []).filter((a) => a.is_management).map((a) => a.display_name),
     openIncidents: (open.data ?? []).flatMap((i) => {
       const key = planKey(i.escalation_plan);
       return key ? [{ number: i.number, key }] : [];

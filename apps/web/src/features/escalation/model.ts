@@ -87,8 +87,19 @@ export function stepNote(
       ? 'No CEO page — the CEO sees it in the digest.'
       : `${who ? `Reminder to ${who}. ` : ''}No CEO page — the CEO sees it in the daily digest.`;
   }
+  // Tier 1 DOWN L2 → Management (§43.1, D-078): asked to step in, never called.
+  if (s.level > 0 && s.targets.includes('management'))
+    return phone
+      ? 'Asked to step in and find someone to take it. No voice call.'
+      : 'Asked to step in and find someone — call the owner or backup, reassign, or acknowledge. Chat @mention + email, no voice call.';
   // Only where an earlier step may already have told someone (the Admin beside the backup, MEscalation).
-  if (s.level > 0) return s.targets.includes('admins') ? 'Anyone already paged is left out.' : null;
+  // The phone says the Management line here; the desktop row has it beside the NOTIFY tags (§43.2).
+  if (s.level > 0)
+    return s.targets.includes('admins')
+      ? phone && p.key === 't1'
+        ? `Anyone already paged is left out. ${MANAGEMENT_LEFT_OUT}`
+        : 'Anyone already paged is left out.'
+      : null;
   if (p.severity === 'down') {
     if (p.key !== 't1')
       return 'Outside response hours it still posts, but the timers below wait for the next opening.';
@@ -106,13 +117,31 @@ export function stepNote(
   return phone ? null : 'Tier 2–3 outside response hours are held until the next opening.';
 }
 
-const ORDER: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'ceo', 'site_am'];
+/** The L1 line on Tier 1 DOWN (§43.2): only there do the Admins who are Management get a step of their own. */
+export const MANAGEMENT_LEFT_OUT = 'Admins who are Management are left out here — they get L2.';
+
+/** Whether a row's NOTIFY gets {@link MANAGEMENT_LEFT_OUT}: an Admin step on Tier 1 DOWN after L0. */
+export const showsManagementLeftOut = (p: PolicyDraft, s: EscalationStep) =>
+  p.key === 't1' && s.level > 0 && !s.fyi && s.targets.includes('admins');
+
+const ORDER: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'management', 'ceo', 'site_am'];
 const CHANNEL_ORDER: readonly EscalationChannel[] = ['chat', 'space', 'email', 'voice'];
 
-/** "Backup", "Admin (Tao)" — the Admin token names every active Admin (D-034). */
-export const targetLabels = (s: EscalationStep, admins: readonly string[] = []) =>
+/**
+ * "Backup", "Admin (Tao)", "Management · Vee, Pim" — the Admin token names the active Admins who
+ * aren't Management (D-034, D-078 3a); Management names the tagged Admins (§43.8).
+ */
+export const targetLabels = (
+  s: EscalationStep,
+  admins: readonly string[] = [],
+  management?: readonly string[],
+) =>
   ORDER.filter((t) => s.targets.includes(t)).map((t) =>
-    t === 'admins' && admins.length ? `Admin (${admins.join(', ')})` : ESCALATION_TARGET_LABELS[t],
+    t === 'admins' && admins.length
+      ? `Admin (${admins.join(', ')})`
+      : t === 'management' && management
+        ? `Management · ${management.length ? management.join(', ') : 'nobody yet'}`
+        : ESCALATION_TARGET_LABELS[t],
   );
 export const channelLabels = (s: EscalationStep) =>
   CHANNEL_ORDER.filter((c) => s.channels.includes(c)).map((c) => ESCALATION_CHANNEL_LABELS[c]);
@@ -132,8 +161,22 @@ const reaching = (s: EscalationStep) => s.channels.filter((c) => c !== 'voice');
 /** A step that pages the CEO (and isn't the FYI): it can't sit above L2 (§14.7). */
 export const pagesCeo = (s: EscalationStep | undefined) => !!s && !s.fyi && s.targets.includes('ceo');
 
-/** A step's blocking errors, in the board's words and order. `key` adds the CEO rules (§15.5). */
-export function stepErrors(steps: readonly EscalationStep[], i: number, key?: PolicyKey): string[] {
+/** A step that tells Management (§43.9): Tier 1 DOWN, from L2. */
+export const tellsManagement = (s: EscalationStep | undefined) => !!s && s.targets.includes('management');
+
+/** A step that can't sit above L2: one that pages the CEO or tells Management (§43.9). */
+const fromL2 = (s: EscalationStep | undefined) => pagesCeo(s) || tellsManagement(s);
+
+/**
+ * A step's blocking errors, in the board's words and order. `key` adds the CEO and Management rules
+ * (§15.5, §43.9); `management` (the tagged Admins' names) adds "nobody is Management yet".
+ */
+export function stepErrors(
+  steps: readonly EscalationStep[],
+  i: number,
+  key?: PolicyKey,
+  management?: readonly string[],
+): string[] {
   const s = steps[i];
   if (!s) return [];
   const errs: string[] = [];
@@ -148,6 +191,15 @@ export function stepErrors(steps: readonly EscalationStep[], i: number, key?: Po
   if (s.targets.includes('ceo') && key) {
     if (key !== 't1') errs.push('The CEO is paged only on Tier 1 DOWN — remove CEO from this step.');
     else if (i < 2) errs.push('The CEO can be paged only from L2 onward.');
+  }
+  // As `save_escalation_policies` (D-078): management_not_allowed / _too_early / nobody_management / voice_not_here.
+  if (tellsManagement(s) && key) {
+    if (key !== 't1') errs.push('Management is used only on Tier 1 DOWN — remove it from this step.');
+    else if (i < 2) errs.push('Management can be told only from L2.');
+    else if (management && !management.length)
+      errs.push('Nobody is Management yet — set someone on Users & roles.');
+    if (s.channels.includes('voice'))
+      errs.push('No voice on a Management step — they’re told by Chat @mention + email.');
   }
   return errs;
 }
@@ -164,14 +216,14 @@ export const fyiNote = (s: EscalationStep) =>
 /**
  * Whether steps `a` and `b` (a < b) can trade places — their people and channels; each level keeps
  * its delay (the board: "delays stay with the level when you reorder"). L0 and the FYI step never
- * move; a CEO step never lands above L2.
+ * move; a CEO or Management step never lands above L2.
  */
 export function canSwap(steps: readonly EscalationStep[], a: number, b: number): boolean {
   const x = steps[a];
   const y = steps[b];
   if (!x || !y || a === 0 || x.fyi || y.fyi) return false;
-  if (pagesCeo(y) && a < 2) return false;
-  if (pagesCeo(x) && b < 2) return false;
+  if (fromL2(y) && a < 2) return false;
+  if (fromL2(x) && b < 2) return false;
   return true;
 }
 
@@ -197,7 +249,7 @@ export function moveLabels(steps: readonly EscalationStep[], i: number) {
         : !canSwap(steps, i - 1, i)
           ? fyiNear(i - 1)
             ? 'The CEO + AM FYI step keeps its place'
-            : 'A step that pages the CEO can’t move above L2'
+            : 'A Management or CEO step can’t move above L2'
           : `Move ${L} earlier`;
   const down =
     i === 0
@@ -207,7 +259,7 @@ export function moveLabels(steps: readonly EscalationStep[], i: number) {
         : !canSwap(steps, i, i + 1)
           ? fyiNear(i + 1)
             ? 'The CEO + AM FYI step keeps its place'
-            : `L${i + 1} pages the CEO — it can’t move up to L${i}`
+            : `L${i + 1} tells ${tellsManagement(steps[i + 1]) ? 'Management' : 'the CEO'} — it can’t move up to L${i}`
           : `Move ${L} later`;
   return {
     up,
@@ -237,11 +289,11 @@ export const reminderError = (v: string) =>
   WHOLE.test(v.trim()) && Number(v) > 0 && Number(v) <= 1440 ? null : 'Whole minutes above 0, e.g. 15';
 
 /** Everything that blocks the save, one line each (the save dialog). */
-export function saveProblems(d: EscalationDraft): string[] {
+export function saveProblems(d: EscalationDraft, management?: readonly string[]): string[] {
   const out: string[] = [];
   for (const p of d.policies) {
     p.steps.forEach((s, i) => {
-      for (const e of stepErrors(p.steps, i, p.key))
+      for (const e of stepErrors(p.steps, i, p.key, management))
         out.push(`${policyShort(p.key)} · L${i} (+${s.delayMin} min): ${e}`);
     });
     const m = policyMessage(p);

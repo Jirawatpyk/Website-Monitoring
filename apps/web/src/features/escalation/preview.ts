@@ -37,12 +37,24 @@ export function tokenRows(
   admins: readonly string[],
   /** Only the tokens the policy's steps use (spec-check B6: Site AM returns with S11's track). */
   used?: readonly EscalationStep[],
+  /** The Admins tagged Management (§43.8; D-078 3a: the Admin token leaves them out). */
+  management: readonly string[] = [],
 ) {
+  const adminName = admins.length ? admins.join(', ') : '—';
   const all = [
     // Spec §8: the owner by day, on Tier 1 outside response hours the person on call (S10).
     { key: 'owner', token: 'Owner / on-call', name: site?.owner ?? '—' },
     { key: 'backup', token: 'Backup', name: site?.backup ?? '—' },
-    { key: 'admins', token: 'Admin', name: admins.length ? admins.join(', ') : '—' },
+    {
+      key: 'admins',
+      token: 'Admin',
+      name: management.length ? `${adminName} · ${management.join(', ')} left out (Management)` : adminName,
+    },
+    {
+      key: 'management',
+      token: 'Management',
+      name: management.length ? management.join(', ') : 'Nobody yet',
+    },
     { key: 'site_am', token: 'Site AM', name: site ? (site.am ?? '— (internal)') : '—' },
     { key: 'ceo', token: 'CEO', name: 'CEO' },
   ] as const;
@@ -60,6 +72,7 @@ export function stepNames(
   i: number,
   site: PreviewSite | undefined,
   admins: readonly string[],
+  management: readonly string[] = [],
 ) {
   const namesOf = (s: EscalationStep) =>
     s.targets.flatMap((t) =>
@@ -77,9 +90,11 @@ export function stepNames(
               : []
             : t === 'admins'
               ? [...admins]
-              : t === 'ceo'
-                ? ['CEO']
-                : [],
+              : t === 'management'
+                ? [...management]
+                : t === 'ceo'
+                  ? ['CEO']
+                  : [],
     );
   const step = steps[i]!;
   const all = [...new Set(namesOf(step))];
@@ -95,12 +110,13 @@ export function isReminderStep(
   i: number,
   site: PreviewSite | undefined,
   admins: readonly string[],
+  management: readonly string[] = [],
 ): boolean {
   const s = steps[i];
   if (!s || s.fyi || i < 2 || !site) return false;
-  const names = stepNames(steps, i, site, admins);
+  const names = stepNames(steps, i, site, admins, management);
   const earlier = new Set(
-    steps.slice(0, i).flatMap((_x, j) => stepNames(steps.slice(0, i), j, site, admins)),
+    steps.slice(0, i).flatMap((_x, j) => stepNames(steps.slice(0, i), j, site, admins, management)),
   );
   return names.length > 0 && names.every((n) => earlier.has(n));
 }
@@ -110,6 +126,7 @@ const NO_ONE: Partial<Record<EscalationStep['targets'][number], string>> = {
   backup: 'no backup set',
   site_am: 'no site AM',
   admins: 'no active Admin',
+  management: 'nobody is Management yet',
 };
 
 /**
@@ -120,21 +137,37 @@ export function nobodyWhy(
   s: EscalationStep,
   site: PreviewSite | undefined,
   admins: readonly string[],
+  management: readonly string[] = [],
 ): string {
   const unset = s.targets.filter((t) =>
     t === 'admins'
       ? !admins.length
-      : t === 'owner'
-        ? !site?.owner
-        : t === 'backup'
-          ? !site?.backup
-          : t === 'site_am'
-            ? !site?.am
-            : false,
+      : t === 'management'
+        ? !management.length
+        : t === 'owner'
+          ? !site?.owner
+          : t === 'backup'
+            ? !site?.backup
+            : t === 'site_am'
+              ? !site?.am
+              : false,
   );
   const told = unset.length < s.targets.length;
   const why = [...(told ? ['already told'] : []), ...unset.flatMap((t) => NO_ONE[t] ?? [])];
   return `${told ? 'nobody new' : 'nobody'} (${why.join(' · ')})`;
+}
+
+/** A step whose only token is Management (§43.8). */
+export const onlyManagement = (s: EscalationStep) =>
+  s.targets.length > 0 && s.targets.every((t) => t === 'management');
+
+/**
+ * A step's names in a line: "Management — Vee, Pim" for the Management step (§43.8 preview), the
+ * names joined with " + " otherwise. Without a site the names are token labels already.
+ */
+export function namesLine(s: EscalationStep, names: readonly string[], resolved = true): string {
+  if (resolved && onlyManagement(s) && names.length) return `Management — ${names.join(', ')}`;
+  return names.join(' + ');
 }
 
 const at = (d: Date, now: Date) =>
@@ -164,8 +197,9 @@ export function scenario(
   admins: readonly string[],
   hours: ResponseHours,
   now: Date,
-  options: { phone?: boolean; reminderMin?: number } = {},
+  options: { phone?: boolean; reminderMin?: number; management?: readonly string[] } = {},
 ) {
+  const management = options.management ?? [];
   const tier = p.tier ?? site?.tier ?? 1;
   const plan = { severity: p.severity, tier, reminderMin: options.reminderMin ?? 15, steps: p.steps };
   const schedule = scheduleOf({ plan, detectedAt: now, hours });
@@ -190,15 +224,19 @@ export function scenario(
     add(reminder.dueAt, { what: `Reminder in the thread (every ${plan.reminderMin} min)`, muted: true });
   p.steps.forEach((s, i) => {
     // No site to resolve for: the role tokens stand in for names (spec-check round 2).
-    const names = site ? stepNames(p.steps, i, site, admins) : targetLabels(s, admins);
+    const names = site
+      ? stepNames(p.steps, i, site, admins, management)
+      : targetLabels(s, admins, management);
     const due = held && i === 0 ? opening : (schedule.find((x) => x.level === s.level)?.dueAt ?? now);
     const nobody = !s.channels.some((c) => c !== 'voice')
       ? 'notifies nobody (no channel ticked)'
       : !s.targets.length
         ? 'notifies nobody (no one picked)'
-        : !names.length
-          ? nobodyWhy(s, site, admins)
-          : null;
+        : onlyManagement(s) && !management.length
+          ? 'notifies nobody (nobody is Management yet)'
+          : !names.length
+            ? nobodyWhy(s, site, admins, management)
+            : null;
     const space = i === 0 && s.channels.includes('space') ? ' + Alerts Space' : '';
     const suffix =
       i > 0
@@ -212,8 +250,11 @@ export function scenario(
             : '';
     add(due, {
       level: s.level,
-      what: `L${i} → ${nobody ?? names.join(' + ') + space + (isReminderStep(p.steps, i, site, admins) ? ' (reminder)' : '')}${suffix}`,
-      danger: !s.channels.some((c) => c !== 'voice') || !s.targets.length,
+      what: `L${i} → ${nobody ?? namesLine(s, names, !!site) + space + (isReminderStep(p.steps, i, site, admins, management) ? ' (reminder)' : '')}${suffix}`,
+      danger:
+        !s.channels.some((c) => c !== 'voice') ||
+        !s.targets.length ||
+        (onlyManagement(s) && !management.length),
     });
   });
   // Steps before the muted row at the same minute; otherwise by time (a stable sort keeps the order added).

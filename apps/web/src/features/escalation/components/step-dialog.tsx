@@ -12,17 +12,41 @@ import { delayCheck, policyShort, type PolicyDraft } from '../model';
 import { scenario } from '../preview';
 import type { PreviewSite } from '../types';
 
-/** The role tokens; the CEO only on Tier 1 DOWN from L2 (§15.5). */
-const TOKENS: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'ceo', 'site_am'];
+/** The role tokens; the CEO and Management only on Tier 1 DOWN from L2 (§15.5, §43.9). */
+const TOKENS: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'management', 'ceo', 'site_am'];
 
 /** The CEO line under the tokens (Escalation board `eCeoNote`). */
 function ceoNote(key: PolicyDraft['key'], index: number, fyi: boolean): string {
   if (fyi)
     return 'CEO + Site AM are fixed on this step: it’s the Tier 1 step that still sends an FYI after acknowledge (never a call). It can’t be removed.';
   if (key !== 't1')
-    return 'CEO isn’t available here — the CEO is paged only on Tier 1 DOWN, from L2 onward. On this policy the CEO sees incidents in the daily digest.';
-  return index < 2 ? 'CEO is available from L2 onward.' : 'Adding CEO keeps this step at L2 or later.';
+    return 'CEO isn’t available here — on Tier 1 DOWN the CEO gets only the L3 FYI. On this policy the CEO sees incidents in the daily digest.';
+  return index < 2
+    ? 'CEO is available from L2 onward.'
+    : 'The CEO gets the L3 FYI. Adding CEO here keeps this step at L2 or later.';
 }
+
+/**
+ * The Management line under the tokens (Escalation board `eMgNote`, §43.9): why it's locked, or who
+ * it names. A warning while nobody is Management where the token could go.
+ */
+export function managementNote(
+  key: PolicyDraft['key'],
+  index: number,
+  fyi: boolean,
+  management: readonly string[],
+): { text: string; warn: boolean } {
+  if (fyi) return { text: 'Management isn’t on the FYI step — they act at L2.', warn: false };
+  if (key !== 't1') return { text: 'Management is used only on Tier 1 DOWN', warn: false };
+  if (index < 2) return { text: 'Management can be told only from L2', warn: false };
+  if (!management.length)
+    return { text: 'Nobody is Management yet — set someone on Users & roles', warn: true };
+  return { text: `Management = ${management.join(', ')} · Chat @mention + email, no voice.`, warn: false };
+}
+
+/** "Vee and Pim are", "Vee is", "Vee, Pim and Ann are". */
+const areList = (names: readonly string[]) =>
+  names.length === 1 ? `${names[0]} is` : `${names.slice(0, -1).join(', ')} and ${names.at(-1)} are`;
 
 /**
  * Edit L1 / Add L1 (Escalation board edit dialog): delay, role tokens, channels. Changes stay on the
@@ -34,6 +58,7 @@ export function StepDialog({
   index,
   adding,
   admins,
+  management,
   site,
   hours,
   now,
@@ -44,6 +69,8 @@ export function StepDialog({
   index: number;
   adding: boolean;
   admins: readonly string[];
+  /** The Admins tagged Management (§43.9). */
+  management: readonly string[];
   /** The Preview's site: the dialog's own preview line names its people (Escalation board). */
   site: PreviewSite | undefined;
   hours: ResponseHours;
@@ -66,13 +93,17 @@ export function StepDialog({
     // L0 always @mentions the Owner / on-call (spec §14.7); the pencil only adds people (S10).
     (l0 && t === 'owner') ||
     (fyi && (t === 'ceo' || t === 'site_am')) ||
-    (t === 'ceo' && !targets.includes('ceo') && (policy.key !== 't1' || index < 2));
+    (t === 'ceo' && !targets.includes('ceo') && (policy.key !== 't1' || index < 2)) ||
+    (t === 'management' &&
+      !targets.includes('management') &&
+      (policy.key !== 't1' || index < 2 || fyi || !management.length));
   const pick = (t: EscalationTarget) => {
     if (locked(t)) return;
     const next = toggle(targets, t);
     setTargets(next);
-    // Voice rides only on a CEO step: taking the CEO off drops it.
-    if (t === 'ceo' && !next.includes('ceo')) setChannels((list) => list.filter((c) => c !== 'voice'));
+    // Voice rides only on a CEO step: taking the CEO off, or adding Management (no voice, §43.9), drops it.
+    if ((t === 'ceo' && !next.includes('ceo')) || next.includes('management'))
+      setChannels((list) => list.filter((c) => c !== 'voice'));
   };
   const voice = channels.includes('voice');
   const channel = (c: EscalationChannel) => (on: boolean) =>
@@ -84,6 +115,15 @@ export function StepDialog({
     onApply({ ...start, delayMin: Number(delay), targets, channels });
   };
   const adminNote = admins.length === 1 ? `${admins[0]} is the only active Admin.` : null;
+  const mgNote = managementNote(policy.key, index, fyi, management);
+  // Board `eWhoHint`: on Tier 1 the Admins who are Management get L2 instead (§43.2).
+  const whoAdmins = !targets.includes('admins')
+    ? ''
+    : policy.key === 't1' && management.length
+      ? ` Admin = ${admins.join(', ') || 'nobody'} — ${areList(management)} Management, so they get L2 instead.`
+      : adminNote
+        ? ` ${adminNote}`
+        : '';
   // The step as it would be applied, previewed for the site (board: "10:03 · L1 → Ploy + Tao (MuvMi)").
   const trial = {
     ...policy,
@@ -91,7 +131,7 @@ export function StepDialog({
       i === index ? { ...s, delayMin: check.error ? s.delayMin : Number(delay), targets, channels } : s,
     ),
   };
-  const row = scenario(trial, site, admins, hours, now).rows.find(
+  const row = scenario(trial, site, admins, hours, now, { management }).rows.find(
     (r) => r.level === trial.steps[index]?.level,
   )!;
   const preview = { ...row, what: site ? `${row.what} (${site.name})` : row.what };
@@ -150,10 +190,13 @@ export function StepDialog({
             {tried && nobody
               ? 'Pick at least one person.'
               : targets.length
-                ? `Tokens resolve per site.${targets.includes('admins') && adminNote ? ` ${adminNote}` : ''}`
+                ? `Tokens resolve per site.${whoAdmins}`
                 : 'Pick who this step notifies. Tokens resolve per site — see the preview.'}
           </span>
           <span className="text-xs text-fg-secondary">{ceoNote(policy.key, index, fyi)}</span>
+          <span className={`text-xs ${mgNote.warn ? 'text-fg-warning' : 'text-fg-secondary'}`}>
+            {mgNote.text}
+          </span>
         </fieldset>
         <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
           <legend className="mb-2 p-0 text-sm font-medium">Channels</legend>
@@ -180,7 +223,11 @@ export function StepDialog({
                 ? 'Set up on this step but stays off until the CEO approves voice calls and Twilio is set up (~$23–26 / month).'
                 : fyi
                   ? 'Never on this step — the FYI goes by Chat @mention + email only.'
-                  : 'Only the L2 CEO step can carry a voice call, and it stays off until approved.'
+                  : targets.includes('management')
+                    ? 'No voice on a Management step — they’re told by Chat @mention + email.'
+                    : policy.steps.some((s) => s.channels.includes('voice'))
+                      ? 'Only the L2 CEO step can carry a voice call, and it stays off until approved.'
+                      : 'No step carries a voice call now. It stays configured and off until the CEO approves (Twilio, ~$23–26 / month).'
             }
           >
             {voice ? 'Voice call · Configured · off until approved' : 'Voice call'}
@@ -192,8 +239,17 @@ export function StepDialog({
             </span>
           )}
         </fieldset>
-        {targets.includes('ceo') && !fyi && (
-          <p className="m-0 text-xs text-fg-secondary">This step pages the CEO, so it can’t move above L2.</p>
+        {targets.includes('management') ? (
+          <p className="m-0 text-xs text-fg-secondary">
+            This step tells Management, so it stays at L2 or later.
+          </p>
+        ) : (
+          targets.includes('ceo') &&
+          !fyi && (
+            <p className="m-0 text-xs text-fg-secondary">
+              This step pages the CEO, so it can’t move above L2.
+            </p>
+          )
         )}
         <p className="m-0 flex gap-2.5 rounded-aura-md border border-border-default px-3.5 py-2.5 text-sm">
           <span className="shrink-0 font-mono text-xs whitespace-nowrap text-fg-secondary">{preview.at}</span>

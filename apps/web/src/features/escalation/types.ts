@@ -19,8 +19,10 @@ export interface EscalationPageData {
   /** Tier 2–3 response hours in Bangkok minutes; holidays as `YYYY-MM-DD`. */
   hours: { startMin: number; endMin: number; days: number[]; holidays: string[] };
   sites: PreviewSite[];
-  /** Every active Admin ("Admin" in a step). */
+  /** The active Admins who aren't Management ("Admin" in a step, D-078 3a). */
   admins: string[];
+  /** The active Admins tagged Management ("Management" in a step, §43). */
+  management: string[];
   /** Open incidents that keep the policy they opened with, by policy (the save dialog). */
   openIncidents: { number: number; key: PolicyKey }[];
 }

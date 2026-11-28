@@ -43,10 +43,38 @@ describe('preview (S08, D-034)', () => {
       { token: 'Owner / on-call', name: 'Arm' },
       { token: 'Backup', name: 'Ploy' },
       { token: 'Admin', name: 'Tao' },
+      { token: 'Management', name: 'Nobody yet' },
       { token: 'Site AM', name: 'Bua' },
       { token: 'CEO', name: 'CEO' },
     ]);
-    expect(tokenRows({ ...muvmi, am: null }, [])[3]).toEqual({ token: 'Site AM', name: '— (internal)' });
+    expect(tokenRows({ ...muvmi, am: null }, [])[4]).toEqual({ token: 'Site AM', name: '— (internal)' });
+  });
+
+  it('D-078: Management — the Admin row says who is left out; L2 names them; nobody → notifies nobody', () => {
+    const mg = {
+      level: 2,
+      delayMin: 30,
+      targets: ['management' as const],
+      channels: ['chat' as const, 'email' as const],
+    };
+    const steps = [...down(1).steps, mg];
+    expect(tokenRows(muvmi, ['Tao'], steps, ['Vee', 'Pim'])).toEqual([
+      { token: 'Owner / on-call', name: 'Arm' },
+      { token: 'Backup', name: 'Ploy' },
+      { token: 'Admin', name: 'Tao · Vee, Pim left out (Management)' },
+      { token: 'Management', name: 'Vee, Pim' },
+    ]);
+    const p = { ...down(1), steps };
+    const named = scenario(p, muvmi, ['Tao'], hours, bkk('2026-09-25T09:48:00'), {
+      management: ['Vee', 'Pim'],
+    });
+    expect(named.rows.find((r) => r.level === 2)).toMatchObject({ what: 'L2 → Management — Vee, Pim' });
+    const nobody = scenario(p, muvmi, ['Tao'], hours, bkk('2026-09-25T09:48:00')).rows.find(
+      (r) => r.level === 2,
+    );
+    expect(nobody).toMatchObject({ what: 'L2 → notifies nobody (nobody is Management yet)', danger: true });
+    expect(stepNames(steps, 1, muvmi, ['Tao'], ['Vee'])).not.toContain('Vee');
+    expect(nobodyWhy(mg, muvmi, ['Tao'], [])).toBe('nobody (nobody is Management yet)');
   });
 
   it('S10: L2 names the CEO; the FYI tells CEO + AM again; Tier 2–3 L2 reminds the Admin', () => {

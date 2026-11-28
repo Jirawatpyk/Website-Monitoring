@@ -20,7 +20,9 @@ import {
   canDelete,
   deleteLabel,
   fyiNote,
+  MANAGEMENT_LEFT_OUT,
   moveLabels,
+  showsManagementLeftOut,
   stepCondition,
   stepErrors,
   stepNote,
@@ -47,6 +49,7 @@ export function StepRow({
   policy,
   index,
   admins,
+  management,
   hoursText,
   onEdit,
   onDelete,
@@ -54,8 +57,10 @@ export function StepRow({
 }: {
   policy: PolicyDraft;
   index: number;
-  /** Every active Admin: the token reads "Admin (Tao)" (D-034). */
+  /** The active Admins who aren't Management: the token reads "Admin (Tao)" (D-034, D-078 3a). */
   admins: readonly string[];
+  /** The Admins tagged Management: "Management · Vee, Pim" (§43.8). */
+  management: readonly string[];
   /** The response hours in words, for L0's note (S10). */
   hoursText: string;
   onEdit: (index: number) => void;
@@ -64,7 +69,7 @@ export function StepRow({
   onMove: (index: number, by: -1 | 1) => void;
 }) {
   const step = policy.steps[index] as EscalationStep;
-  const errs = stepErrors(policy.steps, index, policy.key);
+  const errs = stepErrors(policy.steps, index, policy.key, management);
   const note = stepNote(policy, step, false, admins, hoursText);
   const pinned = index === 0;
   const label = `L${index}`;
@@ -143,7 +148,7 @@ export function StepRow({
         <dl className="m-0 grid grid-cols-[calc(var(--spacing)*22)_minmax(0,1fr)] items-center gap-x-4 gap-y-2.5">
           <dt className="font-mono text-xs text-fg-tertiary">NOTIFY</dt>
           <dd className="m-0 flex flex-wrap gap-2">
-            {targetLabels(step, admins).map((t) => (
+            {targetLabels(step, admins, management).map((t) => (
               <Tag key={t} icon={<IconUser />}>
                 {t}
               </Tag>
@@ -152,6 +157,12 @@ export function StepRow({
               <span className="flex items-center gap-1.5 text-xs text-fg-warning">
                 <IconTriangleAlert size="sm" aria-hidden />
                 {admins[0]} is the only active Admin
+              </span>
+            )}
+            {showsManagementLeftOut(policy, step) && (
+              <span className="flex items-center gap-1.5 text-xs text-fg-secondary">
+                <IconInfo size="sm" aria-hidden />
+                {MANAGEMENT_LEFT_OUT}
               </span>
             )}
           </dd>
