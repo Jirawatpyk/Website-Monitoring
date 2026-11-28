@@ -155,10 +155,17 @@ const CHANNEL_WORDS: Record<Exclude<EscalationChannel, 'voice'>, string> = {
 
 const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
-/** "backup + every Admin". */
-function whoOf(s: EscalationStep, owner = TARGET_WORDS.owner): string {
+/**
+ * "backup + every Admin". With a Management step on the policy, the Admin token reads "the Admins who
+ * aren't Management" (D-078 3a) — until then every Admin it names.
+ */
+function whoOf(s: EscalationStep, owner = TARGET_WORDS.owner, management = false): string {
   const names = TARGET_ORDER.filter((t) => s.targets.includes(t)).map((t) =>
-    t === 'owner' ? owner : TARGET_WORDS[t],
+    t === 'owner'
+      ? owner
+      : t === 'admins' && management
+        ? 'the Admins who aren’t Management'
+        : TARGET_WORDS[t],
   );
   return names.join(' + ') || 'nobody';
 }
@@ -174,10 +181,11 @@ const whenOf = (s: EscalationStep) => (s.level === 0 ? '0 min' : `+${s.delayMin}
 
 /** The Tier 1 DOWN ladder as rows (Guide "Who gets it if nobody acknowledges"). */
 export function ladderRows(steps: readonly EscalationStep[]): LadderRow[] {
+  const mg = usesManagement(steps);
   return steps.map((s) => ({
     level: `L${s.level}`,
     when: whenOf(s),
-    who: `${cap(whoOf(s, 'owner inside response hours, on-call outside'))} · ${channelsOf(s)}`,
+    who: `${cap(whoOf(s, 'owner inside response hours, on-call outside', mg))} · ${channelsOf(s)}`,
     ack:
       s.level === 0
         ? s.channels.includes('email')
@@ -191,9 +199,19 @@ export function ladderRows(steps: readonly EscalationStep[]): LadderRow[] {
 }
 
 /** "L0 owner · L1 +15 min backup + every Admin · L2 +30 min every Admin" (a policy in one line). */
-export function policyLine(steps: readonly EscalationStep[]): string {
-  return steps.map((s) => `L${s.level}${s.level ? ` ${whenOf(s)}` : ''} ${whoOf(s)}`).join(' · ');
+export function policyLine(
+  steps: readonly EscalationStep[],
+  /** The Admin token leaves Management out on every policy (D-078 3a) once Tier 1 names them. */
+  mg = usesManagement(steps),
+): string {
+  return steps
+    .map((s) => `L${s.level}${s.level ? ` ${whenOf(s)}` : ''} ${whoOf(s, TARGET_WORDS.owner, mg)}`)
+    .join(' · ');
 }
+
+/** A step of the policy names Management (D-078). */
+const usesManagement = (steps: readonly EscalationStep[]) =>
+  steps.some((s) => s.targets.includes('management'));
 
 const sameSteps = (a: readonly EscalationStep[], b: readonly EscalationStep[]) =>
   JSON.stringify(a) === JSON.stringify(b);
@@ -305,6 +323,8 @@ function oneAdminCallout(f: GuideFacts, what: string): Callout | null {
 function drafts(f: GuideFacts): Draft[] {
   const t1 = f.policies.t1;
   const fyi = t1.find((s) => s.fyi);
+  // D-078: the Tier 1 step that asks Management to step in.
+  const mgStep = t1.find((s) => !s.fyi && s.targets.includes('management'));
   const t1Admins = adminLevel(t1);
   const updT1 = CLIENT_UPDATE_MIN[1] ?? 15;
   const updT2 = CLIENT_UPDATE_MIN[2] ?? 60;
@@ -472,7 +492,7 @@ function drafts(f: GuideFacts): Draft[] {
     title: 'When an alert arrives',
     summary: 'Acknowledge in one tap · who gets it if nobody acks',
     keywords:
-      'ack acknowledge alert escalation ladder l0 l1 l2 l3 undo chat email ceo fyi timers response hours reminder still down',
+      'ack acknowledge alert escalation ladder l0 l1 l2 l3 undo chat email ceo management fyi timers response hours reminder still down',
     roles: ['Responder', 'On-call', 'Stakeholder', 'Admin'],
     lede: 'Open the card, acknowledge in one tap, then work the incident. Nothing is posted until the 10 s undo window closes.',
     blocks: [
@@ -484,6 +504,19 @@ function drafts(f: GuideFacts): Draft[] {
           text: 'Got an FYI or a client-update mention? You can’t acknowledge, and you don’t need to — AMs act on the client update; the CEO needs no action on an FYI.',
         },
       },
+      ...(mgStep
+        ? [
+            {
+              kind: 'callout' as const,
+              callout: {
+                tone: 'info' as const,
+                title: 'For Management',
+                // §43.10: what the L2 card asks of them
+                text: `Tier 1 DOWN comes to you at +${mgStep.delayMin} min when nobody has acknowledged. Step in and find someone to take it: call the owner or backup, reassign, or acknowledge yourself — and ask for a status note${fyi ? `: the CEO and the site’s AM see it in the FYI at +${fyi.delayMin} min` : ''}.`,
+              },
+            },
+          ]
+        : []),
       {
         kind: 'steps',
         items: [
@@ -530,11 +563,11 @@ function drafts(f: GuideFacts): Draft[] {
         cards: [
           ...tierCards.map((c) => ({
             title: c.title,
-            text: `${policyLine(c.steps)}. No CEO page. Outside ${f.hours} it’s posted at once and the timers wait for the next opening.`,
+            text: `${policyLine(c.steps, !!mgStep)}. No CEO page. Outside ${f.hours} it’s posted at once and the timers wait for the next opening.`,
           })),
           {
             title: 'PROBLEM · all tiers',
-            text: `${policyLine(f.policies.problem)} · a reminder every ${f.problemReminderMin} min. Tier 1 outside response hours goes to on-call; Tier 2–3 outside response hours is held until the next opening.`,
+            text: `${policyLine(f.policies.problem, !!mgStep)} · a reminder every ${f.problemReminderMin} min. Tier 1 outside response hours goes to on-call; Tier 2–3 outside response hours is held until the next opening.`,
           },
           {
             title: 'Until someone acknowledges',
@@ -870,8 +903,8 @@ function drafts(f: GuideFacts): Draft[] {
       'at least +15 min and later than the one before; every step needs a channel. A save needs a note and changes new incidents only — open ones keep the policy they opened with.',
     ),
     B(
-      'The CEO only on Tier 1 DOWN, from L2 on.',
-      'Voice shows “Configured · off until approved”. The Tier 1 FYI step can’t be removed or carry voice.',
+      'The CEO and Management only on Tier 1 DOWN, from L2 on.',
+      'Management is a tag on Admins, set on Users & roles: a tagged Admin gets the Management step, not the Admin ones. A Management step never carries voice. Voice shows “Configured · off until approved”. The Tier 1 FYI step can’t be removed or carry voice.',
     ),
   ];
   const usersBullet = B(
@@ -887,7 +920,7 @@ function drafts(f: GuideFacts): Draft[] {
     title: 'Escalation rules, users & roles',
     summary: 'Guardrails, the role matrix and the Used-in check',
     keywords:
-      'admin escalation policy editor rules users roles permissions matrix used in deactivate change role ceo voice',
+      'admin escalation policy editor rules users roles permissions matrix used in deactivate change role ceo management voice',
     roles: ['Admin'],
     lede: 'What the escalation editor won’t let you break, who can do what, and why a role change asks you to reassign first.',
     blocks: [
@@ -906,7 +939,7 @@ function drafts(f: GuideFacts): Draft[] {
     icon: 'arrow-up-right',
     title: 'Escalation rules',
     summary: 'Levels, timing and the guardrails when you edit them',
-    keywords: 'admin escalation policy editor rules levels timing ceo voice',
+    keywords: 'admin escalation policy editor rules levels timing ceo management voice',
     lede: 'What the escalation editor won’t let you break.',
     blocks: [{ kind: 'bullets', items: escalationBullets }],
     related: [LINKS.escalation],

@@ -245,6 +245,31 @@ describe('the ladder in words', () => {
   it('one line per policy', () => {
     expect(policyLine(T23)).toBe('L0 owner · L1 +15 min backup + every Admin · L2 +30 min every Admin');
   });
+  it('D-078: L2 to Management — the Admin token says who it leaves out, Management get their own card', () => {
+    const t1 = T1.map((s) =>
+      s.level === 2
+        ? { ...s, targets: ['management' as const], channels: ['chat' as const, 'email' as const] }
+        : s,
+    );
+    expect(ladderRows(t1)[1]!.who).toBe('Backup + the Admins who aren’t Management · Chat @mention + email');
+    expect(ladderRows(t1)[2]!.who).toBe('Management · Chat @mention + email');
+    expect(policyLine(T23, true)).toBe(
+      'L0 owner · L1 +15 min backup + the Admins who aren’t Management · L2 +30 min the Admins who aren’t Management',
+    );
+    const alert = guideTopics({ ...FACTS, policies: { ...FACTS.policies, t1 } }, 'desktop').find(
+      (t) => t.id === 'alert',
+    )!;
+    const card = alert.blocks.find((b) => b.kind === 'callout' && b.callout.title === 'For Management');
+    expect(card?.kind === 'callout' && card.callout.text).toBe(
+      'Tier 1 DOWN comes to you at +30 min when nobody has acknowledged. Step in and find someone to take it: call the owner or backup, reassign, or acknowledge yourself — and ask for a status note: the CEO and the site’s AM see it in the FYI at +60 min.',
+    );
+    // Before the switch there is no Management card.
+    expect(
+      desktop
+        .find((t) => t.id === 'alert')!
+        .blocks.some((b) => b.kind === 'callout' && b.callout.title === 'For Management'),
+    ).toBe(false);
+  });
   it('shows Tier 2 and Tier 3 apart when they differ', () => {
     const t3 = T23.slice(0, 2);
     const ladder = guideTopics({ ...FACTS, policies: { ...FACTS.policies, t3 } }, 'desktop')
