@@ -26,7 +26,7 @@ import { FOCUS_TARGET } from '@/components/focus-target';
 import { NOTHING_TO_POST, postWaitWords, type PostOverdue } from './use-post-wait';
 import { useSecondsLeft } from '@/components/use-seconds-left';
 import { addNote, resolveIncident, saveRootCause, undoResolve } from '../actions';
-import type { Condition } from '../model';
+import { STOPPED_DETAIL, type Condition } from '../model';
 import { rootCauseSchema } from '../schemas';
 
 const CATEGORY_OPTIONS = ROOT_CAUSE_CATEGORIES.map((c) => ({ value: c, label: ROOT_CAUSE_LABELS[c] }));
@@ -415,6 +415,8 @@ export function ResolveDialog({
               : 'Fill in below · “Unknown — keep investigating” doesn’t count',
         },
   );
+  // D-079: a stopped site's resolve can't be undone, so no Undo button that would only fail.
+  const stoppedSite = conditions.some((c) => c.key === 'recovery' && c.detail === STOPPED_DETAIL);
   const gate = canResolve({
     okRounds: willAccept || conditions.find((c) => c.key === 'recovery')?.met ? 2 : 0,
     // A Page change has no client-update track (§26.3): no condition means nothing pending.
@@ -498,7 +500,7 @@ export function ResolveDialog({
       footer={
         done?.kind === 'resolved' ? (
           <>
-            {seconds > 0 && (
+            {seconds > 0 && !stoppedSite && (
               <Button variant="secondary" icon={<IconRotateCcw />} loading={pending} onClick={undo}>
                 {`Undo · ${seconds} s`}
               </Button>

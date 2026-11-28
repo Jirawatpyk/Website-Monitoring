@@ -155,6 +155,24 @@ describe('episodesFromTimeline (stored incident_events → drops)', () => {
     expect(drops.map((d) => [d.severity, d.end])).toEqual([['down', null]]);
   });
 
+  // D-079: resolved after its monitoring was stopped — the drop ends when nobody watched any more, not at
+  // the resolve days later (a later resolve would count the unwatched days as down).
+  it.each([
+    ['ends the open drop at the stop', '2026-09-21T03:30:00+07:00', 18],
+    ['a stop after a recovery changes nothing', '2026-09-21T04:00:00+07:00', 7],
+  ])('monitoring_stopped %s', (_, stopAt, minutes) => {
+    const events = [
+      { type: 'detected', at: '2026-09-21T03:12:40+07:00', payload: {} },
+      ...(minutes === 7 ? [{ type: 'recovered', at: '2026-09-21T03:19:00+07:00', payload: {} }] : []),
+      { type: 'monitoring_stopped', at: stopAt, payload: {} },
+    ];
+    const drops = episodesFromTimeline(
+      { started_at: '2026-09-21T03:12:00+07:00', severity: 'down', resolved_at: '2026-09-24T10:00:00+07:00' },
+      events,
+    );
+    expect(downMinutesIn(drops, at('2026-09-21T00:00:00'), at('2026-09-25T00:00:00'))).toBe(minutes);
+  });
+
   it('a PROBLEM incident raised to DOWN (D-021) starts its downtime at downStartedAt', () => {
     const drops = episodesFromTimeline({ started_at: '2026-09-25T09:30:00+07:00', severity: 'problem' }, [
       { type: 'detected', at: '2026-09-25T09:31:00+07:00', payload: {} },

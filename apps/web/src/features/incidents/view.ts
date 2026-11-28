@@ -31,6 +31,8 @@ export interface IncidentRow {
   acked_at: string | null;
   acked_by: string | null;
   recovered_at: string | null;
+  /** D-079: a resolve on a stopped site may have no recovery; the header's span ends here then. */
+  resolved_at?: string | null;
   /** The person L0 paged (S10): the person on call outside response hours, else null (the owner). */
   l0_user_id?: string | null;
   sites: {
@@ -39,6 +41,8 @@ export interface IncidentRow {
     primary_owner_id: string | null;
     backup_owner_id: string | null;
     monitors: { url: string; is_primary: boolean }[];
+    /** Monitoring stopped (D-079): no OK round can come, so the 2-OK-rounds condition is waived. */
+    is_active?: boolean;
   };
 }
 
@@ -155,7 +159,11 @@ export function buildIncidentView(
   const recovered = !!i.recovered_at;
   const problem = i.severity === 'problem';
   const started = new Date(i.started_at);
-  const end = i.recovered_at ? new Date(i.recovered_at) : now;
+  // D-079: resolved on a stopped site without a recovery — the drop ended at the stop (else the resolve),
+  // never "now": the header would keep growing after it was closed (engine review M2).
+  const stoppedAt = events.find((e) => e.type === 'monitoring_stopped')?.at ?? null;
+  const endAt = i.recovered_at ?? stoppedAt ?? i.resolved_at ?? null;
+  const end = endAt ? new Date(endAt) : now;
   const minutes = Math.max(1, Math.floor((end.getTime() - started.getTime()) / 60_000));
   const detected = events.find((e) => e.type === 'detected');
   const nameOf = (id: string | null) => (id ? (names.get(id) ?? 'someone') : 'someone');

@@ -2,6 +2,7 @@ import 'server-only';
 import { loadResponseHours } from '@/server/escalation/response-hours';
 import { cache } from 'react';
 import {
+  DROP_EVENT_TYPES,
   downEpisodesFromTimeline,
   settledOutageMinutes,
   episodesFromTimeline,
@@ -110,7 +111,7 @@ export async function downEpisodesBySite(supabase: DbClient, siteIds: readonly s
       let q = supabase
         .from('incidents')
         .select('id, site_id, started_at, resolved_at, severity, incident_events(type, at, payload)')
-        .in('incident_events.type', ['detected', 'relapsed', 'escalated_to_down', 'recovered'])
+        .in('incident_events.type', [...DROP_EVENT_TYPES])
         .eq('severity', 'down')
         .or(`resolved_at.is.null,resolved_at.gte.${from.toISOString()}`);
       if (siteIds) q = q.in('site_id', [...siteIds]);
@@ -154,7 +155,7 @@ export async function maintenanceSpansBySite(
   const { data: incidents, error: incError } = await supabase
     .from('incidents')
     .select('site_id, started_at, severity, resolved_at, incident_events(type, at, payload)')
-    .in('incident_events.type', ['detected', 'relapsed', 'escalated_to_down', 'recovered'])
+    .in('incident_events.type', [...DROP_EVENT_TYPES])
     .in('site_id', withWindows)
     .or(`resolved_at.is.null,resolved_at.gte.${earliest}`);
   if (incError) throw new Error(`incidents: ${incError.message}`);

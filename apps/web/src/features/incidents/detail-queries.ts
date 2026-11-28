@@ -1,7 +1,13 @@
 import 'server-only';
 import { cache } from 'react';
 import type { DbClient } from '@dxt/db';
-import { downEpisodesFromTimeline, episodesFromTimeline, outageMinutes, siteUptimeOver } from '@dxt/engine';
+import {
+  DROP_EVENT_TYPES,
+  downEpisodesFromTimeline,
+  episodesFromTimeline,
+  outageMinutes,
+  siteUptimeOver,
+} from '@dxt/engine';
 import { clientUpdateDraft, describeFailure } from '@dxt/notifier';
 import type { LocationGlyph } from '@/components/site-cells';
 import {
@@ -61,7 +67,7 @@ const MAX_EVENTS = 5000;
 /** Ids per `in` filter (kept well under URL limits). */
 const ID_CHUNK = 150;
 /** The events `episodesFromTimeline` reads an incident's drops from. */
-const DROP_EVENTS = ['detected', 'recovered', 'relapsed', 'escalated_to_down'];
+const DROP_EVENTS: readonly string[] = DROP_EVENT_TYPES;
 
 /** One location's checks for the Evidence card: first check, the recheck and the latest. */
 export interface LocationEvidence {
@@ -94,6 +100,11 @@ export interface IncidentDetail {
   nowSeverity: Severity;
   /** When the drop in progress started (ISO); the incident's start without one. */
   nowSince: string;
+  /**
+   * D-079: resolved on a stopped site while still in a drop — when monitoring stopped (ISO). The page
+   * then never says "recovered": nobody saw it come back.
+   */
+  stoppedAt?: string | null;
   /**
    * §37: the home page came back while a key page (or the certificate chain) still fails — the DOWN is
    * over, the incident carries on as a PROBLEM. Null otherwise.
@@ -455,7 +466,7 @@ export async function loadIncident(
        client_update_due_at, client_updated_by, client_update_note, client_update_not_needed,
        root_cause_category, root_cause, root_cause_fix, preventive_action, site_id, monitor_id, l0_user_id, alerted_at, escalation_plan,
        l0:profiles!incidents_l0_user_id_fkey(is_active, role),
-       sites!inner(name, tier, primary_owner_id, backup_owner_id,
+       sites!inner(name, tier, primary_owner_id, backup_owner_id, is_active,
          monitors(id, url, is_primary, timeout_ms, allowed_redirect_domains),
          clients(am_user_id, name, language, is_internal))`,
     )
@@ -755,6 +766,7 @@ export async function loadIncident(
     severity: i.severity,
     nowSeverity: current,
     nowSince,
+    stoppedAt: i.recovered_at ? null : (events.find((e) => e.type === 'monitoring_stopped')?.at ?? null),
     stillFailing,
     state: i.state,
     escalationLevel: i.escalation_level,
@@ -806,6 +818,7 @@ export async function loadIncident(
           severity: current,
           stillFailingPath: stillFailing?.path ?? null,
           internal: !!i.sites.clients?.is_internal,
+          monitoringStopped: i.sites.is_active === false,
           recoveredAt: i.recovered_at,
           clientUpdateRequired: i.client_update_required,
           clientUpdatedAt: i.client_updated_at,
@@ -1111,6 +1124,7 @@ async function uptimeBox(
     severity: string;
     started_at: string;
     recovered_at: string | null;
+    resolved_at?: string | null;
     sites: { name: string };
   },
   events: Parameters<typeof episodesFromTimeline>[1],
@@ -1130,7 +1144,8 @@ async function uptimeBox(
   });
   if (!r) return null;
   const start = Date.parse(i.started_at);
-  const end = i.recovered_at ? Date.parse(i.recovered_at) : now.getTime();
+  // D-079: a resolve without a recovery (stopped site) ends at the resolve, not now.
+  const end = Date.parse(i.recovered_at ?? i.resolved_at ?? now.toISOString());
   const inWindow = site.some((w) => w.start.getTime() < end && w.end.getTime() > start);
   const month = `${i.sites.name} ${formatMonth(now)} uptime ${formatPercent(r.uptime)}`;
   const minutes = outageMinutes(episodesFromTimeline(i as never, events), now);
