@@ -74,7 +74,8 @@ test.describe('users & roles (local Supabase)', () => {
     await rowMenu(page, viewer.name, 'Change role…');
     const mint = page.getByRole('dialog', { name: `Change ${viewer.name}’s role` });
     await choose(page, 'New role', 'Stakeholder');
-    await expect(mint.getByText(/gets the CEO step on Tier 1 DOWN/)).toBeVisible();
+    // Read from the Tier 1 policy (D-078): "… gets the CEO’s steps: Tier 1 DOWN · …".
+    await expect(mint.getByText(/gets the CEO’s steps: Tier 1 DOWN/)).toBeVisible();
     await mint.getByRole('button', { name: 'Change to Stakeholder' }).click();
     await expect(page.getByTestId('users-count')).toHaveText(
       `${viewer.name} is now Stakeholder · reassignments applied · logged`,
