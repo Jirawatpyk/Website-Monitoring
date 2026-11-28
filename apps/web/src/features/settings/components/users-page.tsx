@@ -28,6 +28,7 @@ import {
   changeBlockedWhy,
   countLine,
   liveShiftOf,
+  managementBlockedWhy,
   MATRIX_ROLES,
   oneAdminBanner,
   ROLE_MATRIX,
@@ -40,7 +41,7 @@ import {
 import { RoleBadge } from './role-badge';
 import { SettingsHeader } from './settings-header';
 import { loadHandover } from '../actions';
-import { ChatIdDialog, InviteDialog, RevokeDialog, RoleDialog } from './user-dialogs';
+import { ChatIdDialog, InviteDialog, ManagementDialog, RevokeDialog, RoleDialog } from './user-dialogs';
 import { ViewOnlyLine } from './view-only-line';
 import { PERSON_CARD, SECTION_HEADING } from './heading';
 
@@ -52,7 +53,7 @@ const ADD = '<add-person>';
 type Open =
   | { kind: 'invite' }
   | { kind: 'revoke'; email: string; isAdmin: boolean }
-  | { kind: 'role' | 'deactivate' | 'chat' | 'handover'; person: Person }
+  | { kind: 'role' | 'deactivate' | 'chat' | 'handover' | 'management'; person: Person }
   | null;
 
 /**
@@ -120,6 +121,13 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
         label: 'Change role…',
         ...(why ? { disabled: true, disabledReason: why } : { onSelect: show({ kind: 'role', person: p }) }),
       },
+      // D-078 (§43.3): under Change role; off with its reason for a non-Admin or an Admin with no Chat id
+      {
+        label: p.management ? 'Remove from Management…' : 'Set as Management…',
+        ...(managementBlockedWhy(p)
+          ? { disabled: true, disabledReason: managementBlockedWhy(p)! }
+          : { onSelect: show({ kind: 'management', person: p }) }),
+      },
       ...(live
         ? [
             {
@@ -178,7 +186,22 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
         </span>
       ),
     },
-    { key: 'role', label: 'Role', width: 120, render: (r) => <RoleBadge role={r.role} /> },
+    {
+      key: 'role',
+      label: 'Role',
+      // §43.3: 204 px, the Management badge wraps under the role when it must
+      width: 204,
+      render: (r) => (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <RoleBadge role={r.role} />
+          {r.management && (
+            <Badge tone="neutral" variant="outline">
+              Management
+            </Badge>
+          )}
+        </span>
+      ),
+    },
     {
       key: 'channels',
       label: 'Alert channels',
@@ -309,6 +332,12 @@ export function UsersPageView({ data, now: nowIso }: { data: UsersData; now: str
         onDone={finish}
       />
       <ChatIdDialog person={open?.kind === 'chat' ? p : null} onClose={close} onDone={finish} />
+      <ManagementDialog
+        data={data}
+        person={open?.kind === 'management' ? p : null}
+        onClose={close}
+        onDone={finish}
+      />
       {oncall && handShift && (
         <HandOverDialog
           open
@@ -377,15 +406,21 @@ function PeopleCards({ data, rows }: { data: UsersData; rows: UserRow[] }) {
             key={r.key}
             type="button"
             onClick={() => setOpen(r)}
-            aria-label={`${r.name}, ${ROLE_LABELS[r.role]}, ${r.meta}. Show details`}
+            aria-label={`${r.name}, ${ROLE_LABELS[r.role]}${r.management ? ', Management' : ''}, ${r.meta}. Show details`}
             className={PERSON_CARD}
           >
             <span className="flex min-w-0 grow flex-col gap-0.5 leading-snug">
-              <span className="flex items-center gap-2">
+              {/* §43.6: the Management badge beside the role, wrapping under the name when tight */}
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="min-w-0 truncate font-semibold">{r.name}</span>
                 <span className="shrink-0">
                   <RoleBadge role={r.role} />
                 </span>
+                {r.management && (
+                  <Badge tone="neutral" variant="outline">
+                    Management
+                  </Badge>
+                )}
               </span>
               <span className="truncate text-xs text-fg-secondary">{r.sub}</span>
               <span className={`text-xs ${r.oncall.live ? 'font-semibold' : 'text-fg-secondary'}`}>
@@ -401,7 +436,11 @@ function PeopleCards({ data, rows }: { data: UsersData; rows: UserRow[] }) {
         onClose={() => setOpen(null)}
         size="sm"
         title={shown?.name ?? ''}
-        description={shown ? `${ROLE_LABELS[shown.role]} · ${shown.sub}` : undefined}
+        description={
+          shown
+            ? `${ROLE_LABELS[shown.role]}${shown.management ? ' · Management' : ''} · ${shown.sub}`
+            : undefined
+        }
       >
         <div className="flex flex-col gap-3">
           {facts.map((f) => (

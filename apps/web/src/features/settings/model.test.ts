@@ -5,6 +5,8 @@ import {
   changeBlockedWhy,
   changeDialogText,
   gainsLoses,
+  managementBlockedWhy,
+  managementDialog,
   missingPicks,
   oncallOf,
   reassignPayload,
@@ -47,6 +49,74 @@ function data(over: Partial<UsersData> = {}): UsersData {
     ...over,
   };
 }
+
+describe('Management (D-078, spec §43.3–5)', () => {
+  const vee = {
+    id: 'vee',
+    name: 'Vee',
+    email: 'vee@x',
+    role: 'admin' as const,
+    chatLinked: true,
+    lastActive: null,
+  };
+  const people = (more: UsersData['people']) => [...data().people, ...more];
+
+  it('who may carry it: an Admin with a Chat id; removing is never blocked here', () => {
+    const p = data().people;
+    expect(managementBlockedWhy(p.find((x) => x.id === 'arm')!)).toBe('Only Admins can be Management');
+    expect(managementBlockedWhy({ ...vee, chatLinked: false })).toBe(
+      'Add a Google Chat id first — Management is @mentioned.',
+    );
+    expect(managementBlockedWhy(vee)).toBeNull();
+    expect(managementBlockedWhy({ ...vee, role: 'responder', management: true })).toBeNull();
+  });
+
+  it.each([
+    ['no step uses it yet', false, vee, [], /^No escalation step goes to Management yet — nothing changes/],
+    ['set, with Tao still outside Management', true, vee, [], /^Gets the L2 step on Tier 1 DOWN/],
+  ])('set · %s', (_, used, who, extra, first) => {
+    const w = managementDialog(
+      data({ managementUsed: used, emailOn: true, people: people([who, ...extra]) }),
+      who,
+    );
+    expect(w.title).toBe('Set Vee as Management?');
+    expect(w.lines[0]).toMatch(first);
+    expect(w.lines.at(-1)).toBe('Vee gets an email saying what changed.');
+  });
+
+  it('set the last Admin outside Management: warns L1 then tells no Admin (allowed)', () => {
+    const d = data({
+      managementUsed: true,
+      people: people([vee]).map((p) => (p.id === 'tao' ? { ...p, management: true } : p)),
+    });
+    expect(managementDialog(d, vee).lines).toContain(
+      'Every active Admin would then be Management, so L1 tells only the backup — no Admin.',
+    );
+  });
+
+  it('remove: back at L1, and who L2 still goes to', () => {
+    const d = data({
+      managementUsed: true,
+      people: people([{ ...vee, management: true }]).map((p) =>
+        p.id === 'tao' ? { ...p, management: true } : p,
+      ),
+    });
+    const w = managementDialog(d, { ...vee, management: true });
+    expect(w.title).toBe('Remove Vee from Management?');
+    expect(w.lines).toEqual([
+      'No longer gets the L2 step on Tier 1 DOWN.',
+      'Told at L1 again as an Admin (Chat + email).',
+      'L2 still goes to Tao.',
+    ]);
+    expect(w.done).toBe('Vee removed from Management · logged');
+  });
+
+  it('the role dialog says the tag goes with the role (§43.5)', () => {
+    expect(changeDialogText('Vee', false, false, true)).toBe(
+      'Takes effect as soon as you confirm. Vee will also leave Management.',
+    );
+  });
+});
 
 describe('changeDialogText (spec §34, D-013)', () => {
   it('promises the email only when the email provider is on', () => {

@@ -27,6 +27,8 @@ export interface Person {
   chatLinked: boolean;
   /** Newest use of any of their signed-in devices; null = none. */
   lastActive: string | null;
+  /** D-078: tagged Management (an Admin only). */
+  management?: boolean;
 }
 
 export interface Invite {
@@ -84,14 +86,23 @@ export interface UsersData {
   acks: AckRef[];
   /** The email provider is set up (D-013): only then does the dialog promise the role-change email. */
   emailOn?: boolean;
+  /** D-078: an escalation step goes to Management — until one does, the tag changes nobody's alerts. */
+  managementUsed?: boolean;
 }
 
 /** The role-change / deactivate dialog's description (spec §14.9, §34). */
-export function changeDialogText(name: string, deactivate: boolean, emailOn: boolean): string {
+export function changeDialogText(
+  name: string,
+  deactivate: boolean,
+  emailOn: boolean,
+  management = false,
+): string {
   const mail = emailOn ? ` ${name} gets an email saying what changed.` : '';
+  // D-078 (§43.5): the tag is an Admin's only — a role change or a deactivation takes it
+  const leaves = management ? ` ${name} will also leave Management.` : '';
   return deactivate
-    ? `${name} loses access at once — every device is signed out — and stops getting alerts and digests. Past acknowledgements and notes stay in the audit log; an Admin can give access back by adding them again.${mail}`
-    : `Takes effect as soon as you confirm.${mail}`;
+    ? `${name} loses access at once — every device is signed out — and stops getting alerts and digests. Past acknowledgements and notes stay in the audit log; an Admin can give access back by adding them again.${leaves}${mail}`
+    : `Takes effect as soon as you confirm.${leaves}${mail}`;
 }
 
 const canOwn = (role: Role) => role === 'admin' || role === 'responder';
@@ -425,6 +436,8 @@ export interface UserRow {
   last: string;
   /** MUsers' third line: on-call and last active, or "No Chat id · …". */
   meta: string;
+  /** D-078: the Management badge beside the role. */
+  management: boolean;
 }
 
 function channelsOf(p: Person): string {
@@ -452,6 +465,7 @@ export function userRows(d: UsersData, now: Date): UserRow[] {
       oncall,
       last,
       meta: [lead, lastLower].filter(Boolean).join(' · ') || '—',
+      management: !!p.management,
     };
   });
   const invites: UserRow[] = d.invites.map((i) => ({
@@ -466,6 +480,7 @@ export function userRows(d: UsersData, now: Date): UserRow[] {
     oncall: { text: '—', live: false },
     last: 'Not signed in yet',
     meta: 'Can’t get alerts until their first sign-in',
+    management: false,
   }));
   return [...people, ...invites];
 }
@@ -485,6 +500,54 @@ export function oneAdminBanner(d: UsersData): { title: string; body: string } | 
 
 export const countLine = (d: UsersData) =>
   `${d.people.length + d.invites.length} people · Google Workspace accounts only · role changes are logged`;
+
+/** D-078 (§43.6): the sheet fact of a Management Admin. */
+export const MANAGEMENT_FACT = 'Gets the L2 step on Tier 1 DOWN';
+
+/**
+ * Why "Set as Management…" is off (§43.3), or null: only an Admin, and one with a Chat id (Management is
+ * @mentioned). "Remove from Management…" is never off here; the last-Management rule comes with the token.
+ */
+export function managementBlockedWhy(p: Person): string | null {
+  if (p.management) return null;
+  if (p.role !== 'admin') return 'Only Admins can be Management';
+  if (!p.chatLinked) return 'Add a Google Chat id first — Management is @mentioned.';
+  return null;
+}
+
+/**
+ * The confirm's words (§43.4). Until an escalation step goes to Management the tag changes nobody's
+ * alerts, so it says that instead of promising the L2 step (D-078 item 3e).
+ */
+export function managementDialog(d: UsersData, p: Person): { title: string; lines: string[]; done: string } {
+  const on = !p.management;
+  const others = d.people.filter((x) => x.management && x.id !== p.id).map((x) => x.name);
+  const lines: string[] = [];
+  if (!d.managementUsed) {
+    lines.push(
+      on
+        ? 'No escalation step goes to Management yet — nothing changes until Tier 1 DOWN L2 is set to Management on Escalation.'
+        : "No escalation step goes to Management yet — removing it changes nobody's alerts.",
+    );
+  } else if (on) {
+    lines.push(
+      'Gets the L2 step on Tier 1 DOWN (+30 min, @mentioned in Chat + email).',
+      'No longer told at L1 as an Admin.',
+    );
+    const outside = d.people.filter((x) => x.role === 'admin' && !x.management && x.id !== p.id);
+    if (!outside.length)
+      lines.push('Every active Admin would then be Management, so L1 tells only the backup — no Admin.');
+  } else {
+    lines.push('No longer gets the L2 step on Tier 1 DOWN.', 'Told at L1 again as an Admin (Chat + email).');
+    if (others.length) lines.push(`L2 still goes to ${others.join(', ')}.`);
+  }
+  if (d.emailOn) lines.push(`${p.name} gets an email saying what changed.`);
+  return {
+    title: on ? `Set ${p.name} as Management?` : `Remove ${p.name} from Management?`,
+    lines,
+    done: on ? `${p.name} is Management · logged` : `${p.name} removed from Management · logged`,
+  };
+}
 
 /** The MUsers sheet (§35.3): Role, Alert channels, Owner · backup (or Clients and escalation), On-call, Last active. */
 export function sheetFacts(d: UsersData, r: UserRow): { k: string; v: string }[] {
@@ -511,6 +574,7 @@ export function sheetFacts(d: UsersData, r: UserRow): { k: string; v: string }[]
           .join(' · ') || '—';
   return [
     { k: 'Role', v: ROLE_LABELS[r.role] },
+    ...(r.management ? [{ k: 'Management', v: MANAGEMENT_FACT }] : []),
     { k: 'Alert channels', v: r.channels },
     { k: r.role === 'stakeholder' ? 'Clients and escalation' : 'Owner · backup', v: own },
     { k: 'On-call', v: r.oncall.text },

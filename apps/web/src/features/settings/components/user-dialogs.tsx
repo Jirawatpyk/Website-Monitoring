@@ -14,7 +14,14 @@ import {
 import { ROLE_LABELS, type Role } from '@dxt/shared';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { changeUserRole, deactivateUser, inviteUser, revokeInvite, setChatId } from '../actions';
+import {
+  changeUserRole,
+  deactivateUser,
+  inviteUser,
+  revokeInvite,
+  setChatId,
+  setManagement,
+} from '../actions';
 import type { UsersResult } from '../mutations';
 import {
   admins,
@@ -23,6 +30,7 @@ import {
   changeDialogText,
   gainsLoses,
   INVITE_HINTS,
+  managementDialog,
   missingPicks,
   reassignPayload,
   STAFF_ROLES,
@@ -318,7 +326,7 @@ export function RoleDialog({
       onClose={onClose}
       size="md"
       title={deact ? `Deactivate ${person.name}?` : `Change ${person.name}’s role`}
-      description={changeDialogText(person.name, deact, !!data.emailOn)}
+      description={changeDialogText(person.name, deact, !!data.emailOn, !!person.management)}
       footer={
         <Foot>
           <Button variant="secondary" onClick={onClose}>
@@ -614,6 +622,84 @@ export function ChatIdDialog({
             error={digits ? undefined : 'A Chat user id is digits only'}
           />
         )}
+        <Refusal error={error} />
+      </div>
+    </Dialog>
+  );
+}
+
+// ── Management (D-078, spec §43.4) ──────────────────────────────────────────────────────────────────
+
+/** Set as / remove from Management: what it does, a note for the audit log, one email to the person. */
+export function ManagementDialog({
+  data,
+  person,
+  onClose,
+  onDone,
+}: {
+  data: UsersData;
+  person: Person | null;
+  onClose: () => void;
+  onDone: (line: string) => void;
+}) {
+  const [note, setNote] = useState('');
+  const [tried, setTried] = useState(false);
+  const [refused, setRefused] = useState(0);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (refused > 0) noteRef.current?.focus();
+  }, [refused]);
+  const w = person ? managementDialog(data, person) : null;
+  const on = !person?.management;
+  const { error, pending, run } = useSubmit(() => {
+    if (w) onDone(w.done);
+    setNote('');
+    setTried(false);
+  }, person?.id ?? '');
+  return (
+    <Dialog
+      open={!!person}
+      onClose={onClose}
+      size="md"
+      title={w?.title ?? ''}
+      footer={
+        <Foot>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant={on ? 'primary' : 'danger'}
+            loading={pending}
+            onClick={() => {
+              if (!note.trim()) {
+                setTried(true);
+                setRefused((n) => n + 1);
+                return;
+              }
+              if (person) run(() => setManagement({ userId: person.id, on, note }));
+            }}
+          >
+            {on ? 'Set as Management' : 'Remove from Management'}
+          </Button>
+        </Foot>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-sm">
+          {w?.lines.map((l) => (
+            <li key={l}>{l}</li>
+          ))}
+        </ul>
+        <Textarea
+          ref={noteRef}
+          label="Note"
+          placeholder="e.g. Bua’s review — L2 goes to Management"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          error={tried && !note.trim() ? 'Add a short note — it goes in the audit log' : undefined}
+          rows={2}
+          required
+        />
         <Refusal error={error} />
       </div>
     </Dialog>

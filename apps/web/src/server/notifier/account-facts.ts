@@ -1,13 +1,13 @@
 import 'server-only';
 import type { DbClient } from '@dxt/db';
-import type { AccountFacts } from '@dxt/notifier';
+import type { AccountEventKind, AccountFacts } from '@dxt/notifier';
 import type { Role } from '@dxt/shared';
 import type { Notification } from './facts';
 
 /** An account event as the change froze it (S16 PR 4, spec §34), and its own person's address. */
 export interface AccountEventFacts {
   id: string;
-  kind: 'role_changed' | 'deactivated';
+  kind: AccountEventKind;
   user_id: string;
   from_role: Role;
   to_role: Role | null;

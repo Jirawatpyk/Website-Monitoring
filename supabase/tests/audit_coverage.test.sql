@@ -59,6 +59,7 @@ insert into audit_classes (fn, kind, note) values
   ('change_user_role', 'audited', 'users.test.sql'),
   ('deactivate_user', 'audited', 'users.test.sql'),
   ('set_chat_user_id', 'audited', 'users.test.sql'),
+  ('set_management', 'audited', 'management_tag.test.sql'),
   ('sign_out_user_everywhere', 'audited', 'users.test.sql'),
   ('sign_out_my_other_devices', 'audited', 'users.test.sql'),
   ('sign_out_my_device', 'audited', 'users.test.sql'),

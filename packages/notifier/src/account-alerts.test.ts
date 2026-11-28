@@ -214,3 +214,46 @@ describe('movedRows', () => {
     ]);
   });
 });
+
+// D-078 (spec §43.4): set as / removed from Management — one email, no role lists, nothing moved.
+describe('buildAccountEmail · Management (D-078)', () => {
+  const mg = (kind: 'management_set' | 'management_removed', others: string[]): AccountEmailInput => ({
+    ...base,
+    kind,
+    fromRole: 'admin',
+    toRole: 'admin',
+    facts: {
+      actor: 'Tao',
+      was_am: false,
+      manages_clients: false,
+      left_rotation: false,
+      admins: [],
+      moves: [],
+      others,
+    },
+  });
+
+  it('set: subject, who and when, what comes with it, who else is Management', () => {
+    const m = buildAccountEmail(mg('management_set', ['Pim']));
+    expect(m.subject).toBe('You’re now Management in DxT Monitor');
+    expect(m.text).toContain('Tao set you as Management · Fri 25 Sep 10:08. Your role stays Admin.');
+    expect(m.text).toContain('WHAT COMES WITH MANAGEMENT');
+    expect(m.text).toContain('You’re no longer told at L1 as an Admin.');
+    expect(m.text).toContain('Management now: Pim and you.');
+    expect(m.text).toContain('Role: Admin · Management');
+    // the role email's parts never show
+    expect(m.text).not.toContain('YOU CAN NOW');
+    expect(m.text).not.toContain('WHAT MOVED TO SOMEONE ELSE');
+    expect(m.text).toContain('You got this because your Management tag in DxT Monitor changed.');
+  });
+
+  it('removed: back at L1, and who is left', () => {
+    const m = buildAccountEmail(mg('management_removed', []));
+    expect(m.subject).toBe('You’re no longer Management in DxT Monitor');
+    expect(m.text).toContain('You’re told at L1 again as an Admin (Chat + email).');
+    expect(m.text).toContain('Nobody else is Management now.');
+    expect(buildAccountEmail(mg('management_removed', ['Vee', 'Pim'])).text).toContain(
+      'Management now: Vee and Pim.',
+    );
+  });
+});

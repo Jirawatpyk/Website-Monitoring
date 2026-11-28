@@ -28,11 +28,15 @@ export interface AccountFacts {
   /** The other active Admins, for a promotion to Admin. */
   admins: string[];
   moves: AccountMove[];
+  /** D-078: the other people who are Management, for a Management email. */
+  others?: string[];
 }
+
+export type AccountEventKind = 'role_changed' | 'deactivated' | 'management_set' | 'management_removed';
 
 export interface AccountEmailInput {
   eventId: string;
-  kind: 'role_changed' | 'deactivated';
+  kind: AccountEventKind;
   fromRole: Role;
   toRole: Role | null;
   at: Date;
@@ -49,6 +53,71 @@ export const accountFooter = (actor: string) =>
   `Times in Thailand time (UTC+7). This is an automated message — replies aren’t read. Questions about your access: ask an Admin (${actor}).`;
 
 const DEACTIVATED_NOTE = 'You no longer get alerts, digests or client-update pings.';
+
+/**
+ * Set as / removed from Management (D-078, spec §43.4): one email to the person. No role lists (the role
+ * doesn't change) and nothing moved — what the tag does on the escalation ladder, and who else has it.
+ */
+function managementEmail(
+  input: AccountEmailInput,
+  at: string,
+  headers: Record<string, string>,
+  footer: string,
+): EmailMessage {
+  const { facts } = input;
+  const on = input.kind === 'management_set';
+  const others = facts.others ?? [];
+  const and = (n: readonly string[]) =>
+    n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n.at(-1)}` : (n[0] ?? '');
+  const team = on
+    ? `Management now: ${and([...others, 'you'])}.`
+    : others.length
+      ? `Management now: ${and(others)}.`
+      : 'Nobody else is Management now.';
+  const pre = on
+    ? `${facts.actor} set you as Management · ${at}`
+    : `${facts.actor} removed you from Management · ${at}`;
+  return emailLayout(
+    {
+      subject: on ? 'You’re now Management in DxT Monitor' : 'You’re no longer Management in DxT Monitor',
+      why: 'You got this because your Management tag in DxT Monitor changed.',
+      footer,
+      headers,
+    },
+    {
+      color: C.secondary,
+      bar: C.tertiary,
+      label: on ? 'MANAGEMENT' : 'MANAGEMENT REMOVED',
+      pre,
+      headline: on ? 'You’re now Management' : 'You’re no longer Management',
+      lede: `${pre}. Your role stays ${ROLE_LABELS[input.fromRole]}.`,
+      facts: [
+        ['Role', on ? `${ROLE_LABELS[input.fromRole]} · Management` : ROLE_LABELS[input.fromRole]],
+        [on ? 'Set by' : 'Removed by', `${facts.actor} · ${at}`],
+      ],
+      buttons: [{ label: 'Open DxT Monitor', href: input.appUrl.replace(/\/$/, '') + '/', primary: true }],
+      sections: [
+        {
+          kind: 'list',
+          title: on ? 'WHAT COMES WITH MANAGEMENT' : 'WHAT CHANGES',
+          mark: on ? '!' : '·',
+          color: on ? C.warning : C.secondary,
+          items: on
+            ? [
+                'When a Tier 1 site is down and nobody has acknowledged it, the escalation step for Management @mentions you in Chat and emails you — step in: call the owner or backup, reassign, or acknowledge yourself.',
+                'You’re no longer told at L1 as an Admin.',
+                team,
+              ]
+            : [
+                'You no longer get the Management step on Tier 1 DOWN.',
+                'You’re told at L1 again as an Admin (Chat + email).',
+                team,
+              ],
+        },
+      ],
+    },
+  );
+}
 
 /**
  * The table's rows: sites grouped per new holder and role ("WeCare Studio, Cando Asia — owner · Arm"),
@@ -89,6 +158,10 @@ export function buildAccountEmail(input: AccountEmailInput): EmailMessage {
     rows.length
       ? [{ kind: 'table', title: 'WHAT MOVED TO SOMEONE ELSE', head: ['Place', 'Now with'], rows, notes }]
       : [];
+
+  if (input.kind === 'management_set' || input.kind === 'management_removed') {
+    return managementEmail(input, at, headers, footer);
+  }
 
   if (input.kind === 'deactivated' || input.toRole === null) {
     // Nothing moved: the note joins the lede instead of standing under an empty table.

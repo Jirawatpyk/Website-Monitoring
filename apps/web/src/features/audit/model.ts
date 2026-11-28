@@ -220,6 +220,7 @@ export const ACTION_WORDS: Record<string, string> = {
   'user.role_change': 'Changed role',
   'user.deactivate': 'Deactivated',
   'profile.chat_id': 'Changed Chat id',
+  'user.management': 'Changed Management', // D-078
   'session.sign_out_all': 'Signed out everywhere',
   'session.sign_out_others': 'Signed out other devices',
   'session.sign_out_device': 'Signed out a device',

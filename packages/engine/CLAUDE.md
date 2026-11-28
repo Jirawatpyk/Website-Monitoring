@@ -24,6 +24,8 @@ S10 (D-048): `ladderDue` also brings the plan’s `fyi` step due while Acknowled
 
 S11 (FR-20, D-002, D-052): `clientUpdateDueAt` (`lifecycle.ts`) is when the client-update track fires. The clock starts at the first DOWN drop's first failed check. Tier 1 fires at +15 min, Tier 2 at +60 min counted inside response hours (`addInsideMinutes`), Tier 3 never. The minutes are the DOWN drops added up (D-052 item 5): a recovery pauses the count, a relapse goes on with it, and a drop that ends exactly when the count reaches the threshold still fires. After a mute it counts from `alertedAt` (item 6). The ack isn't an input. It replaced `clientUpdateRequired`. The runner's tick is `server/engine/client-update.ts`, and who is told is decided in SQL (`engine_client_update_due`). INC-0142 / INC-0139 / INC-0133 cases are in `lifecycle.test.ts`.
 
+D-079: `episodesOf` ends a drop at `monitoring_stopped` as at `recovered` (the resolve of an incident on a stopped site writes it at the stop). `DROP_EVENT_TYPES` lists every event type `episodesOf` reads — callers select those, never a list of their own.
+
 S13 (D-066, D-067, D-068): `expiry.ts` — `expiryIssue` (SSL < 14 days, domain < 30, Bangkok days, a good read ≤ 36 h), `expiryUnknown`; in `site.ts` the expiry is the last PROBLEM, opens only inside response hours (`expiryOpens`), takes a new cause and goes back (`new_cause` / `cause_back`), and a DOWN that came from it recovers into it at once (`backUpOnExpiry`, `then.stillExpiry`). Cases in `expiry.test.ts`.
 
 Contract notes for the engine cron route:
