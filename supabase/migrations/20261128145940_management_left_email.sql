@@ -58,7 +58,8 @@ begin
     'manages_clients', exists (select 1 from public.clients c where c.am_user_id = p_user.id),
     'left_rotation', coalesce((p_before ->> 'rotation')::boolean, false)
                      and not exists (select 1 from public.oncall_rotation r where r.user_id = p_user.id),
-    -- D-078: the tag went with the role (management_follows_role); a deactivation counts too.
+    -- D-078: the tag went with the role (management_follows_role). A deactivation sets it too, but the
+    -- Access removed email has no lists and never reads it.
     'left_management', p_user.is_management and p_to is distinct from 'admin',
     'admins', case when p_to = 'admin' then
       (select coalesce(jsonb_agg(a.display_name order by a.display_name), '[]'::jsonb)

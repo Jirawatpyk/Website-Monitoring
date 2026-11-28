@@ -1455,8 +1455,9 @@ export function buildStepEmail(input: StepEmailInput): EmailMessage {
     color: C.warning,
     bar: C.warning,
     label: down ? `ESCALATED · L${input.level}` : 'STILL PROBLEM',
+    // EmailAlert L1: "… not acknowledged · Next: Management at 10:18" (the token, as the Chat card says it)
     pre: down
-      ? `${site} down ${duration}, not acknowledged`
+      ? `${site} down ${duration}, not acknowledged${mg ? ` · Next: Management at ${mg.at}` : ''}`
       : `${site} problem not acknowledged for ${duration}`,
     headline: down
       ? `${site} still down — ${duration}, no ack`

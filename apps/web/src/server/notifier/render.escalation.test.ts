@@ -370,6 +370,32 @@ describe('render — L2 Management (D-078)', () => {
     expect(l1({ id: 'u-tao', display_name: 'Tao', email: 'tao@example.test' }, true).text).toContain(
       'Nothing needed from you; if nobody acknowledges by 10:18, Management (Vee) step in.',
     );
+    // Sent by hand: no promise of the next level.
+    const byHand = renderEmail(
+      row(
+        'step_fired',
+        { level: 1, severity: 'down', elapsedMin: 15, mentioned: ['u-ploy'], fyi: [], byHand: true },
+        { channel: 'email', user_id: 'u-ploy' },
+      ),
+      { ...t1, state: 'escalated', escalation_level: 1 },
+      { id: 'u-ploy', display_name: 'Ploy', email: 'ploy@example.test' },
+      appUrl,
+      thread,
+    )!;
+    expect(byHand.text).not.toContain('Management (Vee)');
+    // A Tier 1 plan whose L2 is still the CEO: no Management row.
+    const ceoPlan = renderEmail(
+      row(
+        'step_fired',
+        { level: 1, severity: 'down', elapsedMin: 15, mentioned: ['u-ploy'], fyi: [] },
+        { channel: 'email', user_id: 'u-ploy' },
+      ),
+      { ...incident, state: 'escalated', escalation_level: 1 },
+      { id: 'u-ploy', display_name: 'Ploy', email: 'ploy@example.test' },
+      appUrl,
+      thread,
+    )!;
+    expect(ceoPlan.text).not.toContain('Management');
   });
 });
 
