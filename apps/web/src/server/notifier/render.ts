@@ -561,7 +561,7 @@ export function renderChat(n: Notification, i: IncidentFacts, appUrl: string, no
         next: i.state === 'acknowledged' || byHandOf(ctx) ? null : step.next,
         informed: step.informed,
         informedRoles: step.informedRoles,
-        fyiNext: step.fyiNext,
+        fyiNext: byHandOf(ctx) ? null : step.fyiNext,
         acked: step.acked,
         ...(step.kind === 'fyi'
           ? {
@@ -783,7 +783,7 @@ export function renderEmail(
         acked: step.acked,
         stopped: step.stopped,
         nextStep: byHandOf(ctx) ? null : step.nextStep,
-        fyiNext: step.fyiNext,
+        fyiNext: byHandOf(ctx) ? null : step.fyiNext,
         voiceConfigured: step.voiceConfigured,
         severity: ctx.severity === 'problem' ? 'problem' : 'down',
         level,

@@ -17,6 +17,7 @@ import {
   manualCause,
   manualConfirmedBy,
   manualWhen,
+  plainName,
   type ManualOpen,
   type ProblemFacts,
 } from './chat-alerts';
@@ -1303,14 +1304,14 @@ function otherStepEmail(
     // EmailAlert › L2 (Management), spec §43.11: one email per Management Admin, asked to step in.
     const asked = input.informedRoles ?? informed;
     const fyi = input.fyiNext
-      ? ` — and ask for a status note: ${input.fyiNext.who} get an FYI at ${formatTime(input.fyiNext.at)} if it’s still down`
+      ? ` — and ask for a status note: ${plainName(input.fyiNext.who)} get an FYI at ${formatTime(input.fyiNext.at)} if it’s still down`
       : '';
     return render(input, {
       template: 'down',
       color: C.warning,
       bar: C.warning,
       label: `ESCALATED · L${input.level}`,
-      pre: `${site} down ${duration}, not acknowledged · please step in`,
+      pre: `${site} down ${duration}, not acknowledged · please step in${informed.length ? ` · ${informed.join(', ')} informed` : ''}`,
       headline: `${site} down ${duration} — please step in`,
       lede: `Nobody has acknowledged. ${andList(asked)} ${informed.length > 1 ? 'were' : 'was'} asked. Call them, reassign, or acknowledge yourself${fyi}.`,
       facts: [

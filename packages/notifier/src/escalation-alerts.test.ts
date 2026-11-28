@@ -367,7 +367,7 @@ describe('S10 steps: L2 to the CEO, the L3 FYI, the Tier 2–3 L2 reminder (Chat
         fyi: { level: 3, at: bkk('2026-09-25T10:48:41'), who: 'CEO + Bua' },
       },
     });
-    expect(m.text).toContain('Escalation: L2 (Management) cancelled · acked · L3 FYI at 10:48 if still down');
+    expect(m.text).toContain('Escalation: L2 (Management) cancelled · L3 FYI at 10:48 if still down');
   });
 
   it('the AM’s ACKNOWLEDGED email doesn’t ask them for a status note (D-078)', () => {

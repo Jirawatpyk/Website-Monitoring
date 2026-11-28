@@ -512,7 +512,15 @@ security definer
 set search_path = ''
 as $$
 begin
-  if exists (select 1 from public.escalation_steps st where 'management' = any (st.targets))
+  -- One at a time with save_escalation_policies (security review M1): it locks this row first, so a
+  -- save of a Management step and the removal of the last Management person can't both commit. Taken
+  -- after user_access and the profile row (the people path's order), never the other way round.
+  perform 1 from public.organisation_settings where singleton for update;
+  -- a policy step, or an open incident's frozen plan (db review M2), that names Management
+  if (exists (select 1 from public.escalation_steps st where 'management' = any (st.targets))
+      or exists (select 1 from public.incidents i
+                 where i.state not in ('resolved', 'in_review', 'closed')
+                   and i.escalation_plan @? '$.steps[*].targets[*] ? (@ == "management")'))
      and not exists (select 1 from public.profiles m
                      where m.is_management and m.is_active and m.role = 'admin' and m.id <> p_user) then
     raise exception 'Can''t remove: Tier 1 DOWN L2 goes to Management and % is the last one. Change the L2 step on Escalation first, or set someone else as Management.', p_name

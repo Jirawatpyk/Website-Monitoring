@@ -92,7 +92,9 @@ export function stoppedWords(
     // §14.1 / EmailAlert ACKNOWLEDGED: "L2 cancelled · acked · L3 FYI at 10:48 if still down".
     const cancelled =
       through > 1 && (s.firedLevel ?? 0) < through
-        ? `L${through}${s.stopsWho ? ` (${s.stopsWho})` : ''} cancelled · acked · `
+        ? s.stopsWho
+          ? `L${through} (${s.stopsWho}) cancelled · `
+          : `L${through} cancelled · acked · `
         : '';
     const fact: [string, string] | null = s.fyi
       ? ['Escalation', `${cancelled}L${s.fyi.level} FYI at ${formatTime(s.fyi.at)} if still down`]
@@ -394,11 +396,13 @@ function otherStepAlert(
               mention: mentions(input.asked),
             });
   const title =
-    kind === 'ceo' || kind === 'management'
-      ? `ESCALATED · L${input.level} · ${site} down ${duration} · nobody has acknowledged`
-      : kind === 'fyi'
-        ? `FYI · L${input.level} · ${site} still down after ${duration}`
-        : `REMINDER · L${input.level} · ${site} down ${duration}, not acknowledged`;
+    kind === 'management'
+      ? `ESCALATED · L${input.level} · ${site} still down · ${duration}, not acknowledged`
+      : kind === 'ceo'
+        ? `ESCALATED · L${input.level} · ${site} down ${duration} · nobody has acknowledged`
+        : kind === 'fyi'
+          ? `FYI · L${input.level} · ${site} still down after ${duration}`
+          : `REMINDER · L${input.level} · ${site} down ${duration}, not acknowledged`;
   const asked = input.informedRoles?.length ? input.informedRoles : informed;
   const fyiAhead = input.fyiNext
     ? ` — and ask for a status note: ${plainName(input.fyiNext.who)} get an FYI at ${formatTime(input.fyiNext.at)} if it’s still down`

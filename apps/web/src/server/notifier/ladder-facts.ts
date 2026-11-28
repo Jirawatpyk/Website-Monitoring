@@ -187,10 +187,10 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
       ? 'fyi'
       : ctx.reminder === true
         ? 'reminder'
-        : step?.targets.includes('ceo')
-          ? 'ceo'
-          : step?.targets.includes('management')
-            ? 'management'
+        : step?.targets.includes('management')
+          ? 'management'
+          : step?.targets.includes('ceo')
+            ? 'ceo'
             : 'ask';
   const hours = i.ladder?.hours;
   const after = plan?.steps.find((s) => s.level === level + 1);
@@ -266,7 +266,7 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
         : null,
     alreadyTold: alreadyTold || null,
     // "Open it to see the latest, or call Tao." — the Admin the CEO can ring.
-    admin: i.ladder?.admins[0]?.display_name ?? null,
+    admin: i.ladder?.admins[0]?.display_name ?? i.ladder?.management?.[0]?.display_name ?? null,
     acked: typeof ctx.ackedBy === 'string' && ackedAt ? { by: ctx.ackedBy, at: ackedAt } : null,
     stopped: stopsThrough > 1 ? `L1–L${stopsThrough} stopped` : 'L1 stopped',
     voiceConfigured: step?.channels.includes('voice') ?? false,
@@ -373,7 +373,8 @@ export function stepWhy(
   if (kind === 'ceo')
     return `You got this because a Tier 1 site was down ${minutes} without an acknowledgement (L${level}, the step you approved).`;
   // EmailAlert › L2 (Management), §43.11
-  if (kind === 'management')
+  // an Admin told FYI beside Management keeps the Admin's line (engine review L2)
+  if (kind === 'management' && !asFyi)
     return `You got this because you’re Management — Tier 1 DOWN comes to you at L${level} when nobody acknowledges in ${minutes}.`;
   if (kind === 'fyi')
     return p?.token === 'site_am'

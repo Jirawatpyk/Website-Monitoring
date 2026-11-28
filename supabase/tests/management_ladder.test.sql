@@ -4,7 +4,7 @@
 -- person can't go while a step names Management (§43.5).
 begin;
 \ir _helpers.psql
-select plan(15);
+select plan(19);
 
 -- ── Fixtures (as postgres) ───────────────────────────────────────────────
 select tests.clear_sites();
@@ -118,6 +118,29 @@ select throws_like(format($$select public.set_management(%L, false, 'leaving')$$
   'Can''t remove: Tier 1 DOWN L2 goes to Management and % is the last one.%', 'remove refused');
 select throws_like(format($$select public.change_user_role(%L, 'responder')$$, pg_temp.uid('vee')),
   'Can''t remove: Tier 1 DOWN L2 goes to Management%', 'a role change refused too');
+select throws_like(format($$select public.deactivate_user(%L)$$, pg_temp.uid('vee')),
+  'Can''t remove: Tier 1 DOWN L2 goes to Management%', 'a deactivation refused too (db review)');
+-- every_admin is never a policy token (db review)
+select throws_ok(format($$select public.save_escalation_policies(%L, 15, 60, 'x')$$, pg_temp.policy('down1', jsonb_build_array(
+    pg_temp.step(0, 0, array['owner'], array['chat', 'space', 'email']),
+    pg_temp.step(1, 15, array['backup', 'every_admin'], array['chat', 'email']),
+    pg_temp.step(2, 30, array['management'], array['chat', 'email']),
+    pg_temp.step(3, 60, array['ceo', 'site_am'], array['chat', 'email'], true)))),
+  '22023', 'Unknown person or channel', 'every_admin refused in a policy');
+-- With Tao tagged too, Vee can go: someone is left (the allow branch)
+reset role;
+update public.profiles set is_management = true where id = pg_temp.uid('tao');
+select tests.authenticate_as(pg_temp.uid('tao'));
+select lives_ok(format($$select public.set_management(%L, false, 'Tao stays')$$, pg_temp.uid('vee')),
+  'removal allowed while another Management person remains');
+reset role;
+
+-- ── The client-update noAm mention still reaches every Admin (3a) ─────────
+update public.clients set am_user_id = null where id = '00000000-0000-0000-0000-0000000000c1';
+update public.profiles set is_management = true where id = pg_temp.uid('vee');
+update public.profiles set is_management = false where id = pg_temp.uid('tao');
+select is((select count(*)::int from public.escalation_people((select id from inc where name = 'a'), '["every_admin"]')),
+  2, 'noAm: Tao and Vee (Management) both');
 
 select * from finish();
 rollback;
