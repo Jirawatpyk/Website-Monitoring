@@ -330,7 +330,7 @@ function drafts(f: GuideFacts): Draft[] {
   const fyi = t1.find((s) => s.fyi);
   // D-078: the Tier 1 step that asks Management to step in.
   const mgStep = t1.find((s) => !s.fyi && s.targets.includes('management'));
-  const tagged = !!f.managementTagged || !!mgStep;
+  const tagged = !!f.managementTagged;
   const t1Admins = adminLevel(t1);
   const updT1 = CLIENT_UPDATE_MIN[1] ?? 15;
   const updT2 = CLIENT_UPDATE_MIN[2] ?? 60;

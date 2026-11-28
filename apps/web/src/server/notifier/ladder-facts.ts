@@ -270,6 +270,7 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
       kind === 'ask' &&
       after &&
       afterAt &&
+      afterIsNew &&
       after.targets.includes('management') &&
       i.ladder?.management?.length
         ? { names: i.ladder.management.map((p) => p.display_name), at: afterAt }

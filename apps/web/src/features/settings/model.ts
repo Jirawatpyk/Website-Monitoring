@@ -603,9 +603,8 @@ export function managementDialog(
   const and = andList;
   // D-078 (3b): people are resolved when a step fires — the board's "incidents opened after" isn't built
   const mail = d.emailOn ? ` ${p.name} gets an email saying what changed.` : '';
-  const description = d.managementUsed
-    ? `Takes effect from the next escalation step that fires.${on ? ` ${p.name} stays an Admin.` : ''}${mail}`
-    : mail.trim() || undefined;
+  // D-078 3a: the Admin token changes at once, whether or not a step names Management yet.
+  const description = `Takes effect from the next escalation step that fires.${on ? ` ${p.name} stays an Admin.` : ''}${mail}`;
   const rows: ManagementRow[] = [];
   const refuse =
     on || others.length

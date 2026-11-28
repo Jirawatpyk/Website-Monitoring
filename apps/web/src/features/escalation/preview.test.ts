@@ -196,6 +196,7 @@ describe('preview (S08, D-034)', () => {
       level: 1,
       what: 'L1 → notifies nobody (no channel ticked)',
       danger: true,
+      nobody: true,
     });
   });
 

@@ -145,10 +145,7 @@ export function StepDialog({
   )!;
   const preview = {
     ...row,
-    what:
-      site && !row.what.includes('→ notifies nobody') && !row.what.includes('→ nobody')
-        ? `${row.what} (${site.name})`
-        : row.what,
+    what: site && !row.nobody ? `${row.what} (${site.name})` : row.what,
   };
 
   return (

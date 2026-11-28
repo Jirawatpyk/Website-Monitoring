@@ -191,6 +191,8 @@ export interface ScenarioRow {
   what: string;
   muted?: boolean;
   danger?: boolean;
+  /** The step reaches nobody (the dialog's preview then names no site). */
+  nobody?: boolean;
 }
 
 /**
@@ -259,6 +261,7 @@ export function scenario(
             : '';
     add(due, {
       level: s.level,
+      ...(nobody ? { nobody: true } : {}),
       what: `L${i} → ${nobody ?? namesLine(s, names, !!site) + space + (isReminderStep(p.steps, i, site, admins, management) ? ' (reminder)' : '')}${suffix}`,
       danger:
         !s.channels.some((c) => c !== 'voice') ||

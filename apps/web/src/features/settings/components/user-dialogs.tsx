@@ -387,7 +387,7 @@ export function RoleDialog({
         )}
         {mgBox && (
           <Alert tone={mgBox.blocks ? 'warning' : 'info'} title={mgBox.title}>
-            {mgBox.lines.join(' ')}
+            {mgBox.lines.length ? mgBox.lines.join(' ') : undefined}
           </Alert>
         )}
         <section className="flex flex-col gap-3" aria-labelledby="used-in-h">
