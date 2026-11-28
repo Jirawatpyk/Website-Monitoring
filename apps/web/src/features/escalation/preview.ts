@@ -261,7 +261,8 @@ export function scenario(
             : '';
     add(due, {
       level: s.level,
-      ...(nobody ? { nobody: true } : {}),
+      // the board's nobody(): no channel, no one picked, nobody is Management — not "nobody new"
+      ...(nobody?.startsWith('notifies nobody') ? { nobody: true } : {}),
       what: `L${i} → ${nobody ?? namesLine(s, names, !!site) + space + (isReminderStep(p.steps, i, site, admins, management) ? ' (reminder)' : '')}${suffix}`,
       danger:
         !s.channels.some((c) => c !== 'voice') ||

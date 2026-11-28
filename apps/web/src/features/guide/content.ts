@@ -158,7 +158,7 @@ const CHANNEL_WORDS: Record<Exclude<EscalationChannel, 'voice'>, string> = {
 const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 /**
- * "backup + every Admin". With a Management step on the policy, the Admin token reads "the Admins who
+ * "backup + every Admin". Once someone is tagged Management, the Admin token reads "the Admins who
  * aren't Management" (D-078 3a) — until then every Admin it names.
  */
 function whoOf(s: EscalationStep, owner = TARGET_WORDS.owner, management = false): string {
@@ -841,7 +841,13 @@ function drafts(f: GuideFacts): Draft[] {
           ),
           B('The live shift can’t be swapped.', 'An Admin uses Hand over… on the live row of On-call.'),
           ...(t1Admins !== null
-            ? [B('Admins are the backstop.', `Every Admin is at L${t1Admins} of every Tier 1 DOWN.`)]
+            ? [
+                B(
+                  'Admins are the backstop.',
+                  // D-078 3a: a tagged Admin has the Management step, not the Admin ones
+                  `Every Admin${tagged ? ' who isn’t Management' : ''} is at L${t1Admins} of every Tier 1 DOWN.`,
+                ),
+              ]
             : []),
         ],
       },

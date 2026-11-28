@@ -92,7 +92,7 @@ describe('Management (D-078, spec §43.3–5)', () => {
     // D-078 (3b): from the next step; the email promise sits in the description
     // The Admin token changes at once either way (D-078 3a), so the description is the same.
     expect(w.description).toBe(
-      'Takes effect from the next escalation step that fires. Vee stays an Admin. Vee gets an email saying what changed.',
+      'Takes effect from the next escalation step that fires. Vee stays an Admin and gets an email saying what changed.',
     );
     void used;
     expect(w.placeholder).not.toMatch(/Bua|Vee|Tao/);
@@ -119,10 +119,11 @@ describe('Management (D-078, spec §43.3–5)', () => {
     expect(w.title).toBe('Remove Vee from Management?');
     expect(w.rows).toEqual([
       { icon: 'minus', text: 'No longer gets the L2 step on Tier 1 DOWN.' },
-      { icon: 'plus', text: 'Told at L1 again as an Admin (Chat + email).' },
+      { icon: 'plus', text: 'Told again as an Admin on every escalation step.' },
       { icon: 'info', text: 'L2 still goes to Tao.' },
     ]);
     expect(w.refuse).toBeNull();
+    expect(w.refuseOpensEscalation).toBe(false);
     expect(w.done).toBe('Vee left Management · Tier 1 DOWN L2 now goes to Tao · logged');
   });
 
@@ -135,9 +136,7 @@ describe('Management (D-078, spec §43.3–5)', () => {
       data({ managementUsed: false, people: people([{ ...vee, management: true }]) }),
       { ...vee, management: true },
     );
-    expect(back.rows).toEqual([
-      { icon: 'plus', text: 'Told again as an Admin on every escalation step (Chat + email).' },
-    ]);
+    expect(back.rows).toEqual([{ icon: 'plus', text: 'Told again as an Admin on every escalation step.' }]);
   });
 
   it('every Admin would be Management: L1 and Tier 2–3 warnings, allowed (D-078 3f)', () => {
@@ -152,6 +151,8 @@ describe('Management (D-078, spec §43.3–5)', () => {
   it('an open incident’s plan still names Management: the last one stays (spec-check M1)', () => {
     const mgVee = { ...vee, management: true };
     const d = data({ managementUsed: false, managementOpen: true, people: people([mgVee]) });
+    // Escalation can't fix an open incident's plan: Close only (spec re-check M3).
+    expect(managementDialog(d, mgVee).refuseOpensEscalation).toBe(false);
     expect(managementDialog(d, mgVee).refuse).toBe(
       'Can’t remove: an open incident still asks Management at L2 and Vee is the last one. Try again once it’s resolved, or set someone else as Management.',
     );

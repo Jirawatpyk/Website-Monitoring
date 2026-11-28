@@ -184,7 +184,8 @@ export function oncallOf(d: UsersData, p: Person, now: Date): { text: string; li
   if (live) return { text: 'On call now', live: true };
   const next = mine.find((s) => Date.parse(s.startsAt) > now.getTime());
   if (next) return { text: `Next on call ${formatDay(new Date(next.startsAt))}`, live: false };
-  if (p.role === 'admin') return { text: 'Admin backstop', live: false };
+  // D-078 3a: a Management Admin isn't on the Admin steps (Users board: Vee, Pim "—").
+  if (p.role === 'admin' && !p.management) return { text: 'Admin backstop', live: false };
   return { text: '—', live: false };
 }
 
@@ -595,6 +596,8 @@ export function managementDialog(
   rows: ManagementRow[];
   /** The last-Management refusal (§43.5): the dialog shows only this, with Open Escalation / Close. */
   refuse: string | null;
+  /** The refusal is the policy's: Open Escalation fixes it (an open incident's plan doesn't). */
+  refuseOpensEscalation: boolean;
   placeholder: string;
   done: string;
 } {
@@ -604,7 +607,13 @@ export function managementDialog(
   // D-078 (3b): people are resolved when a step fires — the board's "incidents opened after" isn't built
   const mail = d.emailOn ? ` ${p.name} gets an email saying what changed.` : '';
   // D-078 3a: the Admin token changes at once, whether or not a step names Management yet.
-  const description = `Takes effect from the next escalation step that fires.${on ? ` ${p.name} stays an Admin.` : ''}${mail}`;
+  const description = `Takes effect from the next escalation step that fires.${
+    on
+      ? d.emailOn
+        ? ` ${p.name} stays an Admin and gets an email saying what changed.`
+        : ` ${p.name} stays an Admin.`
+      : mail
+  }`;
   const rows: ManagementRow[] = [];
   const refuse =
     on || others.length
@@ -622,10 +631,8 @@ export function managementDialog(
             icon: 'info',
             text: 'No escalation step goes to Management yet — they get no step as Management until Tier 1 DOWN L2 is set to Management on Escalation.',
           },
-      // D-078 3a: the Admin token leaves them out on every policy from now on.
-      d.managementUsed
-        ? { icon: 'minus', text: 'No longer told at L1 as an Admin.' }
-        : { icon: 'minus', text: 'No longer told as an Admin on any escalation step.' },
+      // D-078 3a: the Admin token leaves them out on every policy, not only Tier 1 L1 (§43.4's words).
+      { icon: 'minus', text: 'No longer told as an Admin on any escalation step.' },
     );
     // Allowed (D-078 3f, Tao 28 Nov): warnings, not a refusal.
     const outside = d.people.filter((x) => x.role === 'admin' && !x.management && x.id !== p.id);
@@ -642,13 +649,13 @@ export function managementDialog(
       ...(d.managementUsed
         ? [
             { icon: 'minus' as const, text: 'No longer gets the L2 step on Tier 1 DOWN.' },
-            { icon: 'plus' as const, text: 'Told at L1 again as an Admin (Chat + email).' },
+            { icon: 'plus' as const, text: 'Told again as an Admin on every escalation step.' },
             ...(others.length ? [{ icon: 'info' as const, text: `L2 still goes to ${and(others)}.` }] : []),
           ]
         : [
             {
               icon: 'plus' as const,
-              text: 'Told again as an Admin on every escalation step (Chat + email).',
+              text: 'Told again as an Admin on every escalation step.',
             },
           ]),
     );
@@ -658,6 +665,8 @@ export function managementDialog(
     description: refuse ? undefined : description,
     rows,
     refuse,
+    // Only the policy case can be fixed on Escalation; an open incident's plan can't (spec re-check M3).
+    refuseOpensEscalation: !!refuse && !!d.managementUsed,
     // the board's placeholders (never a real or sample name)
     placeholder: on
       ? 'e.g. Ops lead — can find someone when nobody answers'

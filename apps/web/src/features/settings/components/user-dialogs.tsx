@@ -378,9 +378,10 @@ export function RoleDialog({
             {newRole === 'admin' && (
               // Users board `adminNote`: the tag is set on its own, never by a promotion.
               <Alert tone="info" title={secondAdmin ? 'Adds a second active Admin' : 'Adds an active Admin'}>
-                Monitor-fault emails go to{' '}
-                {secondAdmin ? `${admins(data)[0]?.name} and ${person.name}` : `${person.name} too`} from now
-                on. {person.name} isn’t Management — set that separately from the ⋯ menu.
+                {secondAdmin
+                  ? `Monitor-fault emails go to ${admins(data)[0]?.name} and ${person.name} from now on.`
+                  : `Monitor-fault emails also go to ${person.name} from now on.`}{' '}
+                {person.name} isn’t Management — set that separately from the ⋯ menu.
               </Alert>
             )}
           </>
@@ -694,9 +695,11 @@ export function ManagementDialog({
         w?.refuse ? (
           // §43.5 (Users board): only the refusal — nothing is logged, Open Escalation then Close
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
-            <Button variant="secondary" icon={<IconArrowUpRight />} href="/escalation">
-              Open Escalation
-            </Button>
+            {w.refuseOpensEscalation && (
+              <Button variant="secondary" icon={<IconArrowUpRight />} href="/escalation">
+                Open Escalation
+              </Button>
+            )}
             <Button variant="primary" onClick={onClose}>
               Close
             </Button>
