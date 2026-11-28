@@ -70,7 +70,7 @@ export function StepRow({
 }) {
   const step = policy.steps[index] as EscalationStep;
   const errs = stepErrors(policy.steps, index, policy.key, management);
-  const note = stepNote(policy, step, false, admins, hoursText);
+  const note = stepNote(policy, step, false, admins, hoursText, management);
   const pinned = index === 0;
   const label = `L${index}`;
   const move = moveLabels(policy.steps, index);
@@ -153,13 +153,13 @@ export function StepRow({
                 {t}
               </Tag>
             ))}
-            {step.targets.includes('admins') && admins.length === 1 && (
+            {step.targets.includes('admins') && admins.length === 1 && !management.length && (
               <span className="flex items-center gap-1.5 text-xs text-fg-warning">
                 <IconTriangleAlert size="sm" aria-hidden />
                 {admins[0]} is the only active Admin
               </span>
             )}
-            {showsManagementLeftOut(policy, step) && (
+            {showsManagementLeftOut(policy, step, management) && (
               <span className="flex items-center gap-1.5 text-xs text-fg-secondary">
                 <IconInfo size="sm" aria-hidden />
                 {MANAGEMENT_LEFT_OUT}

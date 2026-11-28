@@ -330,9 +330,9 @@ export function EscalationEditor({ data, now }: { data: EscalationPageData; now:
             // Once Tier 1 L2 is Management no step carries voice (§43.1, Escalation board `showVoice`).
             policy.key === 't1' && (
               <Alert tone="warning" title="Voice call · configured, off">
-                No Tier 1 step carries a voice call since L2 moved to Management. Voice stays configured and
-                off until the CEO approves voice calls (Twilio, ~$23–26 / month). Management and the L3 FYI
-                are never called.
+                {policy.steps.some((s) => s.targets.includes('management'))
+                  ? 'No Tier 1 step carries a voice call since L2 moved to Management. Voice stays configured and off until the CEO approves voice calls (Twilio, ~$23–26 / month). Management and the L3 FYI are never called.'
+                  : 'No step carries a voice call now. It stays configured and off until the CEO approves (Twilio, ~$23–26 / month).'}
               </Alert>
             )
           )}

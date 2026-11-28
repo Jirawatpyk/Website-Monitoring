@@ -44,10 +44,18 @@ describe('preview (S08, D-034)', () => {
       { token: 'Backup', name: 'Ploy' },
       { token: 'Admin', name: 'Tao' },
       { token: 'Management', name: 'Nobody yet' },
-      { token: 'Site AM', name: 'Bua' },
       { token: 'CEO', name: 'CEO' },
+      { token: 'Site AM', name: 'Bua' },
     ]);
-    expect(tokenRows({ ...muvmi, am: null }, [])[4]).toEqual({ token: 'Site AM', name: '— (internal)' });
+    expect(tokenRows({ ...muvmi, am: null }, [])[5]).toEqual({ token: 'Site AM', name: '— (internal)' });
+    // Every active Admin is Management (D-078 3f: allowed, with a warning).
+    expect(tokenRows(muvmi, [], undefined, ['Vee'])[2]).toEqual({
+      token: 'Admin',
+      name: 'Nobody — every active Admin is Management',
+    });
+    expect(
+      nobodyWhy({ level: 1, delayMin: 15, targets: ['admins'], channels: ['chat'] }, muvmi, [], ['Vee']),
+    ).toBe('nobody (every active Admin is Management)');
   });
 
   it('D-078: Management — the Admin row says who is left out; L2 names them; nobody → notifies nobody', () => {

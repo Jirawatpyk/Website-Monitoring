@@ -40,7 +40,11 @@ export function tokenRows(
   /** The Admins tagged Management (§43.8; D-078 3a: the Admin token leaves them out). */
   management: readonly string[] = [],
 ) {
-  const adminName = admins.length ? admins.join(', ') : '—';
+  const adminName = admins.length
+    ? admins.join(', ')
+    : management.length
+      ? 'Nobody — every active Admin is Management'
+      : '—';
   const all = [
     // Spec §8: the owner by day, on Tier 1 outside response hours the person on call (S10).
     { key: 'owner', token: 'Owner / on-call', name: site?.owner ?? '—' },
@@ -48,15 +52,19 @@ export function tokenRows(
     {
       key: 'admins',
       token: 'Admin',
-      name: management.length ? `${adminName} · ${management.join(', ')} left out (Management)` : adminName,
+      name:
+        management.length && admins.length
+          ? `${adminName} · ${management.join(', ')} left out (Management)`
+          : adminName,
     },
     {
       key: 'management',
       token: 'Management',
       name: management.length ? management.join(', ') : 'Nobody yet',
     },
-    { key: 'site_am', token: 'Site AM', name: site ? (site.am ?? '— (internal)') : '—' },
+    // The shared order (`ESCALATION_TARGET_ORDER`): the CEO, then the AM.
     { key: 'ceo', token: 'CEO', name: 'CEO' },
+    { key: 'site_am', token: 'Site AM', name: site ? (site.am ?? '— (internal)') : '—' },
   ] as const;
   const tokens = used ? new Set(used.flatMap((s) => s.targets)) : null;
   return all.filter((t) => !tokens || tokens.has(t.key)).map(({ token, name }) => ({ token, name }));
@@ -139,6 +147,7 @@ export function nobodyWhy(
   admins: readonly string[],
   management: readonly string[] = [],
 ): string {
+  const noOne = { ...NO_ONE, ...(management.length ? { admins: 'every active Admin is Management' } : {}) };
   const unset = s.targets.filter((t) =>
     t === 'admins'
       ? !admins.length
@@ -153,7 +162,7 @@ export function nobodyWhy(
               : false,
   );
   const told = unset.length < s.targets.length;
-  const why = [...(told ? ['already told'] : []), ...unset.flatMap((t) => NO_ONE[t] ?? [])];
+  const why = [...(told ? ['already told'] : []), ...unset.flatMap((t) => noOne[t] ?? [])];
   return `${told ? 'nobody new' : 'nobody'} (${why.join(' · ')})`;
 }
 

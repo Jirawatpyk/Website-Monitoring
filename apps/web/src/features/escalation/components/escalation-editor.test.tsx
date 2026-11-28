@@ -205,9 +205,9 @@ describe('Escalation editor — guardrails (Done-when 3, spec §14.7, §15.5)', 
 
     it('L2 → Management drops voice and previews the names; L1 says who is left out', () => {
       render(<EscalationEditor data={withMg(['Vee', 'Pim'])} now={NOW} />);
-      expect(
-        screen.getByText('Admins who are Management are left out here — they get L2.'),
-      ).toBeInTheDocument();
+      // L2 is still the CEO: "they get L2" isn't true yet.
+      expect(screen.queryByText('Admins who are Management are left out here — they get L2.')).toBeNull();
+      expect(screen.queryByText('Tao is the only active Admin')).toBeNull();
       const d = toManagement();
       expect(within(d).getByRole('checkbox', { name: 'Voice call' })).not.toBeChecked();
       expect(
@@ -221,6 +221,10 @@ describe('Escalation editor — guardrails (Done-when 3, spec §14.7, §15.5)', 
       ).toBeInTheDocument();
       expect(within(d).getByText(/L2 → Management — Vee, Pim \(MuvMi\)/)).toBeInTheDocument();
       fireEvent.click(within(d).getByRole('button', { name: 'Apply to L2' }));
+      expect(
+        screen.getByText('Admins who are Management are left out here — they get L2.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/since L2 moved to Management/)).toBeInTheDocument();
       expect(screen.getByText('Management · Vee, Pim')).toBeInTheDocument();
       expect(screen.getByText(/L2 → Management — Vee, Pim/)).toBeInTheDocument();
       expect(screen.getByText('Tao · Vee, Pim left out (Management)')).toBeInTheDocument();

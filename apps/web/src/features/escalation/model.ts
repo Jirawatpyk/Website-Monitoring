@@ -77,6 +77,8 @@ export function stepNote(
   admins: readonly string[],
   /** The organisation's response hours in words (Settings › Organisation, S17). */
   hoursText: string,
+  /** The Admins tagged Management (D-078): the phone's L1 note names them only once they get a step. */
+  management: readonly string[] = [],
 ): string | null {
   if (s.fyi) return phone ? 'FYI only, never a call. Recovered by then → nothing is sent.' : null;
   // Tier 2–3 L2 (Escalation board / MEscalation): a reminder to the Admin, no CEO page.
@@ -96,7 +98,7 @@ export function stepNote(
   // The phone says the Management line here; the desktop row has it beside the NOTIFY tags (§43.2).
   if (s.level > 0)
     return s.targets.includes('admins')
-      ? phone && p.key === 't1'
+      ? phone && showsManagementLeftOut(p, s, management)
         ? `Anyone already paged is left out. ${MANAGEMENT_LEFT_OUT}`
         : 'Anyone already paged is left out.'
       : null;
@@ -120,9 +122,22 @@ export function stepNote(
 /** The L1 line on Tier 1 DOWN (§43.2): only there do the Admins who are Management get a step of their own. */
 export const MANAGEMENT_LEFT_OUT = 'Admins who are Management are left out here — they get L2.';
 
-/** Whether a row's NOTIFY gets {@link MANAGEMENT_LEFT_OUT}: an Admin step on Tier 1 DOWN after L0. */
-export const showsManagementLeftOut = (p: PolicyDraft, s: EscalationStep) =>
-  p.key === 't1' && s.level > 0 && !s.fyi && s.targets.includes('admins');
+/**
+ * Whether a row's NOTIFY gets {@link MANAGEMENT_LEFT_OUT}: an Admin step on Tier 1 DOWN after L0, once
+ * someone is Management and a Tier 1 step names them (board `hasAdmin … && !NOMG`) — before the L2
+ * switch "they get L2" isn't true yet (D-078 3e).
+ */
+export const showsManagementLeftOut = (
+  p: PolicyDraft,
+  s: EscalationStep,
+  management: readonly string[] = [],
+) =>
+  p.key === 't1' &&
+  s.level > 0 &&
+  !s.fyi &&
+  s.targets.includes('admins') &&
+  management.length > 0 &&
+  p.steps.some((x) => x.targets.includes('management'));
 
 const ORDER = ESCALATION_TARGET_ORDER;
 const CHANNEL_ORDER: readonly EscalationChannel[] = ['chat', 'space', 'email', 'voice'];
@@ -187,10 +202,11 @@ export function stepErrors(
   else if (i > 0 && prev && s.delayMin <= prev.delayMin) {
     errs.push(`Must be later than L${i - 1} (+${prev.delayMin} min).`);
   }
-  if (pagesCeo(s) && i < 2) errs.push('A step that pages the CEO can’t sit above L2.');
+  // Without the policy, the place alone; with it, the board's own line (one error, not two).
+  if (pagesCeo(s) && i < 2 && !key) errs.push('A step that pages the CEO can’t sit above L2.');
   if (s.targets.includes('ceo') && key) {
-    if (key !== 't1') errs.push('The CEO is paged only on Tier 1 DOWN — remove CEO from this step.');
-    else if (i < 2) errs.push('The CEO can be paged only from L2 onward.');
+    if (key !== 't1') errs.push('The CEO is told only on Tier 1 DOWN — remove CEO from this step.');
+    else if (i < 2) errs.push('The CEO can be told only from L2 onward.');
   }
   // As `save_escalation_policies` (D-078): management_not_allowed / _too_early / nobody_management / voice_not_here.
   if (tellsManagement(s) && key) {

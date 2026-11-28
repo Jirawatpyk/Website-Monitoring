@@ -8,8 +8,9 @@ export interface EscalationDeps {
 }
 
 /** Hints `save_escalation_policies` raises whose message is already the board's sentence. */
-const BOARD_WORDS = new Set([
+export const BOARD_WORDS = new Set([
   'note_required',
+  'note_too_long',
   'reminder_invalid',
   'no_channel',
   'no_person',
@@ -24,6 +25,10 @@ const BOARD_WORDS = new Set([
   'l0_pinned',
   'too_many_steps',
   'step_too_late',
+  // D-078 (20261128124815_management_token.sql)
+  'management_not_allowed',
+  'management_too_early',
+  'nobody_management',
 ]);
 
 /** Saves every policy and the reminder intervals in one SQL call (Admin only; one audit row with the note). */

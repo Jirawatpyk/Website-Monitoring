@@ -105,19 +105,13 @@ describe('S10 — the CEO, the FYI step, moving steps (Escalation board, §14.7,
     expect(p.steps.flatMap((_s, i) => stepErrors(p.steps, i, 't1'))).toEqual([]);
   });
   it.each<[string, EscalationStep[], number, 't1' | 't2', string[]]>([
-    [
-      'CEO on L1',
-      [l0, l1({ targets: ['ceo'] })],
-      1,
-      't1',
-      ['A step that pages the CEO can’t sit above L2.', 'The CEO can be paged only from L2 onward.'],
-    ],
+    ['CEO on L1', [l0, l1({ targets: ['ceo'] })], 1, 't1', ['The CEO can be told only from L2 onward.']],
     [
       'CEO on Tier 2',
       [l0, l1(), { ...l2ceo, channels: ['chat', 'email'] }],
       2,
       't2',
-      ['The CEO is paged only on Tier 1 DOWN — remove CEO from this step.'],
+      ['The CEO is told only on Tier 1 DOWN — remove CEO from this step.'],
     ],
   ])('%s', (_case, steps, i, key, want) => {
     expect(stepErrors(steps, i, key)).toEqual(want);
@@ -132,6 +126,11 @@ describe('S10 — the CEO, the FYI step, moving steps (Escalation board, §14.7,
       up: 'L0 is pinned — nothing can move above it',
       canUp: false,
     });
+  });
+  it('without the policy key, a CEO step above L2 says where it sits', () => {
+    expect(stepErrors([l0, l1({ targets: ['ceo'] })], 1)).toEqual([
+      'A step that pages the CEO can’t sit above L2.',
+    ]);
   });
   it('a CEO step never lands above L2', () => {
     const steps = t1full().steps;
@@ -188,12 +187,17 @@ describe('S10 — the CEO, the FYI step, moving steps (Escalation board, §14.7,
   });
   it('the L1 Management line: Tier 1 Admin steps only; the phone says it in the note', () => {
     const t2 = { ...t1(), key: 't2' as const, tier: 2 };
-    expect(showsManagementLeftOut(t1full(), l1())).toBe(true);
-    expect(showsManagementLeftOut(t2, l1())).toBe(false);
-    expect(showsManagementLeftOut(t1full(), l0)).toBe(false);
-    expect(stepNote(t1full(), l1(), true, ['Tao'], 'h')).toBe(
+    const switched = t1([l0, l1(), mgL2, l3fyi]);
+    expect(showsManagementLeftOut(switched, l1(), ['Vee'])).toBe(true);
+    // Before the L2 switch, or with nobody tagged, "they get L2" isn't true (board `!NOMG`).
+    expect(showsManagementLeftOut(t1full(), l1(), ['Vee'])).toBe(false);
+    expect(showsManagementLeftOut(switched, l1(), [])).toBe(false);
+    expect(showsManagementLeftOut({ ...t2, steps: switched.steps }, l1(), ['Vee'])).toBe(false);
+    expect(showsManagementLeftOut(switched, l0, ['Vee'])).toBe(false);
+    expect(stepNote(switched, l1(), true, ['Tao'], 'h', ['Vee'])).toBe(
       'Anyone already paged is left out. Admins who are Management are left out here — they get L2.',
     );
+    expect(stepNote(switched, l1(), true, ['Tao'], 'h')).toBe('Anyone already paged is left out.');
     expect(stepNote(t2, l1(), true, ['Tao'], 'h')).toBe('Anyone already paged is left out.');
     expect(stepNote(t1full(), mgL2, true, [], 'h')).toBe(
       'Asked to step in and find someone to take it. No voice call.',

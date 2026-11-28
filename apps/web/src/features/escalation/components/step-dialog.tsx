@@ -36,13 +36,17 @@ export function managementNote(
   index: number,
   fyi: boolean,
   management: readonly string[],
+  on = false,
 ): { text: string; warn: boolean } {
   if (fyi) return { text: 'Management isn’t on the FYI step — they act at L2.', warn: false };
   if (key !== 't1') return { text: 'Management is used only on Tier 1 DOWN', warn: false };
   if (index < 2) return { text: 'Management can be told only from L2', warn: false };
   if (!management.length)
     return { text: 'Nobody is Management yet — set someone on Users & roles', warn: true };
-  return { text: `Management = ${management.join(', ')} · Chat @mention + email, no voice.`, warn: false };
+  return {
+    text: `Management = ${management.join(', ')}${on ? ' ·' : '.'} Chat @mention + email, no voice.`,
+    warn: false,
+  };
 }
 
 /** "Vee and Pim are", "Vee is", "Vee, Pim and Ann are". */
@@ -115,16 +119,20 @@ export function StepDialog({
     if (check.error || nobody) return;
     onApply({ ...start, delayMin: Number(delay), targets, channels });
   };
-  const adminNote = admins.length === 1 ? `${admins[0]} is the only active Admin.` : null;
-  const mgNote = managementNote(policy.key, index, fyi, management);
+  // Every active Admin is `admins` + `management` (D-078 3a splits them).
+  const adminNote =
+    admins.length === 1 && !management.length ? `${admins[0]} is the only active Admin.` : null;
+  const mgNote = managementNote(policy.key, index, fyi, management, targets.includes('management'));
   // Board `eWhoHint`: on Tier 1 the Admins who are Management get L2 instead (§43.2).
   const whoAdmins = !targets.includes('admins')
     ? ''
-    : policy.key === 't1' && management.length
-      ? ` Admin = ${admins.join(', ') || 'nobody'} — ${areList(management)} Management, so they get L2 instead.`
-      : adminNote
-        ? ` ${adminNote}`
-        : '';
+    : management.length && !admins.length
+      ? ' Every active Admin is Management, so this step tells no Admin.'
+      : policy.key === 't1' && management.length
+        ? ` Admin = ${admins.join(', ')} — ${areList(management)} Management, so they get L2 instead.`
+        : adminNote
+          ? ` ${adminNote}`
+          : '';
   // The step as it would be applied, previewed for the site (board: "10:03 · L1 → Ploy + Tao (MuvMi)").
   const trial = {
     ...policy,
@@ -135,7 +143,13 @@ export function StepDialog({
   const row = scenario(trial, site, admins, hours, now, { management }).rows.find(
     (r) => r.level === trial.steps[index]?.level,
   )!;
-  const preview = { ...row, what: site ? `${row.what} (${site.name})` : row.what };
+  const preview = {
+    ...row,
+    what:
+      site && !row.what.includes('→ notifies nobody') && !row.what.includes('→ nobody')
+        ? `${row.what} (${site.name})`
+        : row.what,
+  };
 
   return (
     <Dialog
