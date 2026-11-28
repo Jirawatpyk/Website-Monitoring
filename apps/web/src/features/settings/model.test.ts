@@ -74,7 +74,13 @@ describe('Management (D-078, spec §43.3–5)', () => {
   });
 
   it.each([
-    ['no step uses it yet', false, vee, [], /^No escalation step goes to Management yet — nothing changes/],
+    [
+      'no step uses it yet',
+      false,
+      vee,
+      [],
+      /^No escalation step goes to Management yet — they get no step as Management until/,
+    ],
     ['set, with Tao still outside Management', true, vee, [], /^Gets the L2 step on Tier 1 DOWN/],
   ])('set · %s', (_, used, who, extra, first) => {
     const w = managementDialog(
@@ -118,6 +124,41 @@ describe('Management (D-078, spec §43.3–5)', () => {
     ]);
     expect(w.refuse).toBeNull();
     expect(w.done).toBe('Vee left Management · Tier 1 DOWN L2 now goes to Tao · logged');
+  });
+
+  it('the tag leaves the Admin steps at once, even before a step names Management (D-078 3a)', () => {
+    const d = data({ managementUsed: false, people: people([vee]) });
+    expect(managementDialog(d, vee).rows.map((r) => r.text)).toContain(
+      'No longer told as an Admin on any escalation step.',
+    );
+    const back = managementDialog(
+      data({ managementUsed: false, people: people([{ ...vee, management: true }]) }),
+      { ...vee, management: true },
+    );
+    expect(back.rows).toEqual([
+      { icon: 'plus', text: 'Told again as an Admin on every escalation step (Chat + email).' },
+    ]);
+  });
+
+  it('every Admin would be Management: L1 and Tier 2–3 warnings, allowed (D-078 3f)', () => {
+    const d = data({ people: people([vee]).map((p) => (p.id === 'tao' ? { ...p, management: true } : p)) });
+    const warn = managementDialog(d, vee).rows.filter((r) => r.icon === 'warn');
+    expect(warn.map((r) => r.text)).toEqual([
+      'Every active Admin would then be Management, so L1 tells only the backup — no Admin.',
+      'Tier 2–3 Admin steps would then tell no Admin.',
+    ]);
+  });
+
+  it('an open incident’s plan still names Management: the last one stays (spec-check M1)', () => {
+    const mgVee = { ...vee, management: true };
+    const d = data({ managementUsed: false, managementOpen: true, people: people([mgVee]) });
+    expect(managementDialog(d, mgVee).refuse).toBe(
+      'Can’t remove: an open incident still asks Management at L2 and Vee is the last one. Try again once it’s resolved, or set someone else as Management.',
+    );
+    expect(managementRoleBox(d, mgVee, true, 'viewer')).toMatchObject({
+      blocks: true,
+      lines: [expect.stringMatching(/^Can’t deactivate: an open incident still asks Management/)],
+    });
   });
 
   it('remove the last one while a step uses it: only the refusal (§43.5)', () => {
@@ -263,7 +304,7 @@ describe('usageOf — Used in (§14.9, Done-when 2)', () => {
     expect(owner.sites![0]!.hint).toBe('Backup here: Arm');
     expect(owner.sites![0]!.options.map((o) => o.value)).toEqual(['tao', 'ploy']);
     expect(items[1]!.sites![0]!.options.map((o) => o.value)).toEqual(['tao', 'arm']);
-    expect(items[5]!.detail).toMatch(/gets the CEO’s steps: none on any policy/);
+    expect(items[5]!.detail).toMatch(/gets no escalation step, only the daily digest/);
     expect(usageSummary(items)).toBe('3 of 3 need a new person');
   });
 

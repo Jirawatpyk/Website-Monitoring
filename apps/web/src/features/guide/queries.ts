@@ -36,7 +36,7 @@ export async function getGuidePage(me: { id: string; role: Role }, now = new Dat
     db.from('sites').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('tier', 1),
     db
       .from('profiles')
-      .select('display_name')
+      .select('display_name, is_management')
       .eq('role', 'admin')
       .eq('is_active', true)
       .order('display_name'),
@@ -84,6 +84,7 @@ export async function getGuidePage(me: { id: string; role: Role }, now = new Dat
       hours: formatResponseHours(hours),
       tier1Sites: sites.count ?? 0,
       admins: (admins.data ?? []).map((a) => a.display_name),
+      managementTagged: (admins.data ?? []).some((a) => a.is_management),
       onCallNow: live ? toShift(live) : null,
       onCallNext: next.map(toShift),
       policies: byPolicy,

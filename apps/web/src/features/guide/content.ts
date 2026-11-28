@@ -35,6 +35,8 @@ export interface GuideFacts {
   tier1Sites: number;
   /** Every active Admin's name. */
   admins: string[];
+  /** An Admin is tagged Management: the Admin token then leaves them out on every policy (D-078 3a). */
+  managementTagged?: boolean;
   onCallNow: GuideShift | null;
   /** The next shifts after the live one, soonest first. */
   onCallNext: GuideShift[];
@@ -180,8 +182,11 @@ function channelsOf(s: EscalationStep): string {
 const whenOf = (s: EscalationStep) => (s.level === 0 ? '0 min' : `+${s.delayMin} min`);
 
 /** The Tier 1 DOWN ladder as rows (Guide "Who gets it if nobody acknowledges"). */
-export function ladderRows(steps: readonly EscalationStep[]): LadderRow[] {
-  const mg = usesManagement(steps);
+export function ladderRows(
+  steps: readonly EscalationStep[],
+  /** The Admin token leaves Management out (D-078 3a) — from the moment someone is tagged. */
+  mg = usesManagement(steps),
+): LadderRow[] {
   return steps.map((s) => ({
     level: `L${s.level}`,
     when: whenOf(s),
@@ -325,6 +330,7 @@ function drafts(f: GuideFacts): Draft[] {
   const fyi = t1.find((s) => s.fyi);
   // D-078: the Tier 1 step that asks Management to step in.
   const mgStep = t1.find((s) => !s.fyi && s.targets.includes('management'));
+  const tagged = !!f.managementTagged || !!mgStep;
   const t1Admins = adminLevel(t1);
   const updT1 = CLIENT_UPDATE_MIN[1] ?? 15;
   const updT2 = CLIENT_UPDATE_MIN[2] ?? 60;
@@ -559,15 +565,15 @@ function drafts(f: GuideFacts): Draft[] {
         kind: 'ladder',
         title: 'Tier 1 DOWN · 24/7',
         note: 'Timers start at “Confirmed down” and pause while the site is up',
-        rows: ladderRows(t1),
+        rows: ladderRows(t1, tagged),
         cards: [
           ...tierCards.map((c) => ({
             title: c.title,
-            text: `${policyLine(c.steps, !!mgStep)}. No CEO page. Outside ${f.hours} it’s posted at once and the timers wait for the next opening.`,
+            text: `${policyLine(c.steps, tagged)}. No CEO page. Outside ${f.hours} it’s posted at once and the timers wait for the next opening.`,
           })),
           {
             title: 'PROBLEM · all tiers',
-            text: `${policyLine(f.policies.problem, !!mgStep)} · a reminder every ${f.problemReminderMin} min. Tier 1 outside response hours goes to on-call; Tier 2–3 outside response hours is held until the next opening.`,
+            text: `${policyLine(f.policies.problem, tagged)} · a reminder every ${f.problemReminderMin} min. Tier 1 outside response hours goes to on-call; Tier 2–3 outside response hours is held until the next opening.`,
           },
           {
             title: 'Until someone acknowledges',

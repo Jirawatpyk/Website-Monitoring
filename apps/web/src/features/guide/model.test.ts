@@ -263,6 +263,11 @@ describe('the ladder in words', () => {
     expect(card?.kind === 'callout' && card.callout.text).toBe(
       'Tier 1 DOWN comes to you at +30 min when nobody has acknowledged. Step in and find someone to take it: call the owner or backup, reassign, or acknowledge yourself — and ask for a status note: the CEO and the site’s AM see it in the FYI at +60 min.',
     );
+    // Tagged before the switch: the Admin token already leaves them out (D-078 3a, spec-check H1).
+    const tagged = guideTopics({ ...FACTS, managementTagged: true }, 'desktop')
+      .find((t) => t.id === 'alert')!
+      .blocks.find((b) => b.kind === 'ladder');
+    expect(tagged?.kind === 'ladder' && tagged.rows[1]!.who).toMatch(/the Admins who aren’t Management/);
     // Before the switch there is no Management card.
     expect(
       desktop

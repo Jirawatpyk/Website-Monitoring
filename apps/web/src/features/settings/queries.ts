@@ -7,6 +7,19 @@ import { SIGNIN_ACTIONS, type SecurityData } from './security-model';
 const OPEN_SWAP = ['waiting', 'accepted'];
 const OPEN_INCIDENT = ['unacked', 'escalated', 'acknowledged', 'monitoring', 'needs_root_cause'] as const;
 
+/** A frozen `escalation_plan` with a step naming Management. */
+function planNamesManagement(plan: unknown): boolean {
+  const steps = (plan as { steps?: unknown } | null)?.steps;
+  return (
+    Array.isArray(steps) &&
+    steps.some(
+      (s) =>
+        Array.isArray((s as { targets?: unknown }).targets) &&
+        (s as { targets: unknown[] }).targets.includes('management'),
+    )
+  );
+}
+
 function check<T>(what: string, r: { data: T; error: { message: string } | null }): T {
   if (r.error) throw new Error(`${what}: ${r.error.message}`);
   return r.data;
@@ -19,7 +32,7 @@ function check<T>(what: string, r: { data: T; error: { message: string } | null 
  */
 export async function loadUsersData(db: DbClient, viewerId: string, now: Date): Promise<UsersData> {
   const nowIso = now.toISOString();
-  const [people, invites, sessions, sites, clients, rotation, shifts, swaps, acks, policies, steps] =
+  const [people, invites, sessions, sites, clients, rotation, shifts, swaps, acks, policies, steps, plans] =
     await Promise.all([
       db
         .from('profiles')
@@ -44,6 +57,12 @@ export async function loadUsersData(db: DbClient, viewerId: string, now: Date): 
       // D-078: whether a step goes to Management, and the CEO's Tier 1 steps, from the policies.
       db.from('escalation_policies').select('id, severity, tier'),
       db.from('escalation_steps').select('policy_id, level, delay_min, targets, fyi'),
+      // As private.assert_management_left: an open incident's frozen plan counts too (spec-check M1).
+      db
+        .from('incidents')
+        .select('escalation_plan')
+        .in('state', [...OPEN_INCIDENT])
+        .not('escalation_plan', 'is', null),
     ]);
   const t1 = (check('escalation_policies', policies) ?? []).find(
     (p) => p.severity === 'down' && p.tier === 1,
@@ -101,6 +120,7 @@ export async function loadUsersData(db: DbClient, viewerId: string, now: Date): 
       ackedBy: i.acked_by!,
     })),
     managementUsed: allSteps.some((s) => s.targets.includes('management')),
+    managementOpen: (check('incidents', plans) ?? []).some((i) => planNamesManagement(i.escalation_plan)),
     ceoSteps: ceoStepsLine(
       allSteps
         .filter((s) => s.policy_id === t1?.id)

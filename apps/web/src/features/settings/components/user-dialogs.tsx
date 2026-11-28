@@ -3,6 +3,7 @@
 import { Alert, Button, Dialog, Select, TextField, Textarea } from '@jirawatpyk/aura-react';
 import {
   IconArrowRight,
+  IconArrowUpRight,
   IconBan,
   IconCheck,
   IconCircleCheck,
@@ -374,16 +375,13 @@ export function RoleDialog({
               <List title="GAINS" sign="plus" items={gains} empty="Nothing new" />
               <List title="LOSES" sign="minus" items={loses} empty="Nothing" />
             </div>
-            {secondAdmin && (
-              <Alert tone="info" title="Adds a second active Admin">
-                Monitor-fault emails go to {admins(data)[0]?.name} and {person.name} from now on.
-              </Alert>
-            )}
             {newRole === 'admin' && (
               // Users board `adminNote`: the tag is set on its own, never by a promotion.
-              <p className="m-0 text-xs text-fg-secondary">
-                {person.name} isn’t Management — set that separately from the ⋯ menu.
-              </p>
+              <Alert tone="info" title={secondAdmin ? 'Adds a second active Admin' : 'Adds an active Admin'}>
+                Monitor-fault emails go to{' '}
+                {secondAdmin ? `${admins(data)[0]?.name} and ${person.name}` : `${person.name} too`} from now
+                on. {person.name} isn’t Management — set that separately from the ⋯ menu.
+              </Alert>
             )}
           </>
         )}
@@ -399,7 +397,7 @@ export function RoleDialog({
             </h3>
             <span className="text-xs text-fg-secondary">{usageSummary(items)}</span>
           </div>
-          {items.length === 0 && (
+          {items.length === 0 && !mgBox && (
             <p className="m-0 text-sm text-fg-secondary">
               Not used in any site, client or on-call shift — nothing to reassign.
             </p>
@@ -694,15 +692,15 @@ export function ManagementDialog({
       description={w?.description}
       footer={
         w?.refuse ? (
-          // §43.5: only the refusal, Open Escalation / Close
-          <Foot>
-            <Button variant="secondary" onClick={onClose}>
-              Close
-            </Button>
-            <Button variant="primary" href="/escalation">
+          // §43.5 (Users board): only the refusal — nothing is logged, Open Escalation then Close
+          <div className="flex w-full flex-wrap items-center justify-end gap-2">
+            <Button variant="secondary" icon={<IconArrowUpRight />} href="/escalation">
               Open Escalation
             </Button>
-          </Foot>
+            <Button variant="primary" onClick={onClose}>
+              Close
+            </Button>
+          </div>
         ) : (
           <Foot>
             <Button variant="secondary" onClick={onClose}>
@@ -734,7 +732,7 @@ export function ManagementDialog({
         </Alert>
       ) : (
         <div className="flex flex-col gap-4">
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
+          <ul className="m-0 flex list-none flex-col gap-1.5 rounded-aura-md border border-border-default px-3.5 py-3 text-sm">
             {w?.rows.map((r) => (
               <li key={r.text} className="flex gap-2">
                 <span
