@@ -122,6 +122,26 @@ describe('escalationRows: read from the policies (D-062 item 12)', () => {
     ]);
   });
 
+  it('an Admin tagged Management is on the Management step, not the Admin ones (D-078 3a)', () => {
+    const policies = base.policies.map((p) =>
+      p.severity === 'down' && p.tier === 1
+        ? {
+            ...p,
+            steps: [...p.steps, { level: 2, delayMin: 30, targets: ['management'], fyi: false }],
+          }
+        : p,
+    );
+    const mg = {
+      ...base,
+      policies,
+      me: { ...base.me, role: 'admin' as const, isManagement: true },
+      sites: [],
+    };
+    expect(escalationRows(mg).slice(0, 1)).toEqual([
+      { label: 'Tier 1 DOWN', value: 'L2 at +30 min as Management' },
+    ]);
+  });
+
   it('the one-Admin warning, only for an Admin and only with one (D-009)', () => {
     const admin = { ...base, me: { ...base.me, role: 'admin' as const } };
     expect(onlyAdmin(admin)).toBe('Tao');

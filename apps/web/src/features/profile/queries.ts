@@ -38,7 +38,11 @@ export async function loadProfileData(
     checklist,
     channelTest,
   ] = await Promise.all([
-    db.from('profiles').select('id, display_name, email, role, google_chat_user_id').eq('id', meId).single(),
+    db
+      .from('profiles')
+      .select('id, display_name, email, role, google_chat_user_id, is_management')
+      .eq('id', meId)
+      .single(),
     db.rpc('list_sessions', { p_user_id: meId }),
     db
       .from('sites')
@@ -135,6 +139,7 @@ export async function loadProfileData(
       email: p.email,
       role,
       chatLinked: !!p.google_chat_user_id?.trim(),
+      isManagement: role === 'admin' && p.is_management,
     },
     sessions: (check('list_sessions', sessions) ?? []).map((s) => ({
       id: s.id,

@@ -10,6 +10,19 @@ import { z } from 'zod';
 export const ESCALATION_TARGETS = ['owner', 'backup', 'admins', 'management', 'site_am', 'ceo'] as const;
 export type EscalationTarget = (typeof ESCALATION_TARGETS)[number];
 
+/**
+ * The order the screens list the tokens in (Escalation step dialog and rows, the guide): the ladder's
+ * people first, then the CEO and the AM. Every token once — `escalation.test.ts` holds it.
+ */
+export const ESCALATION_TARGET_ORDER: readonly EscalationTarget[] = [
+  'owner',
+  'backup',
+  'admins',
+  'management',
+  'ceo',
+  'site_am',
+];
+
 /** On screen. "Owner" reads "Owner / on-call" once on-call exists (S10); the CEO token is S10's too. */
 export const ESCALATION_TARGET_LABELS: Record<EscalationTarget, string> = {
   // Spec §8: by day the owner, outside response hours on Tier 1 the person on call (S10).

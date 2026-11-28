@@ -193,9 +193,15 @@ async function withL1People(
   >,
 ): Promise<WindowRow[]> {
   if (!rows.some((r) => r.silenced)) return rows;
-  const { data, error } = await db.from('profiles').select('id').eq('role', 'admin').eq('is_active', true);
+  const { data, error } = await db
+    .from('profiles')
+    .select('id, is_management')
+    .eq('role', 'admin')
+    .eq('is_active', true);
   if (error) return rows;
-  const admins = (data ?? []).map((p) => p.id);
+  // D-078 3a: the Admin token leaves out Management, who have their own token (never on L0 / L1).
+  const admins = (data ?? []).filter((p) => !p.is_management).map((p) => p.id);
+  const management = (data ?? []).filter((p) => p.is_management).map((p) => p.id);
   return rows.map((r) => {
     const p = people.get(r.id);
     if (!r.silenced || !p?.plan) return r;
@@ -214,7 +220,9 @@ async function withL1People(
               : []
             : token === 'admins'
               ? admins
-              : [];
+              : token === 'management'
+                ? management
+                : [];
     const told = new Set(p.plan.steps.filter((s) => s.level < 1).flatMap((s) => s.targets.flatMap(of)));
     const l1 = p.plan.steps.find((s) => s.level === 1);
     const anyoneNew = !!l1 && l1.targets.flatMap(of).some((id) => !told.has(id));

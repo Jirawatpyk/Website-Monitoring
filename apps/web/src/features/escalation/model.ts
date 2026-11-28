@@ -1,11 +1,11 @@
 import {
   ESCALATION_CHANNEL_LABELS,
   ESCALATION_TARGET_LABELS,
+  ESCALATION_TARGET_ORDER,
   formatIncidentId,
   MIN_STEP_DELAY_MIN,
   type EscalationChannel,
   type EscalationStep,
-  type EscalationTarget,
 } from '@dxt/shared';
 
 /**
@@ -124,7 +124,7 @@ export const MANAGEMENT_LEFT_OUT = 'Admins who are Management are left out here 
 export const showsManagementLeftOut = (p: PolicyDraft, s: EscalationStep) =>
   p.key === 't1' && s.level > 0 && !s.fyi && s.targets.includes('admins');
 
-const ORDER: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'management', 'ceo', 'site_am'];
+const ORDER = ESCALATION_TARGET_ORDER;
 const CHANNEL_ORDER: readonly EscalationChannel[] = ['chat', 'space', 'email', 'voice'];
 
 /**

@@ -548,7 +548,7 @@ export async function loadIncident(
     db.from('agent_heartbeats').select('last_seen_at').eq('name', 'engine-run').maybeSingle(),
     db
       .from('profiles')
-      .select('display_name')
+      .select('display_name, is_management')
       .eq('role', 'admin')
       .eq('is_active', true)
       .order('display_name'),
@@ -721,7 +721,9 @@ export async function loadIncident(
             : null,
         backup: i.sites.backup_owner_id ? nameOf(i.sites.backup_owner_id) : null,
         am: am ? nameOf(am) : null,
-        admins: (admins.data ?? []).map((a) => a.display_name),
+        // D-078 3a: the Admin token leaves out the Admins tagged Management, who have their own token.
+        admins: (admins.data ?? []).filter((a) => !a.is_management).map((a) => a.display_name),
+        management: (admins.data ?? []).filter((a) => a.is_management).map((a) => a.display_name),
       },
       acked:
         i.acked_at && i.acked_by

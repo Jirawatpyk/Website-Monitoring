@@ -104,7 +104,10 @@ function peopleOf(targets: readonly EscalationTarget[], p: LadderPeople): { name
  * when a level names them twice ("Tao (backup, Admin)", §37.6).
  */
 const whoOf = (targets: readonly EscalationTarget[], p: LadderPeople, space: boolean) => {
-  const people = peopleOf(targets, p);
+  const people = peopleOf(
+    targets.filter((t) => t !== 'management'),
+    p,
+  );
   const roles = new Map<string, string[]>();
   for (const x of people) roles.set(x.name, [...(roles.get(x.name) ?? []), x.role]);
   const names = [...roles].map(([name, rs]) =>
@@ -114,11 +117,19 @@ const whoOf = (targets: readonly EscalationTarget[], p: LadderPeople, space: boo
         ? name
         : `${name} (${rs.map((r) => (r === 'Site AM' ? 'AM' : r)).join(', ')})`,
   );
-  return [names.join(' + ') || 'Nobody', ...(space ? ['Alerts Space'] : [])].join(' + ');
+  // Incident board: "Management (Vee, Pim)" — the group by its token, as the step asks them to step in.
+  const group = targets.includes('management') && p.management?.length ? [managementGroup(p)] : [];
+  return [[...names, ...group].join(' + ') || 'Nobody', ...(space ? ['Alerts Space'] : [])].join(' + ');
 };
+
+/** "Management (Vee, Pim)" (Incident board, §43). */
+const managementGroup = (p: LadderPeople) => `Management (${(p.management ?? []).join(', ')})`;
 
 /** The button's words (§30.6): "L1 (Arm, backup · Tao)", "L2 (CEO)", "L3 (CEO + Thee, Site AM)". */
 const buttonWho = (targets: readonly EscalationTarget[], p: LadderPeople) => {
+  // Incident board: "L2 (Management · Vee, Pim)".
+  if (targets.length === 1 && targets[0] === 'management')
+    return `Management · ${(p.management ?? []).join(', ') || 'nobody'}`;
   const parts = peopleOf(targets, p).map((x) =>
     x.name === 'CEO' ? 'CEO' : x.role === 'Admin' ? x.name : `${x.name}, ${x.role}`,
   );
@@ -371,7 +382,7 @@ export function escalationCardOf(input: {
             ? `Running again · next at ${nextWord(nextAt)}`
             : waiting && next && nextAt
               ? // unacked, the Tier 1 L3 is a real escalation ("L3 if still down"); "FYI" only after an ack
-                `${next.targets.includes('ceo') && !next.fyi ? 'CEO step' : `L${next.level}`} at ${nextWord(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
+                `${next.targets.includes('management') && input.people.management?.length ? managementGroup(input.people) : next.targets.includes('ceo') && !next.fyi ? 'CEO step' : `L${next.level}`} at ${nextWord(nextAt)}${inMin(nextAt) ? ` (in ${formatDuration(inMin(nextAt)!)})` : inMin(nextAt) === 0 ? ' (due now)' : ''}`
               : waiting
                 ? 'No more levels'
                 : input.problemSince

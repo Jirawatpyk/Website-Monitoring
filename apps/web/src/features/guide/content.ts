@@ -2,6 +2,7 @@ import { CLIENT_UPDATE_MIN } from '@dxt/engine';
 import {
   TIER_CONFIG,
   formatDay,
+  ESCALATION_TARGET_ORDER,
   formatPercent,
   type EscalationChannel,
   type EscalationStep,
@@ -134,14 +135,7 @@ export interface Topic extends TopicLike {
 
 // ── Words from the facts ───────────────────────────────────────────────────
 
-const TARGET_ORDER: readonly EscalationTarget[] = [
-  'owner',
-  'backup',
-  'admins',
-  'management',
-  'ceo',
-  'site_am',
-];
+const TARGET_ORDER = ESCALATION_TARGET_ORDER;
 
 /** A step's people in the guide's words: the Admin token names every active Admin (D-034). */
 const TARGET_WORDS: Record<EscalationTarget, string> = {

@@ -52,7 +52,15 @@ export interface OpenSwap {
 }
 
 export interface ProfileData {
-  me: { id: string; name: string; email: string; role: Role; chatLinked: boolean };
+  me: {
+    id: string;
+    name: string;
+    email: string;
+    role: Role;
+    chatLinked: boolean;
+    /** An Admin tagged Management (D-078): the `management` token, not `admins`. */
+    isManagement?: boolean;
+  };
   sessions: SessionRef[];
   sites: MySite[];
   /** A Stakeholder who manages no client is the CEO for Tier 1 L2 (D-009). */
@@ -141,7 +149,9 @@ export function escalationRows(d: ProfileData): { label: string; value: string }
         case 'backup':
           return inTier('Backup') ? `as backup for ${count(inTier('Backup'), 'site')}` : null;
         case 'admins':
-          return d.me.role === 'admin' ? 'as Admin' : null;
+          return d.me.role === 'admin' && !d.me.isManagement ? 'as Admin' : null;
+        case 'management':
+          return d.me.isManagement ? 'as Management' : null;
         case 'site_am':
           return inTier('AM') ? `as Site AM for ${count(inTier('AM'), 'site')}` : null;
         case 'ceo':

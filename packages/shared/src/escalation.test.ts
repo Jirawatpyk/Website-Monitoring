@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatResponseHours, timeToMinutes } from './escalation';
+import {
+  ESCALATION_TARGET_ORDER,
+  ESCALATION_TARGETS,
+  formatResponseHours,
+  timeToMinutes,
+} from './escalation';
 
 describe('formatResponseHours (spec §7, §14.14)', () => {
   it.each([
@@ -16,5 +21,11 @@ describe('timeToMinutes', () => {
   it('reads a Postgres time', () => {
     expect(timeToMinutes('09:00:00')).toBe(540);
     expect(timeToMinutes('18:00')).toBe(1080);
+  });
+});
+
+describe('ESCALATION_TARGET_ORDER', () => {
+  it('lists every token once, so a new token reaches every screen list (D-078)', () => {
+    expect([...ESCALATION_TARGET_ORDER].sort()).toEqual([...ESCALATION_TARGETS].sort());
   });
 });

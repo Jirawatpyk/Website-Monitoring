@@ -2,6 +2,7 @@ import { Button, Checkbox, Dialog, Tag, TextField } from '@jirawatpyk/aura-react
 import { IconCheck, IconCircleAlert, IconUser } from '@jirawatpyk/aura-react/icons';
 import {
   ESCALATION_TARGET_LABELS,
+  ESCALATION_TARGET_ORDER,
   type EscalationChannel,
   type EscalationStep,
   type EscalationTarget,
@@ -13,7 +14,7 @@ import { scenario } from '../preview';
 import type { PreviewSite } from '../types';
 
 /** The role tokens; the CEO and Management only on Tier 1 DOWN from L2 (§15.5, §43.9). */
-const TOKENS: readonly EscalationTarget[] = ['owner', 'backup', 'admins', 'management', 'ceo', 'site_am'];
+const TOKENS = ESCALATION_TARGET_ORDER;
 
 /** The CEO line under the tokens (Escalation board `eCeoNote`). */
 function ceoNote(key: PolicyDraft['key'], index: number, fyi: boolean): string {

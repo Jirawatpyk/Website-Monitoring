@@ -548,3 +548,30 @@ describe('escalationCardOf — the ESCALATION fact, board states (spec re-check)
     expect(card.fact).toEqual({ value: 'L2 · CEO', caption: 'L3 at 03:31 (in 26 min)' });
   });
 });
+
+describe('escalationCardOf — Tier 1 L2 → Management (D-078, Incident board)', () => {
+  const plan: EscalationPlan = {
+    ...PLAN,
+    steps: PLAN.steps.map((s) =>
+      s.level === 2 ? { ...s, targets: ['management'], channels: ['chat', 'email'] } : s,
+    ),
+  };
+  const mg = { ...base, plan, people: { ...base.people, management: ['Vee', 'Pim'] } };
+  it('the row, the next caption and Escalate now name the group', () => {
+    const live = escalationCardOf({
+      ...mg,
+      engine: { stopped: false, since: null },
+      level: 1,
+      steps: [{ level: 1, at: at('02:46'), sentBy: null }],
+      now: new Date(at('02:50')),
+    })!;
+    expect(live.rows[2]!.who).toBe('Management (Vee, Pim)');
+    expect(live.fact.caption).toBe('Management (Vee, Pim) at 03:01 (in 11 min)');
+    const down = escalationCardOf({
+      ...mg,
+      level: 1,
+      steps: [{ level: 1, at: at('02:35'), sentBy: 'Tao' }],
+    })!;
+    expect(down.button?.label).toBe('Escalate now · L2 (Management · Vee, Pim)');
+  });
+});
