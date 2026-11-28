@@ -90,11 +90,11 @@ describe('Management (D-078, spec §43.3–5)', () => {
     expect(w.title).toBe('Set Vee as Management?');
     expect(w.rows[0]!.text).toMatch(first);
     // D-078 (3b): from the next step; the email promise sits in the description
+    // The Admin token changes at once either way (D-078 3a), so the description is the same.
     expect(w.description).toBe(
-      used
-        ? 'Takes effect from the next escalation step that fires. Vee stays an Admin. Vee gets an email saying what changed.'
-        : 'Vee gets an email saying what changed.',
+      'Takes effect from the next escalation step that fires. Vee stays an Admin. Vee gets an email saying what changed.',
     );
+    void used;
     expect(w.placeholder).not.toMatch(/Bua|Vee|Tao/);
   });
 
