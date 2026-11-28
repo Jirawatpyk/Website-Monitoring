@@ -233,7 +233,10 @@ export function contextOf(context: Json): Record<string, Json | undefined> {
 
 /** Who the ladder's tokens name beyond a site's own people, and the Tier 2–3 hours. */
 export interface LadderEnv {
+  /** The ladder's Admins: active Admins who aren't Management (D-078 3a, `escalation_people`). */
   admins: Owner[];
+  /** D-078: the Admins tagged Management (the `management` token). */
+  management?: Owner[];
   /** The CEO (D-032): every active stakeholder who manages no client — `escalation_people`'s rule. */
   ceo?: Owner[];
   hours: ResponseHours;
@@ -248,7 +251,7 @@ async function loadLadderEnv(db: DbClient, now: Date): Promise<LadderEnv | null>
   const [people, ams, hours] = await Promise.all([
     db
       .from('profiles')
-      .select('id, display_name, google_chat_user_id, role')
+      .select('id, display_name, google_chat_user_id, role, is_management')
       .in('role', ['admin', 'stakeholder'])
       .eq('is_active', true),
     db.from('clients').select('am_user_id').not('am_user_id', 'is', null),
@@ -265,9 +268,10 @@ async function loadLadderEnv(db: DbClient, now: Date): Promise<LadderEnv | null>
     display_name,
     google_chat_user_id,
   });
-  const rows = (people.data ?? []) as (Owner & { role: string })[];
+  const rows = (people.data ?? []) as (Owner & { role: string; is_management: boolean })[];
   return {
-    admins: rows.filter((p) => p.role === 'admin').map(owner),
+    admins: rows.filter((p) => p.role === 'admin' && !p.is_management).map(owner),
+    management: rows.filter((p) => p.role === 'admin' && p.is_management).map(owner),
     ceo: rows.filter((p) => p.role === 'stakeholder' && !managing.has(p.id)).map(owner),
     hours,
   };

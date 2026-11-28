@@ -38,6 +38,8 @@ export interface LadderPeople {
   backup: string | null;
   am: string | null;
   admins: readonly string[];
+  /** D-078: the Admins tagged Management (the `management` token). */
+  management?: readonly string[];
 }
 
 export interface LadderRow {
@@ -80,6 +82,7 @@ const roleWord: Record<EscalationTarget, string> = {
   owner: 'owner',
   backup: 'backup',
   admins: 'Admin',
+  management: 'Management',
   ceo: 'CEO',
   site_am: 'Site AM',
 };
@@ -91,6 +94,7 @@ function peopleOf(targets: readonly EscalationTarget[], p: LadderPeople): { name
     if (t === 'backup') return p.backup ? [{ name: p.backup, role: 'backup' }] : [];
     if (t === 'site_am') return p.am ? [{ name: p.am, role: 'Site AM' }] : [];
     if (t === 'ceo') return [{ name: 'CEO', role: 'CEO' }];
+    if (t === 'management') return (p.management ?? []).map((m) => ({ name: m, role: roleWord.management }));
     return p.admins.filter((a) => a !== p.owner?.name).map((a) => ({ name: a, role: roleWord.admins }));
   });
 }

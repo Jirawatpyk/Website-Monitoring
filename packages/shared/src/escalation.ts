@@ -6,7 +6,8 @@ import { z } from 'zod';
  */
 
 /** Role tokens a step names; each resolves per site (owner, backup, every active Admin, the client's AM). */
-export const ESCALATION_TARGETS = ['owner', 'backup', 'admins', 'site_am', 'ceo'] as const;
+// D-078 (spec §43): `management` — the Admins tagged Management; `admins` then means the other Admins.
+export const ESCALATION_TARGETS = ['owner', 'backup', 'admins', 'management', 'site_am', 'ceo'] as const;
 export type EscalationTarget = (typeof ESCALATION_TARGETS)[number];
 
 /** On screen. "Owner" reads "Owner / on-call" once on-call exists (S10); the CEO token is S10's too. */
@@ -15,6 +16,7 @@ export const ESCALATION_TARGET_LABELS: Record<EscalationTarget, string> = {
   owner: 'Owner / on-call',
   backup: 'Backup',
   admins: 'Admin',
+  management: 'Management',
   site_am: 'Site AM',
   ceo: 'CEO',
 };

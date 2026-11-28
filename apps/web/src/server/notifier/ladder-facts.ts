@@ -29,6 +29,9 @@ import { contextOf, l0IsOnCall, l0Of, type IncidentFacts, type Owner } from './f
  * tokens minus anyone already told (L0 = the owner); an Admin named next to someone else is FYI.
  */
 
+/** What a fired step is (S10; D-078 adds `management`, the Tier 1 L2 ask to Management). */
+export type StepKind = 'ask' | 'ceo' | 'management' | 'fyi' | 'reminder';
+
 const planOf = (i: IncidentFacts) => {
   const p = escalationPlanSchema.safeParse(i.escalation_plan);
   return p.success ? p.data : null;
@@ -38,6 +41,7 @@ const ROLE: Record<EscalationTarget, string> = {
   owner: 'owner',
   backup: 'backup',
   admins: 'Admin',
+  management: 'Management',
   site_am: 'account manager',
   ceo: 'CEO',
 };
@@ -55,6 +59,8 @@ function peopleOf(i: IncidentFacts, token: EscalationTarget): Owner[] {
       return i.sites.client?.am ? [i.sites.client.am] : [];
     case 'admins':
       return i.ladder?.admins ?? [];
+    case 'management':
+      return i.ladder?.management ?? [];
     case 'ceo':
       return i.ladder?.ceo ?? [];
   }
@@ -142,6 +148,12 @@ export function stoppedOf(i: IncidentFacts, ctx: Record<string, unknown>): Ladde
     // §14.1: "Acknowledge stops L1 and L2" — every level but the FYI.
     stopsThrough: Math.max(1, ...plan.steps.filter((s) => !s.fyi).map((s) => s.level)),
     firedLevel: fired,
+    // D-078: the last level an ack stops, by who it would have gone to — "L2 (Management)"
+    stopsWho: plan.steps
+      .find((s) => !s.fyi && s.level === Math.max(...plan.steps.filter((x) => !x.fyi).map((x) => x.level)))
+      ?.targets.includes('management')
+      ? 'Management'
+      : null,
     site: i.sites.name,
     // Promised only while it's still ahead of the ack (engine review L2).
     fyi:
@@ -170,14 +182,16 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
   const plan = planOf(i);
   const level = typeof ctx.level === 'number' ? ctx.level : 1;
   const step = plan?.steps.find((s) => s.level === level);
-  const kind: 'ask' | 'ceo' | 'fyi' | 'reminder' =
+  const kind: StepKind =
     ctx.fyiStep === true
       ? 'fyi'
       : ctx.reminder === true
         ? 'reminder'
         : step?.targets.includes('ceo')
           ? 'ceo'
-          : 'ask';
+          : step?.targets.includes('management')
+            ? 'management'
+            : 'ask';
   const hours = i.ladder?.hours;
   const after = plan?.steps.find((s) => s.level === level + 1);
   const afterAt =
@@ -229,15 +243,27 @@ export function stepFactsOf(i: IncidentFacts, context: unknown) {
     kind,
     next:
       kind === 'ask' && after && afterAt && afterIsNew
-        ? { who: after.targets.flatMap((t) => tokenWords(i, t)).join(' + '), at: afterAt }
+        ? {
+            who: after.targets.includes('management')
+              ? 'Management'
+              : after.targets.flatMap((t) => tokenWords(i, t)).join(' + '),
+            at: afterAt,
+          }
         : null,
-    // "L3 (CEO + Bua, no call) at 10:48" on the CEO's L2 email.
+    // "L3 (CEO + Bua, no call) at 10:48" on the CEO's L2 email; "L3 FYI (CEO + Bua, no call) at 10:48"
+    // on Management's (§43.11).
     nextStep:
-      kind === 'ceo' && after && afterAt
-        ? `L${after.level} (${after.targets.flatMap((t) => tokenWords(i, t)).join(' + ')}${after.fyi ? ', no call' : ''}) at ${formatTime(afterAt)}`
-        : null,
+      kind === 'management' && after && afterAt
+        ? `L${after.level}${after.fyi ? ' FYI' : ''} (${after.targets.flatMap((t) => tokenWords(i, t)).join(' + ')}${after.fyi ? ', no call' : ''}) at ${formatTime(afterAt)}`
+        : kind === 'ceo' && after && afterAt
+          ? `L${after.level} (${after.targets.flatMap((t) => tokenWords(i, t)).join(' + ')}${after.fyi ? ', no call' : ''}) at ${formatTime(afterAt)}`
+          : null,
     informed,
     informedRoles: [...told.values()],
+    fyiNext:
+      kind === 'management' && after?.fyi && afterAt
+        ? { who: after.targets.flatMap((t) => tokenWords(i, t)).join(' + '), at: afterAt }
+        : null,
     alreadyTold: alreadyTold || null,
     // "Open it to see the latest, or call Tao." — the Admin the CEO can ring.
     admin: i.ladder?.admins[0]?.display_name ?? null,
@@ -300,6 +326,7 @@ function directory(i: IncidentFacts): Map<string, Owner & { token: EscalationTar
   const all: (Owner & { token: EscalationTarget })[] = [
     ...(i.ladder?.ceo ?? []).map((p) => ({ ...p, token: 'ceo' as const })),
     ...(i.ladder?.admins ?? []).map((p) => ({ ...p, token: 'admins' as const })),
+    ...(i.ladder?.management ?? []).map((p) => ({ ...p, token: 'management' as const })),
     ...(i.sites.client?.am ? [{ ...i.sites.client.am, token: 'site_am' as const }] : []),
     ...(i.sites.backup ? [{ ...i.sites.backup, token: 'backup' as const }] : []),
     ...(l0Of(i) ? [{ ...l0Of(i)!, token: 'owner' as const }] : []),
@@ -336,7 +363,7 @@ export function stepWhy(
   userId: string,
   level: number,
   asFyi: boolean,
-  kind: 'ask' | 'ceo' | 'fyi' | 'reminder' = 'ask',
+  kind: StepKind = 'ask',
 ): string {
   const p = directory(i).get(userId);
   const delay = planOf(i)?.steps.find((s) => s.level === level)?.delayMin;
@@ -345,6 +372,9 @@ export function stepWhy(
   const minutes = formatDuration(delay ?? 15);
   if (kind === 'ceo')
     return `You got this because a Tier 1 site was down ${minutes} without an acknowledgement (L${level}, the step you approved).`;
+  // EmailAlert › L2 (Management), §43.11
+  if (kind === 'management')
+    return `You got this because you’re Management — Tier 1 DOWN comes to you at L${level} when nobody acknowledges in ${minutes}.`;
   if (kind === 'fyi')
     return p?.token === 'site_am'
       ? `You got this because you’re the AM for ${site} and a Tier 1 site is still down after ${minutes}.`
